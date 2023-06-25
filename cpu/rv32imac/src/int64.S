@@ -1,4 +1,6 @@
 
+# SPDX-License-Identifier: MIT
+
 	# Unsigned 64-bit division.
 	.global __udivdi3
 	.type __udivdi3, %function

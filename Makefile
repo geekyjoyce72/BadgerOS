@@ -1,4 +1,6 @@
 
+# SPDX-License-Identifier: MIT
+
 IDF_PATH ?= $(shell pwd)/../esp-idf
 SHELL    := /usr/bin/env bash
 PORT     ?= $(shell ls /dev/ttyUSB0 2>/dev/null || echo /dev/ttyACM0)

@@ -18,6 +18,8 @@
 #define LP_WDT_INT_CLR_REG			(LP_WDT_BASE + 0x0030)
 #define LP_WDT_DATE_REG				(LP_WDT_BASE + 0x03fc)
 
+// SPDX-License-Identifier: MIT
+
 #define LD_WDT_WRPROTECT_MAGIC 0x50D83AA1
 
 // Timer 0 configuration register (Access: varies)

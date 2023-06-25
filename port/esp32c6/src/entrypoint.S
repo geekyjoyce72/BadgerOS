@@ -1,4 +1,6 @@
 
+# SPDX-License-Identifier: MIT
+
 	# This is the C entrypoint, which will be called when basic CRT is set up.
 	.global main
 	# The global pointer is used for relaxation of `.data` accesses.

@@ -1,4 +1,6 @@
 
+// SPDX-License-Identifier: MIT
+
 #pragma once
 
 // Base address of peripherals.
