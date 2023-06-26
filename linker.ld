@@ -72,6 +72,8 @@ SECTIONS
 	/* Code sections. */
 	__start_text = .;
 	.text : AT(LOADADDR(.espseg.1) + SIZEOF(.espseg.1)) {
+		. = ALIGN(256);
+		*(.interrupt_vector_table)
 		*(.text) *(.text*)
 		. = ALIGN(__section_alignment);
 	} :codeseg
