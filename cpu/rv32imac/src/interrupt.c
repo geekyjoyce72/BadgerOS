@@ -5,7 +5,7 @@
 #include <interrupt.h>
 
 // Install interrupt and trap handlers.
-void interrupt_init(isr_ctx_t *ctx, isr_regs_t *regs) {
+void interrupt_init(kernel_ctx_t *ctx, cpu_regs_t *regs) {
 	// Disable interrupts.
 	asm volatile ("csrc mstatus, %0" :: "r" (0x0000000f));
 	// Disable interrupt delegation.

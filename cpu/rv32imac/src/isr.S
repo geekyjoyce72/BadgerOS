@@ -10,10 +10,10 @@
 	.macro isr_entry
 	# Save tempregs t0-t3.
 	csrrw t0, mscratch, t0
-	sw t1, isr_ctx_t_scratch1(t0)
+	sw t1, kernel_ctx_t_scratch1(t0)
 	csrrw t1, mscratch, t0
-	sw t1, isr_ctx_t_scratch0(t0)
-	lw t1, isr_ctx_t_regs(t0)
+	sw t1, kernel_ctx_t_scratch0(t0)
+	lw t1, kernel_ctx_t_regs(t0)
 	sw t2, riscv_regs_t_t2(t1)
 	sw t3, riscv_regs_t_t3(t1)
 	
@@ -51,9 +51,9 @@
 	sw t2, riscv_regs_t_pc(t1)
 	
 	# Move tempregs.
-	lw t2, isr_ctx_t_scratch0(t0)
+	lw t2, kernel_ctx_t_scratch0(t0)
 	sw t2, riscv_regs_t_t0(t1)
-	lw t2, isr_ctx_t_scratch1(t0)
+	lw t2, kernel_ctx_t_scratch1(t0)
 	sw t2, riscv_regs_t_t1(t1)
 	
 	# Set up special regs.
@@ -71,7 +71,7 @@
 	.macro isr_exit
 	# Restore PC.
 	csrr t0, mscratch
-	lw t1, isr_ctx_t_regs(t0)
+	lw t1, kernel_ctx_t_regs(t0)
 	lw t2, riscv_regs_t_pc(t1)
 	csrw mepc, t2
 	
