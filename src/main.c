@@ -5,8 +5,14 @@
 #include <log.h>
 #include <time.h>
 #include <gpio.h>
+#include <interrupt.h>
 
 
+
+// Temporary kernel context until threading is implemented.
+static kernel_ctx_t kctx;
+// Temporary registers struct until threading is implemented.
+static isr_regs_t regs;
 
 // This is the entrypoint after the stack has been set up and the init functions have been run.
 // Main is not allowed to return, so declare it noreturn.
@@ -15,6 +21,9 @@ void main() {
 	// First thing we do is set up the timekeeping.
 	// Logs always use timestamps and watchdog feeding is currently unimplemented.
 	time_init();
+	
+	// Install interrupt and trap handlers.
+	interrupt_init(&kctx, &regs);
 	
 	// Test a log message.
 	logk(LOG_FATAL, "The ultimage log message test");
