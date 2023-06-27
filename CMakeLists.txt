@@ -7,7 +7,7 @@ cmake_minimum_required(VERSION 3.10.0)
 set(CMAKE_C_COMPILER riscv32-unknown-linux-gnu-gcc)
 set(CMAKE_C_COMPILER_FORCED true)
 
-add_compile_options(-march=rv32imac_zifencei_zicsr -mabi=ilp32 -nodefaultlibs -O2)
+add_compile_options(-march=rv32imac_zifencei_zicsr -mabi=ilp32 -nodefaultlibs -O2 -ggdb)
 add_link_options(-march=rv32imac_zifencei_zicsr -mabi=ilp32 -nodefaultlibs -nostartfiles -T${CMAKE_CURRENT_LIST_DIR}/linker.ld)
 
 # For IDE users.

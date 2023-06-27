@@ -32,11 +32,6 @@ void main() {
 	logk(LOG_INFO,  "The ultimage log message test");
 	logk(LOG_DEBUG, "The ultimage log message test");
 	
-	// Test a system call.
-	logk(LOG_DEBUG, "Pre");
-	asm volatile ("ecall");
-	logk(LOG_DEBUG, "Post");
-	
 	// Test a GPIO.
 	io_mode(NULL, 15, IO_MODE_OUTPUT);
 	io_mode(NULL, 22, IO_MODE_INPUT);

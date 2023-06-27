@@ -72,9 +72,6 @@ STRUCT_END(riscv_regs_t)
 
 #ifndef __ASSEMBLER__
 typedef riscv_regs_t cpu_regs_t;
-
-// Print a register dump given cpu_regs_t.
-void cpu_regs_dump(const cpu_regs_t *ctx);
 #endif
 
 

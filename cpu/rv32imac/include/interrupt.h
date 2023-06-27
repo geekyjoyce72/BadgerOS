@@ -6,7 +6,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
-#include <isr.h>
+#include <kernel_ctx.h>
 
 // Type used for storing registers.
 typedef riscv_regs_t isr_regs_t;
