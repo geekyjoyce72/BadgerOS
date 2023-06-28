@@ -6,7 +6,8 @@
 
 
 
-	# Entry code for an ISR; saves all registers.
+	# Entry code for an ISR or trap handler; save tempregs and swap out SP/GP/TP.
+	# Assumes valid `kernel_ctx_t *` containing a valid `riscv_regs_t *` in CSR mscratch.
 	.macro isr_entry
 	# Save tempregs t0-t3.
 	csrrw t0, mscratch, t0
@@ -14,14 +15,74 @@
 	csrrw t1, mscratch, t0
 	sw t1, kernel_ctx_t_scratch0(t0)
 	lw t1, kernel_ctx_t_regs(t0)
+	
 	sw t2, riscv_regs_t_t2(t1)
 	sw t3, riscv_regs_t_t3(t1)
 	
-	# Save all regs.
 	sw ra, riscv_regs_t_ra(t1)
 	sw sp, riscv_regs_t_sp(t1)
 	sw gp, riscv_regs_t_gp(t1)
 	sw tp, riscv_regs_t_tp(t1)
+	
+	# Clear context to switch field.
+	sw x0, kernel_ctx_t_ctxswitch(t0)
+	
+	# Move tempregs.
+	lw t2, kernel_ctx_t_scratch0(t0)
+	sw t2, riscv_regs_t_t0(t1)
+	lw t2, kernel_ctx_t_scratch1(t0)
+	sw t2, riscv_regs_t_t1(t1)
+	
+	# Save PC.
+	csrr t2, mepc
+	sw t2, riscv_regs_t_pc(t1)
+	
+	# Set up special regs.
+	li tp, 0
+	.option push
+	.option norvc
+	la gp, __global_pointer$
+	.option pop
+	la sp, __interrupt_stack_hi
+	.endm
+
+
+
+	# Exit code for an ISR or trap handler; restores tempregs and SP/GP/TP.
+	# Assumes `kernel_ctx_t *` in t0 and `riscv_regs_t *` in t1.
+	.macro isr_exit
+	# Restore PC.
+	lw t2, riscv_regs_t_pc(t1)
+	csrw mepc, t2
+	
+	lw ra, riscv_regs_t_ra(t1)
+	lw sp, riscv_regs_t_sp(t1)
+	lw gp, riscv_regs_t_gp(t1)
+	lw tp, riscv_regs_t_tp(t1)
+	
+	# Restore tempregs t0-t3.
+	lw t2, riscv_regs_t_t0(t1)
+	csrw mscratch, t2
+	lw t3, riscv_regs_t_t3(t1)
+	lw t2, riscv_regs_t_t2(t1)
+	lw t1, riscv_regs_t_t1(t1)
+	csrrw t0, mscratch, t0
+	.endm
+
+
+
+	# Load `kernel_ctx_t *` from CSR mscratch into t0 and load `riscv_regs_t *` into t1.
+	.macro get_kctx
+	csrr t0, mscratch
+	lw t1, kernel_ctx_t_regs(t0)
+	.endm
+
+
+
+	# Save all regs not saved by `isr_entry`.
+	# Assumes `kernel_ctx_t *` in t0 and `riscv_regs_t *` in t1.
+	.macro save_regs
+	# Save all regs.
 	sw s0, riscv_regs_t_s0(t1)
 	sw s1, riscv_regs_t_s1(t1)
 	sw a0, riscv_regs_t_a0(t1)
@@ -45,41 +106,13 @@
 	sw t4, riscv_regs_t_t4(t1)
 	sw t5, riscv_regs_t_t5(t1)
 	sw t6, riscv_regs_t_t6(t1)
-	
-	# Save PC.
-	csrr t2, mepc
-	sw t2, riscv_regs_t_pc(t1)
-	
-	# Move tempregs.
-	lw t2, kernel_ctx_t_scratch0(t0)
-	sw t2, riscv_regs_t_t0(t1)
-	lw t2, kernel_ctx_t_scratch1(t0)
-	sw t2, riscv_regs_t_t1(t1)
-	
-	# Set up special regs.
-	li tp, 0
-	.option push
-	.option norvc
-	la gp, __global_pointer$
-	.option pop
-	la sp, __interrupt_stack_hi
 	.endm
 
 
 
-	# Exit code for an ISR; restores all registers.
-	.macro isr_exit
-	# Restore PC.
-	csrr t0, mscratch
-	lw t1, kernel_ctx_t_regs(t0)
-	lw t2, riscv_regs_t_pc(t1)
-	csrw mepc, t2
-	
-	# Restore all regs.
-	lw ra, riscv_regs_t_ra(t1)
-	lw sp, riscv_regs_t_sp(t1)
-	lw gp, riscv_regs_t_gp(t1)
-	lw tp, riscv_regs_t_tp(t1)
+	# Restore all regs not restored by `isr_exit`.
+	# Assumes `kernel_ctx_t *` in t0 and `riscv_regs_t *` in t1.
+	.macro restore_regs
 	lw s0, riscv_regs_t_s0(t1)
 	lw s1, riscv_regs_t_s1(t1)
 	lw a0, riscv_regs_t_a0(t1)
@@ -103,15 +136,9 @@
 	lw t4, riscv_regs_t_t4(t1)
 	lw t5, riscv_regs_t_t5(t1)
 	lw t6, riscv_regs_t_t6(t1)
-	
-	# Restore tempregs t0-t3.
-	lw t2, riscv_regs_t_t0(t1)
-	csrw mscratch, t2
-	lw t3, riscv_regs_t_t3(t1)
-	lw t2, riscv_regs_t_t2(t1)
-	lw t1, riscv_regs_t_t1(t1)
-	csrrw t0, mscratch, t0
 	.endm
+
+
 
 
 
@@ -130,20 +157,48 @@ __trap_asm:
 	li t3, 11
 	beq t2, t3, .syscall
 	
-	# Handle normal traps.
-	la ra, .trap_exit
-	j __trap_handler
+	# This is a non-syscall trap; saving all registers is mandatory.
+	save_regs
+	# Most of the trap handler is implemented in C.
+	jal __trap_handler
+	get_kctx
+	
+	# Check for outstanding context switch.
+	# If nonnull, context will be switched.
+	lw t2, kernel_ctx_t_ctxswitch(t0)
+	beq t2, x0, .trap_restore_regs
+	# All that is necessary is swapping out t0.
+	mv t0, t2
+	
+.trap_restore_regs:
+	# This is a non-syscall trap; restoring all registers is mandatory.
+	restore_regs
+	j .trap_exit
 	
 .syscall:
-	# Handle system calls.
+	# This is a system call; only callee-saved registers are saved.
+	# Increment the program counter past the initiating `ecall` instruction.
 	lw t2, riscv_regs_t_pc(t1)
 	addi t2, t2, 4
 	sw t2, riscv_regs_t_pc(t1)
+	# Most of the syscall handler is implemented in C.
 	jal __syscall_handler
+	get_kctx
+	
+	# Check for outstanding context switch.
+	# If nonnull, context will be switched.
+	lw t2, kernel_ctx_t_ctxswitch(t0)
+	beq t2, x0, .trap_exit
+	# General registers were not saved and must be done explicitly.
+	save_regs
+	mv t0, t2
+	restore_regs
 	
 .trap_exit:
 	isr_exit
 	mret
+
+
 
 
 
@@ -152,10 +207,27 @@ __trap_asm:
 	.type __isr_asm, %function
 	.align 2
 __isr_asm:
+	# This is an interrupt; saving all registers is mandatory.
 	isr_entry
+	save_regs
+	# Most of the interrupt handler is implemented in C.
 	jal __interrupt_handler
+	get_kctx
+	
+	# Check for outstanding context switch.
+	# If nonnull, context will be switched.
+	lw t2, kernel_ctx_t_ctxswitch(t0)
+	beq t2, x0, .isr_exit
+	# All that is necessary is swapping out t0.
+	mv t0, t2
+	
+.isr_exit:
+	# This is an interrupt; restoring all registers is mandatory.
+	restore_regs
 	isr_exit
 	mret
+
+
 
 
 
@@ -164,6 +236,8 @@ __isr_asm:
 __interrupt_stack_lo:
 	.skip ISR_STACK_DEPTH*4
 __interrupt_stack_hi:
+
+
 
 
 
