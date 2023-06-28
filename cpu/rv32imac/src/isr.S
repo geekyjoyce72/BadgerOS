@@ -245,6 +245,8 @@ __interrupt_stack_hi:
 	# This must be aligned to a 256-byte boundary, so it is in a special section.
 	.section ".interrupt_vector_table"
 __interrupt_vector_table:
+	.option push
+	.option norvc
 	j __trap_asm
 	j __isr_asm
 	j __isr_asm
@@ -277,4 +279,5 @@ __interrupt_vector_table:
 	j __isr_asm
 	j __isr_asm
 	j __isr_asm
+	.option pop
 	
