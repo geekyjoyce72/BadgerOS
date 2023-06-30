@@ -9,9 +9,10 @@
 
 
 // Install interrupt and trap handlers.
-void interrupt_init(kernel_ctx_t *ctx, cpu_regs_t *regs) {
+void interrupt_init(kernel_ctx_t *ctx) {
 	// Disable interrupts.
-	asm volatile ("csrc mstatus, %0" :: "r" (0x0000000f));
+	long mstatus;
+	asm volatile ("csrrc %0, mstatus, %1" : "=r" (mstatus) : "r" (0x0000000f));
 	// Disable interrupt delegation.
 	asm volatile ("csrw mideleg, %0" :: "r" (0x00000000));
 	
@@ -19,11 +20,10 @@ void interrupt_init(kernel_ctx_t *ctx, cpu_regs_t *regs) {
 	asm volatile ("csrw mtvec, %0" :: "r" ((size_t) &__interrupt_vector_table | 1));
 	
 	// Set up trap context.
-	ctx->regs = regs;
 	asm volatile ("csrw mscratch, %0" :: "r" (ctx));
 	
 	// Re-enable interrupts.
-	asm volatile ("csrs mstatus, %0" :: "r" (0x00000008));
+	asm volatile ("csrs mstatus, %0" :: "r" (mstatus & 0x00000008));
 }
 
 // Callback from ASM to platform-specific interrupt handler.

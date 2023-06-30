@@ -16,4 +16,4 @@
 
 // Install interrupt and trap handlers.
 // Requires a preallocated context and regs struct.
-void interrupt_init(kernel_ctx_t *ctx, cpu_regs_t *regs);
+void interrupt_init(kernel_ctx_t *ctx);

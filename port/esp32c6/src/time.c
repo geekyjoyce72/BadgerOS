@@ -142,9 +142,9 @@ void timer_int_config(int timerno, bool interrupt_enable, int interrupt_channel)
 	size_t base = timg_base(timerno);
 	if (interrupt_enable) {
 		if (timerno) {
-			intmtx_route(INTMTX_CORE0_TG1_T0_INTR_MAP_SIG, interrupt_channel);
+			intmtx_route(INTMTX_CORE0_TG1_T0_INTR_SIG, interrupt_channel);
 		} else {
-			intmtx_route(INTMTX_CORE0_TG0_T0_INTR_MAP_SIG, interrupt_channel);
+			intmtx_route(INTMTX_CORE0_TG0_T0_INTR_SIG, interrupt_channel);
 		}
 		asm volatile ("fence");
 		WRITE_REG(base+T0CONFIG_REG, READ_REG(base+T0CONFIG_REG) | TIMG_ALARM_EN_BIT);
