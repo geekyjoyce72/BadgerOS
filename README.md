@@ -20,7 +20,7 @@ The goal is the allow future badge users to get both the performance that native
 To build BadgerOS:
 - `build-essential`
 - `cmake`
-- `riscv32-unknown-linux-gnu-gcc` ([RISC-V collab toolchain](https://github.com/riscv-collab/riscv-gnu-toolchain))
+- `riscv32-unknown-elf-gcc` ([RISC-V collab toolchain](https://github.com/riscv-collab/riscv-gnu-toolchain))
 
 To flash to an ESP:
 - ESP-IDF ([Espressif toolchain](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/get-started/#installation))
@@ -38,7 +38,7 @@ To build: `make build`
 
 To remove build files: `make clean`
 
-To flash to an ESP: `make flash`
+To flash to an ESP: `export IDF_PATH=<path to ESP-IDF>` (once) `make flash` (every time you flash)
 
 To open picocom: `make monitor`
 
