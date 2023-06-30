@@ -63,30 +63,17 @@ STRUCT_END(kernel_ctx_t)
 
 
 #ifndef __ASSEMBLER__
-// Get the current kernel context.
-static inline kernel_ctx_t *kernel_ctx_get() {
-	kernel_ctx_t *kctx;
-	asm ("csrr %0, mscratch" : "=r" (kctx));
-	return kctx;
-}
-// Set the current kernel context.
-static inline void kernel_ctx_set(kernel_ctx_t *kctx) {
-	// Disable interrupts.
-	uint32_t mstatus;
-	asm volatile ("csrrc %0, mstatus, %1" : "=r" (mstatus) : "r" (15));
-	mstatus &= 15;
-	// Write mscratch.
-	asm volatile ("csrw mscratch, %0" :: "r" (kctx));
-	// Re-enable interrupts if applicable.
-	asm volatile ("csrs mstatus, %0" :: "r" (mstatus));
-}
 // Get the outstanding context swap target, if any.
 static inline kernel_ctx_t *kernel_ctx_switch_get() {
-	return kernel_ctx_get()->ctxswitch;
+	kernel_ctx_t *kctx;
+	asm ("csrr %0, mscratch" : "=r" (kctx));
+	return kctx->ctxswitch;
 }
 // Set the context swap target to swap to before exiting the trap/interrupt handler.
 static inline void kernel_ctx_switch_set(kernel_ctx_t *switch_to) {
-	kernel_ctx_get()->ctxswitch = switch_to;
+	kernel_ctx_t *kctx;
+	asm ("csrr %0, mscratch" : "=r" (kctx));
+	kctx->ctxswitch = switch_to;
 }
 // Print a register dump given kernel_ctx_t.
 void kernel_ctx_dump(const kernel_ctx_t *ctx);
