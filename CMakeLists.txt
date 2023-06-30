@@ -4,7 +4,7 @@
 cmake_minimum_required(VERSION 3.10.0)
 
 # Set the C compiler.
-set(CMAKE_C_COMPILER riscv32-unknown-linux-gnu-gcc)
+set(CMAKE_C_COMPILER riscv32-unknown-elf-gcc)
 set(CMAKE_C_COMPILER_FORCED true)
 
 add_compile_options(-march=rv32imac_zifencei_zicsr -mabi=ilp32 -nodefaultlibs -O2 -ggdb)

@@ -3,6 +3,9 @@
 
 #include <isr.h>
 #include <interrupt.h>
+#include <intmtx.h>
+
+#include <time.h>
 
 // Install interrupt and trap handlers.
 void interrupt_init(kernel_ctx_t *ctx, cpu_regs_t *regs) {
@@ -20,4 +23,18 @@ void interrupt_init(kernel_ctx_t *ctx, cpu_regs_t *regs) {
 	
 	// Re-enable interrupts.
 	asm volatile ("csrs mstatus, %0" :: "r" (0x00000008));
+}
+
+// Callback from ASM to platform-specific interrupt handler.
+void __interrupt_handler() {
+	// Get interrupt cause.
+	uint32_t mcause;
+	asm ("csrr %0, mcause" : "=r" (mcause));
+	mcause &= 31;
+	
+	// Jump to ISRs.
+	switch (mcause) {
+		case INT_TIMER_ALARM_CH: timer_isr_timer_alarm(); break;
+		case INT_WATCHDOG_ALARM_CH: timer_isr_watchdog_alarm(); break;
+	}
 }

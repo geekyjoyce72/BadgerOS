@@ -1,5 +1,6 @@
 
 // SPDX-License-Identifier: MIT
+// Note: This file implements placeholder ISRs and will be removed eventually.
 
 #include <isr.h>
 #include <log.h>
@@ -33,17 +34,14 @@ static const size_t trapnames_len = sizeof(trapnames) / sizeof(const char *);
 // Bitmask of traps that have associated memory addresses.
 #define MEM_ADDR_TRAPS 0x00050f0
 
-// Called from ASM on interrupt.
-void __interrupt_handler() {
-	
-}
-
 // Called from ASM on system call.
+// TODO: Subject to be moved when systam calls are implemented.
 void __syscall_handler(long a0, long a1, long a2, long a3, long a4, long a5, long a6, long sysno) {
 	logk(LOG_DEBUG, "The system call!");
 }
 
 // Called from ASM on non-system call trap.
+// TODO: Subject to be moved to scheduler when scheduler is implemented.
 void __trap_handler() {
 	uint32_t mcause, mtval, mepc;
 	asm volatile ("csrr %0, mcause" : "=r" (mcause));
