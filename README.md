@@ -7,6 +7,12 @@ The goal is the allow future badge users to get both the performance that native
 
 
 
+# Contributing
+Make sure to check out the [style guide](docs/styleguide.md) so your code can fit right in.
+If you're unsure where to put your code, look into the [project structure](docs/project-structure.md).
+
+
+
 # Documents
 
 [OS specification doc](https://docs.google.com/document/d/1qgpeLhjLZvecd4yATPb-9B1IthdMw18idM6reSSEXS8/edit?usp=sharing)
