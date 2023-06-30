@@ -1,3 +1,3 @@
 # BadgerOS documentation
-
-- [Style guide and project structure](styleguide.md)
+- [C code style guide](styleguide.md)
+- [Project structure](project-structure.md)
