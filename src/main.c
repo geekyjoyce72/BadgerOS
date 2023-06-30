@@ -12,7 +12,7 @@
 // Temporary kernel context until threading is implemented.
 static kernel_ctx_t kctx;
 // Temporary registers struct until threading is implemented.
-static isr_regs_t regs;
+static cpu_regs_t regs;
 
 // This is the entrypoint after the stack has been set up and the init functions have been run.
 // Main is not allowed to return, so declare it noreturn.

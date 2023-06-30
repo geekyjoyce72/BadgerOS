@@ -26,10 +26,12 @@
 #else
 // Interrupt vector table implemented in ASM.
 extern void *__interrupt_vector_table[32];
-// Called from ASM on interrupt.
+// Callback from ASM to platform-specific interrupt handler.
 extern void __interrupt_handler();
-// Called from ASM on system call.
-extern void __syscall_handler(long a0, long a1, long a2, long a3, long a4, long a5, long a6, long sysno);
-// Called from ASM on non-syscall trap.
+// Callback from ASM to syscall implementation.
+#define __SYSCALL_HANDLER_ARGS long a0, long a1, long a2, long a3, long a4, long a5, long a6, long sysno
+// Callback from ASM to syscall implementation.
+extern void __syscall_handler(__SYSCALL_HANDLER_ARGS);
+// Callback from ASM on non-syscall trap.
 extern void __trap_handler();
 #endif

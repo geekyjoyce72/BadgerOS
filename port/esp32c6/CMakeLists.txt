@@ -9,6 +9,7 @@ target_sources(${target} PUBLIC
 	${CMAKE_CURRENT_LIST_DIR}/src/clkconfig.c
 	${CMAKE_CURRENT_LIST_DIR}/src/gpio.c
 	${CMAKE_CURRENT_LIST_DIR}/src/i2c.c
+	${CMAKE_CURRENT_LIST_DIR}/src/interrupt.c
 	${CMAKE_CURRENT_LIST_DIR}/src/intmtx.c
 	${CMAKE_CURRENT_LIST_DIR}/src/rawprint.c
 	${CMAKE_CURRENT_LIST_DIR}/src/time.c
