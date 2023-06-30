@@ -4,6 +4,7 @@
 
 
 # C code style
+- [Naming conventions](#naming-conventions)
 - [Type definitions](#type-definitions)
 - [Variable declarations](#variable-declarations)
 - [Function declarations](#function-declarations)
@@ -12,6 +13,42 @@
 - [Spacing](#spacing)
 - [Indentation](#indentation)
 
+
+## Naming conventions
+All names should be in `snake_case`, some of which are `SNAKE_UPPERCASE`.
+Specifically, macros may be either, other most namable things are only `snake_case`.
+
+The following are always `snake_case`:
+- Function names
+- Variable names
+- Struct/union/enum names
+- Typedef names
+
+Enum values and macro names are mostly `SNAKE_UPPERCASE` except macros that replace functions, types or other lowercase items, in which case the macro name should also be lowercase.
+
+It is also good to establish the words that make up the name, take the following example:
+```c
+// Returns the amount of GPIO pins present.
+#define io_count() (31)
+// Sets the mode of GPIO pin `pin` to `mode`.
+void    io_mode (badge_err_t *ec, int pin, io_mode_t mode);
+```
+
+This demonstrates the macro exception as well as the prefix given to the GPIO API.
+In general, every API has a prefix, which may be extended if an API is split into multiple sub-APIs.
+
+In general, names should:
+- Have a prefix indicating what API is being referred to.
+- Roughly describe their purpose:
+    - Especially if the type of a variable is something nameless, like `int pin`.
+    - This may be simplified if the context makes it clear, like `badge_err_t *ec`.
+- Not use terms that are too abstract:
+    - Things like `int *list` are not recommended.
+    - Exact duplication of the type name like `badge_err_t *badge_err` is not recommended.
+- Not start with `_`:
+    - This is typically a workaround for equal names.
+    - Names starting with `__` are reserved.
+    - Names starting with `_` followed by a capital letter are reserved.
 
 ## Type definitions
 Type definitions should be simple. If a type is a complex composite, consider using typedefs and structs. Here is a general example of how to define types:
@@ -54,7 +91,7 @@ The following rules apply to types in general:
 - When referring to a length, use `size_t`.
 
 The following rules apply to structs, unions and enums:
-- The content of the definition is indented with one tab.
+- The content of the definition is indented with four spaces.
 - The `{` is on the same line as the `struct`, `union` or `enum` keyword.
 
 The following rules apply to function pointer types:
@@ -67,10 +104,10 @@ The following rules apply to integers in types:
 - The `signed` and `unsigned` keywords are before the length of the integer.
 
 The `bool` type is not to be treated as a regular integer:
-  - `true` and `false` should be used where applicable.
-  - Multiplication with a constant is allowed.
-  - Multiplication with a variable or expression is not.
-  - Bitwise OR, bitwise AND and bitwise complement are not allowed on booleans.
+    - `true` and `false` should be used where applicable.
+    - Multiplication with a constant is allowed.
+    - Multiplication with a variable or expression is not.
+    - Bitwise OR, bitwise AND and bitwise complement are not allowed on booleans.
 
 
 ## Variable declarations
@@ -124,8 +161,8 @@ The following rules apply:
 - The column at which the `(` starts is constant among a block of definitions.
 - The padding is written with spaces.
 - The attributes are behind the `)`.
-  - With exactly one space of padding OR
-  - On a newline, preceded by exactly two tab characters.
+    - With exactly one space of padding OR
+    - On a newline, preceded by exactly eight spaces.
 - The function name should approximately describe the purpose.
 
 
@@ -161,8 +198,8 @@ size_t count_occurances(const char *str, char c) {
 The following rules apply:
 - [The rules for type definitions](#type-definitions).
 - [The rules for functions declarations](#function-declarations), except:
-  - No horizontal alignment is required or allowed.
-  - If attributes are required, they must be on the declaration, but not definition.
+    - No horizontal alignment is required or allowed.
+    - If attributes are required, they must be on the declaration, but not definition.
 - The `{` is on the same line as the `)`.
 
 ## File structure
