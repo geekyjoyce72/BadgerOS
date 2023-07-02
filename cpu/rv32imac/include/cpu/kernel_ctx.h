@@ -63,6 +63,12 @@ STRUCT_END(kernel_ctx_t)
 
 
 #ifndef __ASSEMBLER__
+// Get the current kernel context.
+static inline kernel_ctx_t *kernel_ctx_get() {
+	kernel_ctx_t *kctx;
+	asm ("csrr %0, mscratch" : "=r" (kctx));
+	return kctx;
+}
 // Get the outstanding context swap target, if any.
 static inline kernel_ctx_t *kernel_ctx_switch_get() {
 	kernel_ctx_t *kctx;
