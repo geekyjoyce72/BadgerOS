@@ -19,7 +19,7 @@ int64_t time_us();
 // Set the counting frequency of a hardware timer.
 void timer_set_freq(int timerno, int32_t frequency);
 // Configure timer interrupt settings.
-void timer_int_config(int timerno, bool interrupt_enable, int interrupt_channel);
+void timer_int_config(int timerno, bool enable, int channel);
 // Configure timer alarm.
 void timer_alarm_config(int timerno, int64_t threshold, bool reset_on_alarm);
 // Get the current value of timer.

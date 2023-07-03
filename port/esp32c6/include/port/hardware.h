@@ -3,6 +3,9 @@
 
 #pragma once
 
+#include <stddef.h>
+#include <stdint.h>
+
 // Base address of peripherals.
 #define PERI_BASE 0x60000000
 

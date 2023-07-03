@@ -34,5 +34,5 @@ void _kernel_reg_dump(const uint32_t *arr) {
 
 // Print a register dump given kernel_ctx_t.
 void kernel_ctx_dump(const kernel_ctx_t *ctx) {
-	_kernel_reg_dump((const uint32_t *) ctx->regs);
+	_kernel_reg_dump((const uint32_t *) &ctx->regs);
 }

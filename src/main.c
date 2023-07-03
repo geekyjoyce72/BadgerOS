@@ -11,15 +11,13 @@
 
 // Temporary kernel context until threading is implemented.
 static kernel_ctx_t kctx;
-// Temporary registers struct until threading is implemented.
-static cpu_regs_t regs;
 
 // This is the entrypoint after the stack has been set up and the init functions have been run.
 // Main is not allowed to return, so declare it noreturn.
 void main() __attribute__((noreturn));
 void main() {
 	// Install interrupt and trap handlers.
-	interrupt_init(&kctx, &regs);
+	interrupt_init(&kctx);
 	
 	// Set up timers and watchdogs.
 	// This function must run within the first ~1s of power-on time and should be called as early as possible.
