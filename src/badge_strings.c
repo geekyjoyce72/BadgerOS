@@ -81,11 +81,13 @@ bool cstr_prefix_equals(char const *a, char const *b, size_t length) {
 		if (!*a) return true;
 		a++, b++;
 	}
+	return true;
 }
 
 
 
-// Copy at most `length`-1 characters and a NULL terminator of C-string `src` into buffer `dest`.
+// Copy a NULL-terminated C-string from `src` into buffer `dest.
+// This may truncate characters, but not the NULL terminator, if `dest` does not fit `src` entirely.
 void cstr_copy(char *dest, size_t size, char const *src) {
 	while (size-- > 1) {
 		if (!*src) break;
@@ -112,7 +114,7 @@ void cstr_copy_packed(char *dest, size_t size, char const *src) {
 // Find the first occurrance of byte `value` in memory `memory`.
 // Returns -1 when not found.
 ptrdiff_t mem_index(void const *memory, size_t size, uint8_t value) {
-	uint8_t *const ptr = memory;
+	uint8_t const *ptr = memory;
 	for (size_t i = 0; i < size; i++) {
 		if (ptr[i] == value) return i;
 	}
@@ -122,7 +124,7 @@ ptrdiff_t mem_index(void const *memory, size_t size, uint8_t value) {
 // Find the first occurrance of byte `value` in memory `memory`.
 // Returns -1 when not found.
 ptrdiff_t mem_last_index(void const *memory, size_t size, uint8_t value) {
-	uint8_t *const ptr = memory;
+	uint8_t const *ptr = memory;
 	for (size_t i = size; i-- > 0;) {
 		if (ptr[i] == value) return i;
 	}
@@ -131,8 +133,8 @@ ptrdiff_t mem_last_index(void const *memory, size_t size, uint8_t value) {
 
 // Implementation of the mem_equals loop with variable read size.
 #define MEM_EQUALS_IMPL(type, alignment, a, b, size) { \
-		type *const a_ptr = a; \
-		type *const b_ptr = b; \
+		type const *a_ptr = a; \
+		type const *b_ptr = b; \
 		size_t _size = size / alignment; \
 		for (size_t i = 0; i < _size; i++) { \
 			if (a_ptr[i] != b_ptr[i]) return false; \
@@ -161,8 +163,8 @@ bool mem_equals(void const *a, void const *b, size_t size) {
 
 // Implementation of the mem_copy loop with variable access size.
 #define MEM_COPY_IMPL(type, alignment, dest, src, size) { \
-		type *const dest_ptr = dest; \
-		type *const src_ptr  = src; \
+		type       *dest_ptr = dest; \
+		type const *src_ptr  = src; \
 		size_t _size = size / alignment; \
 		if (dest < src) { \
 			/* Forward iteration. */ \
