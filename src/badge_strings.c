@@ -10,6 +10,14 @@ size_t cstr_length(char const *string) {
 	return ptr - string;
 }
 
+// Compute the length of a C-string at most `max_length` characters long.
+size_t cstr_length_upto(char const *string, size_t max_len) {
+	for (size_t i = 0; i < max_len; i++) {
+		if (!string[i]) return i;
+	}
+	return max_len;
+}
+
 // Find the first occurrance `value` in C-string `string`.
 // Returns -1 when not found.
 ptrdiff_t cstr_index(char const *string, char value) {
@@ -77,6 +85,30 @@ bool cstr_prefix_equals(char const *a, char const *b, size_t length) {
 
 
 
+// Copy at most `length`-1 characters and a NULL terminator of C-string `src` into buffer `dest`.
+void cstr_copy(char *dest, size_t size, char const *src) {
+	while (size-- > 1) {
+		if (!*src) break;
+		*dest = *src;
+		dest++, src++;
+	}
+	if (size) {
+		*dest = 0;
+	}
+}
+
+// Copy at most `length` bytes C-string `src` into buffer `dest`.
+// WARNING: This may leave strings without NULL terminators if `dest` does not fit `src` entirely.
+void cstr_copy_packed(char *dest, size_t size, char const *src) {
+	while (size--) {
+		*dest = *src;
+		if (!*src) return;
+		dest++, src++;
+	}
+}
+
+
+
 // Find the first occurrance of byte `value` in memory `memory`.
 // Returns -1 when not found.
 ptrdiff_t mem_index(void const *memory, size_t size, uint8_t value) {
@@ -108,7 +140,7 @@ ptrdiff_t mem_last_index(void const *memory, size_t size, uint8_t value) {
 	}
 
 // Test the equality of two memory areas.
-ptrdiff_t mem_equals(void const *a, void const *b, size_t size) {
+bool mem_equals(void const *a, void const *b, size_t size) {
 	uint_fast8_t align_detector = (uint_fast8_t) a | (uint_fast8_t) b | (uint_fast8_t) size;
 	
 	// Optimise for alignment.
