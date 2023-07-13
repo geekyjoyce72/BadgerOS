@@ -86,27 +86,52 @@ bool cstr_prefix_equals(char const *a, char const *b, size_t length) {
 
 
 
+// Concatenate a NULL-terminated C-string from `src` onto C-string buffer `dest.
+// This may truncate characters, but not the NULL terminator, if `dest` does not fit `src` entirely.
+size_t cstr_concat(char *dest, size_t size, char const *src) {
+	size_t dest_len = cstr_length(dest);
+	if (dest_len < size - 1) {
+		return cstr_copy(dest + dest_len, size - dest_len, src) + dest_len;
+	}
+	return dest_len;
+}
+
+// Concatenate a NULL-terminated C-string from `src` onto C-string buffer `dest.
+// This may truncate characters, but not the NULL terminator, if `dest` does not fit `src` entirely.
+size_t cstr_concat_packed(char *dest, size_t size, char const *src) {
+	size_t dest_len = cstr_length_upto(dest, size);
+	if (dest_len < size) {
+		return cstr_copy_packed(dest + dest_len, size - dest_len, src) + dest_len;
+	}
+	return dest_len;
+}
+
 // Copy a NULL-terminated C-string from `src` into buffer `dest.
 // This may truncate characters, but not the NULL terminator, if `dest` does not fit `src` entirely.
-void cstr_copy(char *dest, size_t size, char const *src) {
-	while (size-- > 1) {
+size_t cstr_copy(char *dest, size_t size, char const *src) {
+	char const *const orig = dest;
+	while (size > 1) {
 		if (!*src) break;
 		*dest = *src;
 		dest++, src++;
+		size--;
 	}
 	if (size) {
 		*dest = 0;
 	}
+	return dest - orig;
 }
 
 // Copy at most `length` bytes C-string `src` into buffer `dest`.
 // WARNING: This may leave strings without NULL terminators if `dest` does not fit `src` entirely.
-void cstr_copy_packed(char *dest, size_t size, char const *src) {
+size_t cstr_copy_packed(char *dest, size_t size, char const *src) {
+	char const *const orig = dest;
 	while (size--) {
 		*dest = *src;
-		if (!*src) return;
+		if (!*src) return dest - orig;
 		dest++, src++;
 	}
+	return dest - orig;
 }
 
 

@@ -30,15 +30,22 @@ bool      cstr_equals         (char const *a, char const *b) __attribute__((pure
 // Test the of the first `length` characters equality of two C-strings.
 bool      cstr_prefix_equals  (char const *a, char const *b, size_t length) __attribute__((pure));
 
+// Concatenate a NULL-terminated C-string from `src` onto C-string buffer `dest`.
+// This may truncate characters, but not the NULL terminator, if `dest` does not fit `src` entirely.
+// Returns the length of the new string in `dest`.
+size_t cstr_concat       (char *dest, size_t size, char const *src);
 // Concatenate a NULL-terminated C-string from `src` onto C-string buffer `dest.
 // This may truncate characters, but not the NULL terminator, if `dest` does not fit `src` entirely.
-
+// Returns the length of the new string in `dest`.
+size_t cstr_concat_packed(char *dest, size_t size, char const *src);
 // Copy a NULL-terminated C-string from `src` into buffer `dest.
 // This may truncate characters, but not the NULL terminator, if `dest` does not fit `src` entirely.
-void cstr_copy(char *dest, size_t size, char const *src);
+// Returns the length of the new string in `dest`.
+size_t cstr_copy         (char *dest, size_t size, char const *src);
 // Copy at most `length` bytes of C-string `src` into buffer `dest`.
 // WARNING: This may leave strings without NULL terminators if `dest` does not fit `src` entirely.
-void cstr_copy_packed(char *dest, size_t size, char const *src);
+// Returns the length of the new string in `dest`.
+size_t cstr_copy_packed  (char *dest, size_t size, char const *src);
 
 // Find the first occurrance of byte `value` in memory `memory`.
 // Returns -1 when not found.
