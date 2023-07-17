@@ -21,6 +21,7 @@ SECTIONS
 	.data : AT(SIZEOF(.esphdr) + SIZEOF(.espseg.0)) {
 		__global_pointer$ = .;
 		*(.data) *(.data*)
+		*(.sdata) *(.sdata*)
 		. = ALIGN(__section_alignment);
 	} :dataseg
 	__stop_data = .;
@@ -28,6 +29,7 @@ SECTIONS
 	__start_bss = .;
 	.bss : {
 		*(.bss) *(.bss*)
+		*(.sbss) *(.sbss*)
 		. = ALIGN(__section_alignment);
 	} :NONE
 	__stop_bss = .;
@@ -95,6 +97,7 @@ SECTIONS
 	} :rodataseg
 	.rodata : AT(LOADADDR(.init_array) + SIZEOF(.init_array)) {
 		*(.rodata) *(.rodata*)
+		*(.srodata) *(.srodata*)
 		. = ALIGN(__section_alignment);
 	} :rodataseg
 	__stop_rodata = .;
