@@ -196,7 +196,7 @@ bool mem_equals(void const *a, void const *b, size_t size) {
 			for (size_t i = 0; i < _size; i++) { \
 				dest_ptr[i] = src_ptr[i]; \
 			} \
-		} else if (src > dest) { \
+		} else if (src < dest) { \
 			/* Reverse iteration. */ \
 			for (size_t i = _size; i-- > 0;) { \
 				dest_ptr[i] = src_ptr[i]; \
