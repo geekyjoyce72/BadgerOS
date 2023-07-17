@@ -59,3 +59,5 @@ bool      mem_equals    (void const *a, void const *b, size_t size) __attribute_
 // Copy the contents of memory area `src` to memory area `dest`.
 // Correct copying is gauranteed even if `src` and `dest` are overlapping regions.
 void mem_copy(void *dest, void const *src, size_t size);
+// Set the contents of memory area `dest` to the constant byte `value`.
+void mem_set(void *dest, uint8_t value, size_t size);

@@ -221,3 +221,27 @@ void mem_copy(void *dest, void const *src, size_t size) {
 	}
 }
 
+// Implementation of the mem_set loop with variable access size.
+#define MEM_SET_IMPL(type, alignment, dest, value, size) { \
+		type       *dest_ptr = dest; \
+		size_t _size = size / alignment; \
+		for (size_t i = 0; i < _size; i++) { \
+			dest_ptr[i] = value; \
+		} \
+	}
+
+// Set the contents of memory area `dest` to the constant byte `value`.
+void mem_set(void *dest, uint8_t value, size_t size) {
+	uint_fast8_t align_detector = (uint_fast8_t) dest | (uint_fast8_t) size;
+	
+	// Optimise for alignment.
+	if (align_detector & 1) {
+		MEM_SET_IMPL(uint8_t, 1, dest, value, size)
+	} else if (align_detector & 2) {
+		MEM_SET_IMPL(uint16_t, 2, dest, value, size)
+	} else if (align_detector & 4) {
+		MEM_SET_IMPL(uint32_t, 4, dest, value, size)
+	} else {
+		MEM_SET_IMPL(uint64_t, 8, dest, value, size)
+	}
+}
