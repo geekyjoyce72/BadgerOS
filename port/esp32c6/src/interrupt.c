@@ -38,6 +38,12 @@ void interrupt_init(kernel_ctx_t *ctx) {
     // intmtx_enable(INT_CHANNEL_I2C);
     // intmtx_enable(INT_CHANNEL_SPI);
 
+    // Enable interrupt channels.
+    asm volatile("csrw mie, %0" ::"r"(
+        (1 << INT_CHANNEL_TIMER_ALARM) | (1 << INT_CHANNEL_WATCHDOG_ALARM) | (1 << INT_CHANNEL_UART) |
+        (1 << INT_CHANNEL_I2C) | (1 << INT_CHANNEL_SPI)
+    ));
+
     asm volatile("fence");
 
     // Re-enable interrupts.

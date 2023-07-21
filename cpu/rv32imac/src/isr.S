@@ -6,9 +6,12 @@
 
 
 
-    # Entry code for an ISR or trap handler; save tempregs and swap out SP/GP/TP.
+
+
+    # Entry code for an ISR or trap handler; save T0-T3 and swap out SP/GP/TP.
     # Assumes valid `kernel_ctx_t *` in CSR mscratch.
     .macro isr_entry
+#pragma region
     # Save tempregs t0/t1.
     csrrw t0, mscratch, t0
     sw t1, kernel_ctx_t_scratch1(t0)
@@ -43,13 +46,15 @@
     la gp, __global_pointer$
     .option pop
     la sp, __interrupt_stack_hi
+#pragma endregion
     .endm
 
 
 
     # Exit code for an ISR or trap handler; restores tempregs and SP/GP/TP.
-    # Assumes `kernel_ctx_t *` in t0.
+    # Assumes valid `kernel_ctx_t *` in t0.
     .macro isr_exit
+#pragma region
     # Restore PC.
     lw t1, kernel_ctx_t_regs+cpu_regs_t_pc(t0)
     csrw mepc, t1
@@ -66,20 +71,15 @@
     lw t2, kernel_ctx_t_regs+cpu_regs_t_t2(t0)
     lw t1, kernel_ctx_t_regs+cpu_regs_t_t1(t0)
     csrrw t0, mscratch, t0
-    .endm
-
-
-
-    # Load `kernel_ctx_t *` from CSR mscratch into t0.
-    .macro get_kctx
-    csrr t0, mscratch
+#pragma endregion
     .endm
 
 
 
     # Save all regs not saved by `isr_entry`.
-    # Assumes `kernel_ctx_t *` in t0.
+    # Assumes valid `kernel_ctx_t *` in t0.
     .macro save_regs
+#pragma region
     # Save all regs.
     sw s0,  kernel_ctx_t_regs+cpu_regs_t_s0(t0)
     sw s1,  kernel_ctx_t_regs+cpu_regs_t_s1(t0)
@@ -104,13 +104,15 @@
     sw t4,  kernel_ctx_t_regs+cpu_regs_t_t4(t0)
     sw t5,  kernel_ctx_t_regs+cpu_regs_t_t5(t0)
     sw t6,  kernel_ctx_t_regs+cpu_regs_t_t6(t0)
+#pragma endregion
     .endm
 
 
 
     # Restore all regs not restored by `isr_exit`.
-    # Assumes `kernel_ctx_t *` in t0.
+    # Assumes valid `kernel_ctx_t *` in t0.
     .macro restore_regs
+#pragma region
     lw s0,  kernel_ctx_t_regs+cpu_regs_t_s0(t0)
     lw s1,  kernel_ctx_t_regs+cpu_regs_t_s1(t0)
     lw a0,  kernel_ctx_t_regs+cpu_regs_t_a0(t0)
@@ -134,6 +136,7 @@
     lw t4,  kernel_ctx_t_regs+cpu_regs_t_t4(t0)
     lw t5,  kernel_ctx_t_regs+cpu_regs_t_t5(t0)
     lw t6,  kernel_ctx_t_regs+cpu_regs_t_t6(t0)
+#pragma endregion
     .endm
 
 
@@ -149,30 +152,30 @@ __trap_asm:
     # Separate system calls from other traps.
     csrr t1, mcause
     li   t3, 8
-    bltu t1, t3, .trap_save_regs
+    bltu t1, t3, .__trap_asm_save_regs
     li   t3, 11
-    bleu t1, t3, .syscall
+    bleu t1, t3, .__trap_asm_syscall
     
-.trap_save_regs:
+.__trap_asm_save_regs:
     # This is a non-syscall trap; saving all registers is mandatory.
     save_regs
     # Most of the trap handler is implemented in C.
     jal __trap_handler
-    get_kctx
+    csrr t0, mscratch
     
     # Check for outstanding context switch.
     # If nonnull, context will be switched.
     lw   t1, kernel_ctx_t_ctxswitch(t0)
-    beq  t1, x0, .trap_restore_regs
-    # All that is necessary is swapping out t0.
+    beq  t1, x0, .__trap_asm_restore_regs
+    # All that is necessary is swapping out context handle.
     mv   t0, t1
     
-.trap_restore_regs:
+.__trap_asm_restore_regs:
     # This is a non-syscall trap; restoring all registers is mandatory.
     restore_regs
-    j .trap_exit
+    j .__trap_asm_exit
     
-.syscall:
+.__trap_asm_syscall:
     # This is a system call; only callee-saved registers are saved.
     # Increment the program counter past the initiating `ecall` instruction.
     lw   t1, kernel_ctx_t_regs+cpu_regs_t_pc(t0)
@@ -180,18 +183,18 @@ __trap_asm:
     sw   t1, kernel_ctx_t_regs+cpu_regs_t_pc(t0)
     # Most of the syscall handler is implemented in C.
     jal __syscall_handler
-    get_kctx
+    csrr t0, mscratch
     
     # Check for outstanding context switch.
     # If nonnull, context will be switched.
     lw   t1, kernel_ctx_t_ctxswitch(t0)
-    beq  t1, x0, .trap_exit
+    beq  t1, x0, .__trap_asm_exit
     # General registers were not saved and must be done explicitly.
     save_regs
     mv   t0, t1
     restore_regs
     
-.trap_exit:
+.__trap_asm_exit:
     isr_exit
     mret
 
@@ -209,16 +212,16 @@ __isr_asm:
     save_regs
     # Most of the interrupt handler is implemented in C.
     jal __interrupt_handler
-    get_kctx
+    csrr t0, mscratch
     
     # Check for outstanding context switch.
     # If nonnull, context will be switched.
     lw   t1, kernel_ctx_t_ctxswitch(t0)
-    beq  t1, x0, .isr_exit
+    beq  t1, x0, .__isr_asm_exit
     # All that is necessary is swapping out t0.
     mv   t0, t1
     
-.isr_exit:
+.__isr_asm_exit:
     # This is an interrupt; restoring all registers is mandatory.
     restore_regs
     isr_exit
@@ -230,6 +233,7 @@ __isr_asm:
 
     # Interrupt and trap handler stack.
     .section ".bss"
+    .align 4
 __interrupt_stack_lo:
     .skip ISR_STACK_DEPTH*4
 __interrupt_stack_hi:

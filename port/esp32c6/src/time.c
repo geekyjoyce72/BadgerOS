@@ -157,6 +157,9 @@ void timer_set_freq(int timerno, int32_t frequency) {
 
 // Configure timer interrupt settings.
 void timer_int_config(int timerno, bool enable, int channel) {
+    // Disable interrupts before changing interrupt settings.
+    bool mie = interrupt_disable();
+    
     size_t base = timg_base(timerno);
     if (enable) {
         // Route interrupt.
@@ -174,6 +177,12 @@ void timer_int_config(int timerno, bool enable, int channel) {
         WRITE_REG(base + T0CONFIG_REG, READ_REG(base + T0CONFIG_REG) & ~TIMG_TCONFIG_ALARM_EN_BIT);
         WRITE_REG(base + INT_ENA_TIMERS_REG, READ_REG(base + INT_ENA_TIMERS_REG) & ~TIMG_T0_INT_EN_BIT);
     }
+    
+    // Re-enable interrupts.
+    asm volatile("fence");
+    if (mie) {
+        interrupt_enable();
+    }
 }
 
 // Configure timer alarm.
@@ -186,7 +195,7 @@ void timer_alarm_config(int timerno, int64_t threshold, bool reset_on_alarm) {
     }
     if (threshold < 1 || threshold >= (1ll << 56)) {
         logk(LOG_ERROR, "Unachievable timer alarm value requested");
-        threshold = (1llu << 56) - 1;
+        threshold = (1ll << 56) - 1;
     }
     WRITE_REG(base + T0ALARMHI_REG, -1);
     WRITE_REG(base + T0ALARMLO_REG, threshold);
@@ -237,7 +246,7 @@ void timer_isr_timer_alarm() {
 
     // Query TIMG0 T1 interrupt.
     if (READ_REG(TIMG1_BASE + INT_ST_TIMERS_REG) & TIMG_T0_INT_ST_BIT) {
-        logk(LOG_DEBUG, "TIMG0 T1 interrupt");
+        logk(LOG_DEBUG, "TIMG1 T0 interrupt");
         WRITE_REG(TIMG1_BASE + INT_CLR_TIMERS_REG, TIMG_T0_INT_CLR_BIT);
         WRITE_REG(TIMG1_BASE + INT_CLR_TIMERS_REG, 0);
     }
