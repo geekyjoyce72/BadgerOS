@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 #include "port/intmtx.h"
+#include "port/hardware.h"
 
 
 
@@ -17,15 +18,30 @@ static uint16_t offsets[] = {
 
 // Initialise the interrupt matrix with defaults.
 void intmtx_init() {
-    WRITE_REG(INTPRI_CORE0_CPU_INT_ENABLE_REG, 0);
+    // Unroute all interrupt channels.
     for (size_t i = 0; i < sizeof(offsets) / sizeof(uint16_t); i++) {
         WRITE_REG(INTMTX_BASE + offsets[i], 0);
     }
+    
+    // Reset PLIC.
+    for (size_t i = 0; i < 32; i++) {
+        WRITE_REG(PLIC_MX_INT_PRI_N_REG(i), 0);
+    }
+    WRITE_REG(PLIC_MX_INT_TYPE_REG, 0);
+    WRITE_REG(PLIC_MX_INT_ENABLE_REG, 0);
+    WRITE_REG(PLIC_MX_INT_THRESH_REG, 0);
+    WRITE_REG(PLIC_MX_INT_CLEAR_REG, 0xffffffff);
+    WRITE_REG(PLIC_MX_INT_CLEAR_REG, 0);
+    
+    // Reset INTPRI.
     for (size_t i = 0; i < 32; i++) {
         WRITE_REG(INTPRI_CORE0_CPU_INT_PRI_N_REG(i), 0);
     }
-    WRITE_REG(INTPRI_CORE0_CPU_INT_THRESH_REG, 0);
     WRITE_REG(INTPRI_CORE0_CPU_INT_TYPE_REG, 0);
+    WRITE_REG(INTPRI_CORE0_CPU_INT_ENABLE_REG, 0);
+    WRITE_REG(INTPRI_CORE0_CPU_INT_THRESH_REG, 0);
+    WRITE_REG(INTPRI_CORE0_CPU_INT_CLEAR_REG, 0xffffffff);
+    WRITE_REG(INTPRI_CORE0_CPU_INT_CLEAR_REG, 0);
 }
 
 // Route interrupt source `source_map_reg` to interrupt channel `channel`.
@@ -35,19 +51,33 @@ void intmtx_route(int source_map_reg, int channel) {
 
 // Set interrupt channel `channel` priority to `prio`.
 void intmtx_set_prio(int channel, int prio) {
-    WRITE_REG(INTPRI_CORE0_CPU_INT_PRI_N_REG(channel), prio);
+    WRITE_REG(PLIC_MX_INT_PRI_N_REG(channel), prio);
+}
+
+// Set interrupt threshold value.
+void intmtx_set_thresh(int thresh) {
+    WRITE_REG(PLIC_MX_INT_THRESH_REG, thresh);
+}
+
+// Query whether interrupt channel `channel` is enabled.
+bool intmtx_is_enabled(int channel) {
+    return READ_REG(PLIC_MX_INT_ENABLE_REG) & (1 << channel);
 }
 
 // Enable or disable interrupt channel `channel`.
-void intmtx_enable(int channel, bool enable) {
-    if (enable) {
-        WRITE_REG(INTPRI_CORE0_CPU_INT_ENABLE_REG, READ_REG(INTPRI_CORE0_CPU_INT_ENABLE_REG) | (1 << channel));
-    } else {
-        WRITE_REG(INTPRI_CORE0_CPU_INT_ENABLE_REG, READ_REG(INTPRI_CORE0_CPU_INT_ENABLE_REG) & ~(1 << channel));
-    }
+void intmtx_enable(int channel) {
+    WRITE_REG(PLIC_MX_INT_ENABLE_REG, READ_REG(PLIC_MX_INT_ENABLE_REG) | (1 << channel));
+}
+
+// Enable or disable interrupt channel `channel`.
+bool intmtx_disable(int channel) {
+    uint32_t orig = READ_REG(PLIC_MX_INT_ENABLE_REG);
+    WRITE_REG(PLIC_MX_INT_ENABLE_REG, orig & ~(1 << channel));
+    return orig & (1 << channel);
 }
 
 // Acknowledge an interrupt.
 void intmtx_ack(int channel) {
     WRITE_REG(INTPRI_CORE0_CPU_INT_CLEAR_REG, 1 << channel);
+    WRITE_REG(INTPRI_CORE0_CPU_INT_CLEAR_REG, 0);
 }

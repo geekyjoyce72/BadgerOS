@@ -15,7 +15,7 @@ clean-tools:
 
 build:
 	@mkdir -p build && cmake -B build
-	@cmake --build build
+	@cmake --build build -- --quiet
 	@./packimage.py
 
 clean:

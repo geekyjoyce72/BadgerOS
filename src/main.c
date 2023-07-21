@@ -16,7 +16,7 @@ static kernel_ctx_t kctx;
 // Main is not allowed to return, so declare it noreturn.
 void main() __attribute__((noreturn));
 void main() {
-	// Install interrupt and trap handlers.
+	// Install interrupt and trap handlers and route default interrupt channels.
 	interrupt_init(&kctx);
 	
 	// Set up timers and watchdogs.
