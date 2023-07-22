@@ -84,7 +84,7 @@ void logk_hexdump_vaddr(log_level_t level, char const *msg, void const *data, si
     
     uint8_t const *ptr = data;
     for (size_t y = 0; y*LOGK_HEXDUMP_COLS < size; y++) {
-        rawprinthex((size_t) ptr + y*LOGK_HEXDUMP_COLS, sizeof(size_t)*2);
+        rawprinthex((size_t) vaddr + y*LOGK_HEXDUMP_COLS, sizeof(size_t)*2);
         rawputc(':');
         size_t x;
         for (x = 0; y*LOGK_HEXDUMP_COLS+x < size && x < LOGK_HEXDUMP_COLS; x++) {

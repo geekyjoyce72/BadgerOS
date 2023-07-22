@@ -92,6 +92,16 @@
 // Timer group timer alarm enable.
 #define TIMG_TCONFIG_ALARM_EN_BIT   0x00000400
 
+// Timer group timer interrupt clear bit.
+#define TIMG_T0_INT_CLR_BIT 1
+// Timer group watchdog interrupt clear bit.
+#define TIMG_T0_WDT_CLR_BIT 2
+
+// Timer group timer interrupt state bit.
+#define TIMG_T0_INT_ST_BIT 1
+// Timer group watchdog interrupt state bit.
+#define TIMG_T0_WDT_ST_BIT 2
+
 // Timer group timer interrupt enable bit.
 #define TIMG_T0_INT_EN_BIT 1
 // Timer group watchdog interrupt enable bit.
@@ -114,16 +124,23 @@ void time_init() {
     // Disable LP WDT.
     WRITE_REG(LP_WDT_WRPROTECT_REG, LD_WDT_WRPROTECT_MAGIC);
     WRITE_REG(LP_WDT_CONFIG0_REG, 0);
-    
+
     // Set up TIMG0 T0 as a 1MHz counter.
     timer_stop(0);
     timer_set_freq(0, 1000000);
     timer_value_set(0, 0);
     timer_start(0);
+    
+    // Set TIMG1 T0 frequency to 1MHz.
+    timer_stop(1);
+    timer_set_freq(1, 1000000);
+    timer_value_set(1, 0);
 }
 
 // Get current time in microseconds.
-int64_t time_us() { return timer_value_get(0); }
+int64_t time_us() {
+    return timer_value_get(0);
+}
 
 
 
@@ -140,18 +157,31 @@ void timer_set_freq(int timerno, int32_t frequency) {
 
 // Configure timer interrupt settings.
 void timer_int_config(int timerno, bool enable, int channel) {
+    // Disable interrupts before changing interrupt settings.
+    bool mie = interrupt_disable();
+    
     size_t base = timg_base(timerno);
     if (enable) {
+        // Route interrupt.
         if (timerno) {
             intmtx_route(INTMTX_CORE0_TG1_T0_INTR_MAP_REG, channel);
         } else {
             intmtx_route(INTMTX_CORE0_TG0_T0_INTR_MAP_REG, channel);
         }
+
+        // Enable timer interrupt output.
         WRITE_REG(base + T0CONFIG_REG, READ_REG(base + T0CONFIG_REG) | TIMG_TCONFIG_ALARM_EN_BIT);
         WRITE_REG(base + INT_ENA_TIMERS_REG, READ_REG(base + INT_ENA_TIMERS_REG) | TIMG_T0_INT_EN_BIT);
     } else {
+        // Disable timer interrupt output.
         WRITE_REG(base + T0CONFIG_REG, READ_REG(base + T0CONFIG_REG) & ~TIMG_TCONFIG_ALARM_EN_BIT);
         WRITE_REG(base + INT_ENA_TIMERS_REG, READ_REG(base + INT_ENA_TIMERS_REG) & ~TIMG_T0_INT_EN_BIT);
+    }
+    
+    // Re-enable interrupts.
+    asm volatile("fence");
+    if (mie) {
+        interrupt_enable();
     }
 }
 
@@ -163,9 +193,9 @@ void timer_alarm_config(int timerno, int64_t threshold, bool reset_on_alarm) {
     } else {
         WRITE_REG(base + T0CONFIG_REG, READ_REG(base + T0CONFIG_REG) & ~TIMG_TCONFIG_AUTORELOAD_BIT);
     }
-    if (threshold < 1 || threshold > 0xffffffffffffff) {
+    if (threshold < 1 || threshold >= (1ll << 56)) {
         logk(LOG_ERROR, "Unachievable timer alarm value requested");
-        threshold = 0xffffffffffffff;
+        threshold = (1ll << 56) - 1;
     }
     WRITE_REG(base + T0ALARMHI_REG, -1);
     WRITE_REG(base + T0ALARMLO_REG, threshold);
@@ -178,7 +208,8 @@ int64_t timer_value_get(int timerno) {
     uint32_t lo   = READ_REG(base + T0LO_REG);
     int      div  = 32;
     WRITE_REG(base + T0UPDATE_REG, -1);
-    while (READ_REG(base + T0LO_REG) == lo && --div);
+    while (READ_REG(base + T0LO_REG) == lo && --div)
+        ;
     return READ_REG(base + T0LO_REG) | ((uint64_t)READ_REG(base + T0HI_REG) << 32LLU);
 }
 
@@ -205,7 +236,23 @@ void timer_stop(int timerno) {
 
 
 // Callback to the timer driver for when a timer alarm fires.
-void timer_isr_timer_alarm() { logk(LOG_DEBUG, "Timer alarm ISR"); }
+void timer_isr_timer_alarm() {
+    // Query TIMG0 T0 interrupt.
+    if (READ_REG(TIMG0_BASE + INT_ST_TIMERS_REG) & TIMG_T0_INT_ST_BIT) {
+        logk(LOG_DEBUG, "TIMG0 T0 interrupt");
+        WRITE_REG(TIMG0_BASE + INT_CLR_TIMERS_REG, TIMG_T0_INT_CLR_BIT);
+        WRITE_REG(TIMG0_BASE + INT_CLR_TIMERS_REG, 0);
+    }
+
+    // Query TIMG0 T1 interrupt.
+    if (READ_REG(TIMG1_BASE + INT_ST_TIMERS_REG) & TIMG_T0_INT_ST_BIT) {
+        logk(LOG_DEBUG, "TIMG1 T0 interrupt");
+        WRITE_REG(TIMG1_BASE + INT_CLR_TIMERS_REG, TIMG_T0_INT_CLR_BIT);
+        WRITE_REG(TIMG1_BASE + INT_CLR_TIMERS_REG, 0);
+    }
+}
 
 // Callback to the timer driver for when a watchdog alarm fires.
-void timer_isr_watchdog_alarm() { logk(LOG_DEBUG, "Watchdog alarm ISR"); }
+void timer_isr_watchdog_alarm() {
+    logk(LOG_DEBUG, "Watchdog alarm ISR");
+}

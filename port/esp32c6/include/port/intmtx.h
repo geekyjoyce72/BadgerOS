@@ -5,9 +5,9 @@
 
 #include "port/hardware.h"
 
-#include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #define INTMTX_CORE0_PMU_INTR_MAP_REG               (INTMTX_BASE + 0x0034)
 #define INTMTX_CORE0_EFUSE_INTR_MAP_REG             (INTMTX_BASE + 0x0038)
@@ -83,13 +83,31 @@
 #define INTPRI_CORE0_CPU_INT_THRESH_REG     (INTPRI_BASE + 0x008C)
 #define INTPRI_CORE0_CPU_INT_CLEAR_REG      (INTPRI_BASE + 0x00A8)
 
+#define PLIC_MX_INT_ENABLE_REG     (PLIC_MX_BASE + 0x0000)
+#define PLIC_MX_INT_TYPE_REG       (PLIC_MX_BASE + 0x0004)
+#define PLIC_MX_INT_CLEAR_REG      (PLIC_MX_BASE + 0x0008)
+#define PLIC_MX_INT_EIP_STATUS_REG (PLIC_MX_BASE + 0x000C)
+#define PLIC_MX_INT_PRI_N_REG(N)   (PLIC_MX_BASE + 0x0010 + 4 * (N))
+#define PLIC_MX_INT_THRESH_REG     (PLIC_MX_BASE + 0x0090)
+
+#define INTMTX_PRIO_MAX 15
+#define INTMTX_PRIO_MIN 1
+
 // Initialise the interrupt matrix with defaults.
 void intmtx_init() __attribute__((noinline));
 // Route interrupt source `source_map_reg` to interrupt channel `channel`.
 void intmtx_route(int source_map_reg, int channel);
 // Set interrupt channel `channel` priority to `prio`.
 void intmtx_set_prio(int channel, int prio);
-// Enable or disable interrupt channel `channel`.
-void intmtx_enable(int channel, bool enable);
+// Get interrupt channel `channel` priority.
+int  intmtx_get_prio(int channel);
+// Set interrupt threshold value.
+void intmtx_set_thresh(int thresh);
+// Query whether interrupt channel `channel` is enabled.
+bool intmtx_is_enabled(int channel);
+// Enable interrupt channel `channel`.
+void intmtx_enable(int channel);
+// Disable interrupt channel `channel` and return whether it was enabled.
+bool intmtx_disable(int channel);
 // Acknowledge an interrupt.
 void intmtx_ack(int channel);
