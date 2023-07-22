@@ -18,7 +18,7 @@
 
 	# Reserve stack.
 	.section ".bss"
-	.align 2
+	.align 4
 	.equ __stack_size, 8192
 	.lcomm __stack_bottom, __stack_size
 	.equ __stack_top, __stack_bottom + __stack_size
@@ -56,8 +56,8 @@ _start:
 	lw ra, 0(s0)
 	jalr ra, ra
 	addi s0, s0, 4
-.initfun_skip:
 	bne s0, s1, .initfun_loop
+.initfun_skip:
 	
 	# Jump to the C entrypoint.
 	jal main

@@ -11,8 +11,14 @@ PHDRS
 
 SECTIONS
 {
-	__start_xip  = 0x42000000;
-	__start_sram = 0x40800000;
+	/* Physical memory. */
+	__start_xip    = 0x42000000;
+	__stop_xip     = 0x43000000;
+	__start_sram   = 0x40800000;
+	__stop_sram    = 0x40880000;
+	__start_lpsram = 0x50000000;
+	__stop_lpsram  = 0x50004000;
+	
 	__section_alignment = 8;
 	
 	/* RAM sections. */
@@ -101,6 +107,14 @@ SECTIONS
 		. = ALIGN(__section_alignment);
 	} :rodataseg
 	__stop_rodata = .;
+	
+	/* Unallocated physical memory. */
+	__start_free_xip    = (__stop_rodata + 0xffff) & 0xffff0000;
+	__stop_free_xip     = __stop_xip;
+	__start_free_sram   = (__stop_bss + 0xf) & 0xfffffff0;
+	__stop_free_sram    = __stop_sram;
+	__start_free_lpsram = __start_lpsram;
+	__stop_free_lpsram  = __stop_lpsram;
 }
 
 ENTRY(_start)
