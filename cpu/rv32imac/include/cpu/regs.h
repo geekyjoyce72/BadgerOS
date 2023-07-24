@@ -4,31 +4,27 @@
 #pragma once
 
 #ifndef __ASSEMBLER__
-#include <stdint.h>
-#include <stddef.h>
 #include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
 #endif
 
 
 #ifdef __ASSEMBLER__
 
 #define STRUCT_BEGIN(structname)
-#define STRUCT_FIELD_WORD(structname, name, offset) \
-	.equ structname ## _ ## name, offset
-#define STRUCT_FIELD_PTR(structname, type, name, offset) \
-	.equ structname ## _ ## name, offset
+#define STRUCT_FIELD_WORD(structname, name, offset)      .equ structname##_##name, offset
+#define STRUCT_FIELD_PTR(structname, type, name, offset) .equ structname##_##name, offset
 #define STRUCT_END(structname)
 
 #else
 
-#define STRUCT_BEGIN(structname) \
-	typedef struct structname {
-#define STRUCT_FIELD_WORD(structname, name, offset) \
-	uint32_t name;
-#define STRUCT_FIELD_PTR(structname, type, name, offset) \
-	type *name;
-#define STRUCT_END(structname) \
-	} structname;
+#define STRUCT_BEGIN(structname)                         typedef struct structname {
+#define STRUCT_FIELD_WORD(structname, name, offset)      uint32_t name;
+#define STRUCT_FIELD_PTR(structname, type, name, offset) type *name;
+#define STRUCT_END(structname)                                                                                         \
+    }                                                                                                                  \
+    structname;
 
 #endif
 

@@ -5,9 +5,9 @@
 
 #include "port/hardware.h"
 
-#include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #define PMU_HP_ACTIVE_DIG_POWER_REG      (PMU_BASE + 0x0)
 #define PMU_HP_ACTIVE_ICG_HP_FUNC_REG    (PMU_BASE + 0x4)

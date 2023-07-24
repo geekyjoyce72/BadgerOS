@@ -114,7 +114,9 @@
 
 
 // Get timer group base address based on timer index.
-static inline size_t timg_base(int timerno) { return timerno ? TIMG1_BASE : TIMG0_BASE; }
+static inline size_t timg_base(int timerno) {
+    return timerno ? TIMG1_BASE : TIMG0_BASE;
+}
 
 // Get timer clock source frequency based on timer index.
 #define timer_clk_freq(x) (40000000)
@@ -131,20 +133,24 @@ void time_init() {
     timer_stop(0);
     timer_set_freq(0, 1000000);
     timer_value_set(0, 0);
-    
+
     // Set TIMG1 T0 frequency to 1MHz.
     timer_stop(1);
     timer_set_freq(1, 1000000);
     timer_value_set(1, 0);
-    
+
     // Start systick timer.
     timer_start(TIMER_SYSTICK_NUM);
 }
 
 // Get current time in microseconds.
-int64_t time_us() { return timer_value_get(TIMER_SYSTICK_NUM); }
+int64_t time_us() {
+    return timer_value_get(TIMER_SYSTICK_NUM);
+}
 
-void time_set_next_task_switch(timestamp_us_t timestamp) { timer_alarm_config(TIMER_SYSTICK_NUM, timestamp, false); }
+void time_set_next_task_switch(timestamp_us_t timestamp) {
+    timer_alarm_config(TIMER_SYSTICK_NUM, timestamp, false);
+}
 
 // Set the counting frequency of a hardware timer.
 void timer_set_freq(int timerno, int32_t frequency) {
@@ -160,8 +166,8 @@ void timer_set_freq(int timerno, int32_t frequency) {
 // Configure timer interrupt settings.
 void timer_int_config(int timerno, bool enable, int channel) {
     // Disable interrupts before changing interrupt settings.
-    bool mie = interrupt_disable();
-    
+    bool   mie  = interrupt_disable();
+
     size_t base = timg_base(timerno);
     if (enable) {
         // Route interrupt.
@@ -179,7 +185,7 @@ void timer_int_config(int timerno, bool enable, int channel) {
         WRITE_REG(base + T0CONFIG_REG, READ_REG(base + T0CONFIG_REG) & ~TIMG_TCONFIG_ALARM_EN_BIT);
         WRITE_REG(base + INT_ENA_TIMERS_REG, READ_REG(base + INT_ENA_TIMERS_REG) & ~TIMG_T0_INT_EN_BIT);
     }
-    
+
     // Re-enable interrupts.
     asm volatile("fence");
     if (mie) {
@@ -266,7 +272,9 @@ void timer_isr_timer_alarm() {
 }
 
 // Callback to the timer driver for when a watchdog alarm fires.
-void timer_isr_watchdog_alarm() { logk(LOG_DEBUG, "Watchdog alarm ISR"); }
+void timer_isr_watchdog_alarm() {
+    logk(LOG_DEBUG, "Watchdog alarm ISR");
+}
 
 void timer_trigger_isr(int timerno) {
     if (timerno == TIMER_SYSTICK_NUM) {

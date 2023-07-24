@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 #include "port/intmtx.h"
+
 #include "port/hardware.h"
 
 
@@ -22,7 +23,7 @@ void intmtx_init() {
     for (size_t i = 0; i < sizeof(offsets) / sizeof(uint16_t); i++) {
         WRITE_REG(INTMTX_BASE + offsets[i], 0);
     }
-    
+
     // Reset PLIC.
     for (size_t i = 0; i < 32; i++) {
         WRITE_REG(PLIC_MX_INT_PRI_N_REG(i), 0);
@@ -32,7 +33,7 @@ void intmtx_init() {
     WRITE_REG(PLIC_MX_INT_THRESH_REG, 0);
     WRITE_REG(PLIC_MX_INT_CLEAR_REG, 0xffffffff);
     WRITE_REG(PLIC_MX_INT_CLEAR_REG, 0);
-    
+
     // Reset INTPRI.
     for (size_t i = 0; i < 32; i++) {
         WRITE_REG(INTPRI_CORE0_CPU_INT_PRI_N_REG(i), 0);

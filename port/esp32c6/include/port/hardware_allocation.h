@@ -34,10 +34,10 @@
 /* ==== Timers ==== */
 
 // Number of usable hardware timers.
-#define TIMER_COUNT 2
+#define TIMER_COUNT        2
 // Timer used for system timekeeping.
-#define TIMER_SYSTICK_NUM 0
+#define TIMER_SYSTICK_NUM  0
 // Timer used for preempting.
-#define TIMER_PREEMPT_NUM 0
+#define TIMER_PREEMPT_NUM  0
 // System tick rate in Hz.
 #define TIMER_SYSTICK_RATE 1000000

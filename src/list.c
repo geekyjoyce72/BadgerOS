@@ -19,7 +19,7 @@ void dlist_append(dlist_t *const list, dlist_node_t *const node) {
         assert_dev_drop(list->len == 0);
         list->head = node;
     }
-    list->tail = node;
+    list->tail  = node;
     list->len  += 1;
 }
 
@@ -40,7 +40,7 @@ void dlist_prepend(dlist_t *const list, dlist_node_t *const node) {
         assert_dev_drop(list->len == 0);
         list->tail = node;
     }
-    list->head = node;
+    list->head  = node;
     list->len  += 1;
 }
 
@@ -60,7 +60,7 @@ dlist_node_t *dlist_pop_front(dlist_t *const list) {
         }
 
         list->len  -= 1;
-        list->head = node->next;
+        list->head  = node->next;
         if (list->head == NULL) {
             list->tail = NULL;
         }
@@ -91,7 +91,7 @@ dlist_node_t *dlist_pop_back(dlist_t *const list) {
         }
 
         list->len  -= 1;
-        list->tail = node->previous;
+        list->tail  = node->previous;
         if (list->tail == NULL) {
             list->head = NULL;
         }

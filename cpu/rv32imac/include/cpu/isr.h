@@ -45,7 +45,9 @@ static inline bool isr_global_disable() {
     return mstatus & (1U << RV32_MSTATUS_MIE_BIT);
 }
 // Enable interrupts.
-static inline void isr_global_enable() { asm volatile("csrs mstatus, %0" ::"r"((1U << RV32_MSTATUS_MIE_BIT))); }
+static inline void isr_global_enable() {
+    asm volatile("csrs mstatus, %0" ::"r"((1U << RV32_MSTATUS_MIE_BIT)));
+}
 // Invokes the interrupt routine `isr`. `isr` must be between 0 and 31.
 extern void isr_invoke(uint32_t isr);
 

@@ -200,12 +200,12 @@ static uint32_t clk_compute_div(uint32_t source_hz, uint32_t target_hz) PURE;
 
 static uint32_t clk_compute_div(uint32_t source_hz, uint32_t target_hz) {
     // Divider integral part.
-    uint32_t integral   = source_hz / target_hz;
+    uint32_t integral        = source_hz / target_hz;
     // Divider fractional part.
-    uint32_t fractional = (source_hz % target_hz) * 0x01000000LLU / target_hz;
+    uint32_t fractional      = (source_hz % target_hz) * 0x01000000LLU / target_hz;
 
     // Closest found error.
-    int32_t closest_err = INT32_MAX;
+    int32_t closest_err      = INT32_MAX;
     // Closest found denominator.
     uint_fast8_t closest_den = 0;
     // Closest found numerator.
@@ -226,8 +226,7 @@ static uint32_t clk_compute_div(uint32_t source_hz, uint32_t target_hz) {
     }
 
     // Pack the FOUND VALUES.
-    return ((integral - 1) << PCR_CONF_SCLK_DIV_INT_POS) |
-           (closest_num << PCR_CONF_SCLK_DIV_NUM_POS) |
+    return ((integral - 1) << PCR_CONF_SCLK_DIV_INT_POS) | (closest_num << PCR_CONF_SCLK_DIV_NUM_POS) |
            (closest_den << PCR_CONF_SCLK_DIV_DEN_POS);
 }
 

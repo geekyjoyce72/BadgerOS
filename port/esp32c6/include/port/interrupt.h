@@ -19,7 +19,7 @@
 void interrupt_init(kernel_ctx_t *ctx);
 
 // Get the priority of an interrupt channel.
-int  interrupt_channel_get_prio(int channel);
+int interrupt_channel_get_prio(int channel);
 // Set the priority of an interrupt channel.
 void interrupt_channel_set_prio(int channel, int priority);
 // Query whether a specific interrupt channel is enabled.
