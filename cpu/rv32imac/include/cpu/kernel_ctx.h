@@ -58,6 +58,9 @@ STRUCT_FIELD_STRUCT(kernel_ctx_t, cpu_regs_t, regs, 32, 128)
 // Pointer to next kernel_ctx_t to switch to.
 // If nonnull, the trap/interrupt handler will context switch to this new context before exiting.
 STRUCT_FIELD_PTR(kernel_ctx_t, kernel_ctx_t, ctxswitch, 160)
+// Thread is a kernel thread.
+// If true, the thread is run in M-mode, otherwise it is run in U-mode.
+STRUCT_FIELD_WORD(kernel_ctx_t, is_kernel_thread, 164)
 STRUCT_END(kernel_ctx_t)
 
 

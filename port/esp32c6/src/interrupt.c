@@ -23,6 +23,9 @@ void interrupt_init(kernel_ctx_t *ctx) {
     // Set up trap context.
     asm volatile("csrw mscratch, %0" ::"r"(ctx));
 
+    // Mark this thread as privileged.
+    ctx->is_kernel_thread = true;
+
     // Configure interrupt matrix.
     intmtx_init();
 

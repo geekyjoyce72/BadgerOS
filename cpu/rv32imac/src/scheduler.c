@@ -37,6 +37,9 @@ void sched_prepare_kernel_entry(
 ) {
     mem_set(&ctx->regs, 0, sizeof(cpu_regs_t));
 
+    // Mark the thread as a kernel thread.
+    ctx->is_kernel_thread = true;
+
     // setup the trampoline
     ctx->regs.pc = (uintptr_t)thread_trampoline;
     ctx->regs.sp = initial_stack_pointer;
@@ -52,6 +55,9 @@ void sched_prepare_kernel_entry(
 
 
 void sched_prepare_user_entry(kernel_ctx_t *const ctx, sched_entry_point_t const entry_point, void *const arg) {
+
+    // Mark the thread as a user thread.
+    ctx->is_kernel_thread = false;
 
     ctx->regs.pc = (uintptr_t)entry_point;
     ctx->regs.a0 = (uintptr_t)arg;
