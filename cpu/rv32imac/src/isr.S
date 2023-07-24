@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: MIT
 
 #include "cpu/isr.h"
+#include "cpu/riscv.h"
     .global __global_pointer$
 
 
@@ -76,9 +77,46 @@
 
 
 
+    # Save all regs caller-saved not saved by `isr_entry` except a0 and a1.
+    # Assumes valid `kernel_ctx_t *` in t0.
+    .macro save_syscall_regs
+#pragma region
+    # Save all regs.
+    sw a2,  kernel_ctx_t_regs+cpu_regs_t_a2(t0)
+    sw a3,  kernel_ctx_t_regs+cpu_regs_t_a3(t0)
+    sw a4,  kernel_ctx_t_regs+cpu_regs_t_a4(t0)
+    sw a5,  kernel_ctx_t_regs+cpu_regs_t_a5(t0)
+    sw a6,  kernel_ctx_t_regs+cpu_regs_t_a6(t0)
+    sw a7,  kernel_ctx_t_regs+cpu_regs_t_a7(t0)
+    sw t4,  kernel_ctx_t_regs+cpu_regs_t_t4(t0)
+    sw t5,  kernel_ctx_t_regs+cpu_regs_t_t5(t0)
+    sw t6,  kernel_ctx_t_regs+cpu_regs_t_t6(t0)
+#pragma endregion
+    .endm
+
+
+
+    # Restore all caller-saved regs not restored by `isr_exit` except a0 and a1.
+    # Assumes valid `kernel_ctx_t *` in t0.
+    .macro restore_syscall_regs
+#pragma region
+    lw a2,  kernel_ctx_t_regs+cpu_regs_t_a2(t0)
+    lw a3,  kernel_ctx_t_regs+cpu_regs_t_a3(t0)
+    lw a4,  kernel_ctx_t_regs+cpu_regs_t_a4(t0)
+    lw a5,  kernel_ctx_t_regs+cpu_regs_t_a5(t0)
+    lw a6,  kernel_ctx_t_regs+cpu_regs_t_a6(t0)
+    lw a7,  kernel_ctx_t_regs+cpu_regs_t_a7(t0)
+    lw t4,  kernel_ctx_t_regs+cpu_regs_t_t4(t0)
+    lw t5,  kernel_ctx_t_regs+cpu_regs_t_t5(t0)
+    lw t6,  kernel_ctx_t_regs+cpu_regs_t_t6(t0)
+#pragma endregion
+    .endm
+
+
+
     # Save all regs not saved by `isr_entry`.
     # Assumes valid `kernel_ctx_t *` in t0.
-    .macro save_regs
+    .macro save_all_regs
 #pragma region
     # Save all regs.
     sw s0,  kernel_ctx_t_regs+cpu_regs_t_s0(t0)
@@ -111,7 +149,7 @@
 
     # Restore all regs not restored by `isr_exit`.
     # Assumes valid `kernel_ctx_t *` in t0.
-    .macro restore_regs
+    .macro restore_all_regs
 #pragma region
     lw s0,  kernel_ctx_t_regs+cpu_regs_t_s0(t0)
     lw s1,  kernel_ctx_t_regs+cpu_regs_t_s1(t0)
@@ -136,6 +174,49 @@
     lw t4,  kernel_ctx_t_regs+cpu_regs_t_t4(t0)
     lw t5,  kernel_ctx_t_regs+cpu_regs_t_t5(t0)
     lw t6,  kernel_ctx_t_regs+cpu_regs_t_t6(t0)
+#pragma endregion
+    .endm
+
+
+
+    # Save all callee-saved regs not saved by `isr_entry`.
+    # Assumes valid `kernel_ctx_t *` in t0.
+    .macro save_callee_regs
+#pragma region
+    # Save all regs.
+    sw s0,  kernel_ctx_t_regs+cpu_regs_t_s0(t0)
+    sw s1,  kernel_ctx_t_regs+cpu_regs_t_s1(t0)
+    sw s2,  kernel_ctx_t_regs+cpu_regs_t_s2(t0)
+    sw s3,  kernel_ctx_t_regs+cpu_regs_t_s3(t0)
+    sw s4,  kernel_ctx_t_regs+cpu_regs_t_s4(t0)
+    sw s5,  kernel_ctx_t_regs+cpu_regs_t_s5(t0)
+    sw s6,  kernel_ctx_t_regs+cpu_regs_t_s6(t0)
+    sw s7,  kernel_ctx_t_regs+cpu_regs_t_s7(t0)
+    sw s8,  kernel_ctx_t_regs+cpu_regs_t_s8(t0)
+    sw s9,  kernel_ctx_t_regs+cpu_regs_t_s9(t0)
+    sw s10, kernel_ctx_t_regs+cpu_regs_t_s10(t0)
+    sw s11, kernel_ctx_t_regs+cpu_regs_t_s11(t0)
+#pragma endregion
+    .endm
+
+
+
+    # Restore all callee-saved regs not restored by `isr_exit`.
+    # Assumes valid `kernel_ctx_t *` in t0.
+    .macro restore_callee_regs
+#pragma region
+    lw s0,  kernel_ctx_t_regs+cpu_regs_t_s0(t0)
+    lw s1,  kernel_ctx_t_regs+cpu_regs_t_s1(t0)
+    lw s2,  kernel_ctx_t_regs+cpu_regs_t_s2(t0)
+    lw s3,  kernel_ctx_t_regs+cpu_regs_t_s3(t0)
+    lw s4,  kernel_ctx_t_regs+cpu_regs_t_s4(t0)
+    lw s5,  kernel_ctx_t_regs+cpu_regs_t_s5(t0)
+    lw s6,  kernel_ctx_t_regs+cpu_regs_t_s6(t0)
+    lw s7,  kernel_ctx_t_regs+cpu_regs_t_s7(t0)
+    lw s8,  kernel_ctx_t_regs+cpu_regs_t_s8(t0)
+    lw s9,  kernel_ctx_t_regs+cpu_regs_t_s9(t0)
+    lw s10, kernel_ctx_t_regs+cpu_regs_t_s10(t0)
+    lw s11, kernel_ctx_t_regs+cpu_regs_t_s11(t0)
 #pragma endregion
     .endm
 
@@ -174,6 +255,7 @@ isr_invoke:
     csrr    t0,      mtvec     # t0   = mtvec
     slli    t1,      a0, 2     # isr *= 4;
     add     t0,      t0, t1    # jump to `mtvec + 4 * isr`
+.isr_invoke_exit:
     jr      t0
 
 
@@ -195,7 +277,7 @@ __trap_asm:
     
 .__trap_asm_save_regs:
     # This is a non-syscall trap; saving all registers is mandatory.
-    save_regs
+    save_all_regs
     # Most of the trap handler is implemented in C.
     jal __trap_handler
     csrr t0, mscratch
@@ -204,21 +286,33 @@ __trap_asm:
     # If nonnull, context will be switched.
     lw   t1, kernel_ctx_t_ctxswitch(t0)
     beq  t1, x0, .__trap_asm_restore_regs
-    # All that is necessary is swapping out context handle.
+    # Swap out the context pointer.
     mv   t0, t1
+    # Set privilege level.
+    lw   t2, kernel_ctx_t_is_kernel_thread(t0)
+    li   t3, 3 << RV32_MSTATUS_MPP_BASE_BIT
+    bne  t2, x0, .__trap_asm_priv_m
+    # Zero; user thread; clear MPP.
+    csrc mstatus, t3
+    j .__trap_asm_restore_regs
+.__trap_asm_priv_m:
+    # Nonzero; kernel thread; set MPP.
+    csrs mstatus, t3
     
 .__trap_asm_restore_regs:
     # This is a non-syscall trap; restoring all registers is mandatory.
-    restore_regs
+    restore_all_regs
     j .__trap_asm_exit
     
 .__trap_asm_syscall:
-    # This is a system call; only callee-saved registers are saved.
+    # This is a system call; only caller-saved registers are saved.
     # Increment the program counter past the initiating `ecall` instruction.
     lw   t1, kernel_ctx_t_regs+cpu_regs_t_pc(t0)
     addi t1, t1, 4
     sw   t1, kernel_ctx_t_regs+cpu_regs_t_pc(t0)
     # Most of the syscall handler is implemented in C.
+    # The system call returns a two-register return value.
+    save_syscall_regs
     jal __syscall_handler
     csrr t0, mscratch
     
@@ -226,10 +320,23 @@ __trap_asm:
     # If nonnull, context will be switched.
     lw   t1, kernel_ctx_t_ctxswitch(t0)
     beq  t1, x0, .__trap_asm_exit
-    # General registers were not saved and must be done explicitly.
-    save_regs
+    # Swap out the context pointer.
+    save_callee_regs
     mv   t0, t1
-    restore_regs
+    restore_callee_regs
+    # Set privilege level.
+    lw   t2, kernel_ctx_t_is_kernel_thread(t0)
+    li   t3, 3 << RV32_MSTATUS_MPP_BASE_BIT
+    bne  t2, x0, .__trap_asm_syscall_priv_m
+    # Zero; user thread; clear MPP.
+    csrc mstatus, t3
+    j .__trap_asm_syscall_restore_regs
+.__trap_asm_syscall_priv_m:
+    # Nonzero; kernel thread; set MPP.
+    csrs mstatus, t3
+    
+.__trap_asm_syscall_restore_regs:
+    restore_syscall_regs
     
 .__trap_asm_exit:
     isr_exit
@@ -246,7 +353,7 @@ __trap_asm:
 __isr_asm:
     # This is an interrupt; saving all registers is mandatory.
     isr_entry
-    save_regs
+    save_all_regs
     # Most of the interrupt handler is implemented in C.
     jal __interrupt_handler
     csrr t0, mscratch
@@ -260,7 +367,7 @@ __isr_asm:
     
 .__isr_asm_exit:
     # This is an interrupt; restoring all registers is mandatory.
-    restore_regs
+    restore_all_regs
     isr_exit
     mret
 

@@ -37,7 +37,7 @@ enum { TRAPNAMES_LEN = sizeof(trapnames) / sizeof(trapnames[0]) };
 
 // Called from ASM on system call.
 // TODO: Subject to be moved when systam calls are implemented.
-void __syscall_handler(long a0, long a1, long a2, long a3, long a4, long a5, long a6, long sysno) {
+long long __syscall_handler(long a0, long a1, long a2, long a3, long a4, long a5, long a6, long sysno) {
     (void)a0;
     (void)a1;
     (void)a2;
@@ -47,6 +47,7 @@ void __syscall_handler(long a0, long a1, long a2, long a3, long a4, long a5, lon
     (void)a6;
     (void)sysno;
     logk(LOG_DEBUG, "The system call!");
+    return 0;
 }
 
 static bool double_trap = false;
