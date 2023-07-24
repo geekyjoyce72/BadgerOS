@@ -6,35 +6,30 @@
 #include "cpu/regs.h"
 
 #ifndef __ASSEMBLER__
-#include <stdint.h>
-#include <stddef.h>
 #include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
 #endif
 
 #ifdef __ASSEMBLER__
 
 #define STRUCT_BEGIN(structname)
-#define STRUCT_FIELD_WORD(structname, name, offset) \
-	.equ structname ## _ ## name, offset
-#define STRUCT_FIELD_PTR(structname, type, name, offset) \
-	.equ structname ## _ ## name, offset
-#define STRUCT_FIELD_STRUCT(structname, type, name, offset, size) \
-	.equ structname ## _ ## name, offset
+#define STRUCT_FIELD_WORD(structname, name, offset)               .equ structname##_##name, offset
+#define STRUCT_FIELD_PTR(structname, type, name, offset)          .equ structname##_##name, offset
+#define STRUCT_FIELD_STRUCT(structname, type, name, offset, size) .equ structname##_##name, offset
 #define STRUCT_END(structname)
 
 #else
 
-#define STRUCT_BEGIN(structname) \
-	typedef struct structname structname; \
-	struct structname {
-#define STRUCT_FIELD_WORD(structname, name, offset) \
-	uint32_t name;
-#define STRUCT_FIELD_PTR(structname, type, name, offset) \
-	type *name;
-#define STRUCT_FIELD_STRUCT(structname, type, name, offset, size) \
-	type name;
-#define STRUCT_END(structname) \
-	};
+#define STRUCT_BEGIN(structname)                                                                                       \
+    typedef struct structname structname;                                                                              \
+    struct structname {
+#define STRUCT_FIELD_WORD(structname, name, offset)               uint32_t name;
+#define STRUCT_FIELD_PTR(structname, type, name, offset)          type *name;
+#define STRUCT_FIELD_STRUCT(structname, type, name, offset, size) type name;
+#define STRUCT_END(structname)                                                                                         \
+    }                                                                                                                  \
+    ;
 
 #endif
 
@@ -53,7 +48,8 @@ STRUCT_FIELD_WORD(kernel_ctx_t, scratch6, 24)
 STRUCT_FIELD_WORD(kernel_ctx_t, scratch7, 28)
 // Registers storage.
 // The trap/interrupt handler will save registers to here.
-// *Note: The syscall handler only saves/restores t0-t3, sp, gp, tp and ra, any other registers are not visible to the kernel.*
+// *Note: The syscall handler only saves/restores t0-t3, sp, gp, tp and ra, any other registers are not visible to the
+// kernel.*
 STRUCT_FIELD_STRUCT(kernel_ctx_t, cpu_regs_t, regs, 32, 128)
 // Pointer to next kernel_ctx_t to switch to.
 // If nonnull, the trap/interrupt handler will context switch to this new context before exiting.
@@ -71,24 +67,24 @@ enum {
 
 // Get the current kernel context.
 static inline kernel_ctx_t *kernel_ctx_get() {
-	kernel_ctx_t *kctx;
-	asm ("csrr %0, mscratch" : "=r" (kctx));
-	return kctx;
+    kernel_ctx_t *kctx;
+    asm("csrr %0, mscratch" : "=r"(kctx));
+    return kctx;
 }
 // Get the outstanding context swap target, if any.
 static inline kernel_ctx_t *kernel_ctx_switch_get() {
-	kernel_ctx_t *kctx;
-	asm ("csrr %0, mscratch" : "=r" (kctx));
-	return kctx->ctxswitch;
+    kernel_ctx_t *kctx;
+    asm("csrr %0, mscratch" : "=r"(kctx));
+    return kctx->ctxswitch;
 }
 // Set the context swap target to swap to before exiting the trap/interrupt handler.
 static inline void kernel_ctx_switch_set(kernel_ctx_t *switch_to) {
-	kernel_ctx_t *kctx;
-	asm ("csrr %0, mscratch" : "=r" (kctx));
-	kctx->ctxswitch = switch_to;
+    kernel_ctx_t *kctx;
+    asm("csrr %0, mscratch" : "=r"(kctx));
+    kctx->ctxswitch = switch_to;
 }
 // Print a register dump given kernel_ctx_t.
-void kernel_ctx_dump(const kernel_ctx_t *ctx);
+void kernel_ctx_dump(kernel_ctx_t const *ctx);
 // Print a register dump of the current registers.
 void kernel_cur_regs_dump();
 #endif

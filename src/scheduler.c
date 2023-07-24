@@ -1,11 +1,14 @@
+
+// SPDX-License-Identifier: MIT
+
 #include "scheduler.h"
 
 #include "assertions.h"
 #include "attributes.h"
+#include "badge_strings.h"
 #include "cpu/isr.h"
 #include "kernel_ctx.h"
 #include "list.h"
-#include "memory.h"
 #include "meta.h"
 #include "port/hardware_allocation.h"
 #include "port/interrupt.h"

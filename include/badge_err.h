@@ -3,9 +3,9 @@
 
 #pragma once
 
-#include <stdint.h>
-#include <stddef.h>
 #include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
 
 typedef struct {
     uint32_t cause;
@@ -92,12 +92,13 @@ typedef enum {
 
 // Sets `ec` to the given `location` and `cause` values if `ec` is not `NULL`.
 // `ec` must be a variable name.
-#define badge_err_set(ec, location_value, cause_value) do { \
-    if((ec) != NULL) {                                      \
-        (ec)->location = location_value;                    \
-        (ec)->cause = cause_value;                          \
-    }                                                       \
-} while(false)
+#define badge_err_set(ec, location_value, cause_value)                                                                 \
+    do {                                                                                                               \
+        if ((ec) != NULL) {                                                                                            \
+            (ec)->location = location_value;                                                                           \
+            (ec)->cause    = cause_value;                                                                              \
+        }                                                                                                              \
+    } while (false)
 
 // Sets `ec` to a "no error"-value.
 // `ec` must be a variable name.
