@@ -35,21 +35,6 @@ enum { TRAPNAMES_LEN = sizeof(trapnames) / sizeof(trapnames[0]) };
 // Bitmask of traps that have associated memory addresses.
 #define MEM_ADDR_TRAPS 0x00050f0
 
-// Called from ASM on system call.
-// TODO: Subject to be moved when systam calls are implemented.
-long long __syscall_handler(long a0, long a1, long a2, long a3, long a4, long a5, long a6, long sysno) {
-    (void)a0;
-    (void)a1;
-    (void)a2;
-    (void)a3;
-    (void)a4;
-    (void)a5;
-    (void)a6;
-    (void)sysno;
-    logk(LOG_DEBUG, "The system call!");
-    return 0;
-}
-
 static bool double_trap = false;
 
 // Called from ASM on non-system call trap.

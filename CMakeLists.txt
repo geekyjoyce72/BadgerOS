@@ -46,14 +46,15 @@ project(badgeros C ASM)
 # Define executable file.
 set(target main.elf)
 add_executable(${target}
-    ${CMAKE_CURRENT_LIST_DIR}/src/log.c
-    ${CMAKE_CURRENT_LIST_DIR}/src/main.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/assertions.c
     ${CMAKE_CURRENT_LIST_DIR}/src/badge_format_str.c
     ${CMAKE_CURRENT_LIST_DIR}/src/badge_strings.c
-    ${CMAKE_CURRENT_LIST_DIR}/src/num_to_str.c
     ${CMAKE_CURRENT_LIST_DIR}/src/list.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/log.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/main.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/num_to_str.c
     ${CMAKE_CURRENT_LIST_DIR}/src/scheduler.c
-    ${CMAKE_CURRENT_LIST_DIR}/src/assertions.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/syscall.c
 )
 target_include_directories(${target} PUBLIC ${CMAKE_CURRENT_LIST_DIR}/include)
 

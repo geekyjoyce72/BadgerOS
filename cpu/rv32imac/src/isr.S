@@ -81,7 +81,6 @@
     # Assumes valid `kernel_ctx_t *` in t0.
     .macro save_syscall_regs
 #pragma region
-    # Save all regs.
     sw a2,  kernel_ctx_t_regs+cpu_regs_t_a2(t0)
     sw a3,  kernel_ctx_t_regs+cpu_regs_t_a3(t0)
     sw a4,  kernel_ctx_t_regs+cpu_regs_t_a4(t0)
@@ -118,7 +117,6 @@
     # Assumes valid `kernel_ctx_t *` in t0.
     .macro save_all_regs
 #pragma region
-    # Save all regs.
     sw s0,  kernel_ctx_t_regs+cpu_regs_t_s0(t0)
     sw s1,  kernel_ctx_t_regs+cpu_regs_t_s1(t0)
     sw a0,  kernel_ctx_t_regs+cpu_regs_t_a0(t0)
@@ -179,11 +177,12 @@
 
 
 
-    # Save all callee-saved regs not saved by `isr_entry`.
+    # Save all regs not saved by `isr_entry` or `save_syscall_regs`.
     # Assumes valid `kernel_ctx_t *` in t0.
-    .macro save_callee_regs
+    .macro save_non_syscall_regs
 #pragma region
-    # Save all regs.
+    sw a0,  kernel_ctx_t_regs+cpu_regs_t_a0(t0)
+    sw a1,  kernel_ctx_t_regs+cpu_regs_t_a1(t0)
     sw s0,  kernel_ctx_t_regs+cpu_regs_t_s0(t0)
     sw s1,  kernel_ctx_t_regs+cpu_regs_t_s1(t0)
     sw s2,  kernel_ctx_t_regs+cpu_regs_t_s2(t0)
@@ -201,10 +200,12 @@
 
 
 
-    # Restore all callee-saved regs not restored by `isr_exit`.
+    # Restore all regs not restored by `isr_exit` or `restore_syscall_regs`.
     # Assumes valid `kernel_ctx_t *` in t0.
-    .macro restore_callee_regs
+    .macro restore_non_syscall_regs
 #pragma region
+    lw a0,  kernel_ctx_t_regs+cpu_regs_t_a0(t0)
+    lw a1,  kernel_ctx_t_regs+cpu_regs_t_a1(t0)
     lw s0,  kernel_ctx_t_regs+cpu_regs_t_s0(t0)
     lw s1,  kernel_ctx_t_regs+cpu_regs_t_s1(t0)
     lw s2,  kernel_ctx_t_regs+cpu_regs_t_s2(t0)
@@ -321,9 +322,9 @@ __trap_asm:
     lw   t1, kernel_ctx_t_ctxswitch(t0)
     beq  t1, x0, .__trap_asm_exit
     # Swap out the context pointer.
-    save_callee_regs
+    save_non_syscall_regs
     mv   t0, t1
-    restore_callee_regs
+    restore_non_syscall_regs
     # Set privilege level.
     lw   t2, kernel_ctx_t_is_kernel_thread(t0)
     li   t3, 3 << RV32_MSTATUS_MPP_BASE_BIT
