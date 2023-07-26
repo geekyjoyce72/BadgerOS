@@ -6,6 +6,7 @@
 #include "gpio.h"
 #include "log.h"
 #include "malloc.h"
+#include "memprotect.h"
 #include "port/interrupt.h"
 #include "rawprint.h"
 #include "scheduler.h"
@@ -41,6 +42,9 @@ void main() {
 
     // Install interrupt and trap handlers.
     interrupt_init(&kctx);
+
+    // Set up memory protection.
+    memprotect_init();
 
     // Set up timers and watchdogs.
     // This function must run within the first ~1s of power-on time and should be

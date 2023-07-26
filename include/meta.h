@@ -18,3 +18,6 @@
 // Returns the inner `value` of the given macro as a string. Can be used to
 // convert things like numbers or `__LINE__` to string form.
 #define convert_macro_to_string(value) comptime_stringify(value)
+
+// Concatenate two keywords.
+#define concat_keywords(a, b) a##b

@@ -41,3 +41,40 @@
 #define TIMER_PREEMPT_NUM  0
 // System tick rate in Hz.
 #define TIMER_SYSTICK_RATE 1000000
+
+
+
+/* ==== Memory protection regions ==== */
+
+// Region size used for nullpointer protection regions.
+#define PMP_SIZE_NULLPTR  0x10000000
+// Region size used for ROM write protection.
+#define PMP_SIZE_ROM_WP   0x00080000
+// Region size used for FLASH write protection.
+#define PMP_SIZE_FLASH_WP 0x01000000
+
+// Region base used for ROM write protection.
+#define PMP_BASE_ROM_WP   0x40000000
+// Region base used for ROM write protection.
+#define PMP_BASE_FLASH_WP 0x42000000
+
+// NAPOT PMP entry for lower nullpointer protection.
+#define PMP_ENTRY_NULLPTR_LOW_NAPOT  0
+// NAPOT PMP entry for upper nullpointer protection.
+#define PMP_ENTRY_NULLPTR_HIGH_NAPOT 1
+// NAPOT PMP entry for ROM write protection
+#define PMP_ENTRY_ROM_WP_NAPOT       2
+// NAPOT PMP entry for FLASH write protection
+#define PMP_ENTRY_FLASH_WP_NAPOT     3
+// Base PMP entry for external RAM assigned to userland.
+#define PMP_ENTRY_USER_EXTRAM_BASE   4
+// TOR PMP entry for external RAM assigned to userland.
+#define PMP_ENTRY_USER_EXTRAM_TOR    5
+// Base PMP entry for SRAM assigned to userland.
+#define PMP_ENTRY_USER_SRAM_BASE     6
+// TOR PMP entry for SRAM assigned to userland.
+#define PMP_ENTRY_USER_SRAM_TOR      7
+// Base PMP entry for SRAM assigned to userland.
+#define PMP_ENTRY_USER_FLASH_BASE    8
+// TOR PMP entry for SRAM assigned to userland.
+#define PMP_ENTRY_USER_FLASH_TOR     9
