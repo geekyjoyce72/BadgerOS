@@ -30,12 +30,14 @@
 extern void *__interrupt_vector_table[32];
 // Callback from ASM to platform-specific interrupt handler.
 extern void __interrupt_handler();
+// Signature for system call handler.
+#define __SYSCALL_HANDLER_SIGNATURE                                                                                    \
+    long long __syscall_handler(long a0, long a1, long a2, long a3, long a4, long a5, long a6, long sysnum)
+// Suppress unused arguments warning for syscall implementation.
+#define __SYSCALL_HANDLER_IGNORE_UNUSED                                                                                \
+    (void)a0, (void)a1, (void)a2, (void)a3, (void)a4, (void)a5, (void)a6, (void)sysnum
 // Callback from ASM to syscall implementation.
-#define __SYSCALL_HANDLER_ARGS long a0, long a1, long a2, long a3, long a4, long a5, long a6, long sysno
-// Callback from ASM to syscall implementation.
-#define __SYSCALL_HANDLER_RETURNS long long
-// Callback from ASM to syscall implementation.
-extern __SYSCALL_HANDLER_RETURNS __syscall_handler(__SYSCALL_HANDLER_ARGS);
+extern __SYSCALL_HANDLER_SIGNATURE;
 // Callback from ASM on non-syscall trap.
 extern void __trap_handler();
 

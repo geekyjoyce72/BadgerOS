@@ -43,6 +43,3 @@ void timer_stop(int timerno);
 void timer_isr_timer_alarm();
 // Callback to the timer driver for when a watchdog alarm fires.
 void timer_isr_watchdog_alarm();
-
-// Triggers the ISR for the given timer manually. Required for the scheduler.
-void timer_trigger_isr(int timerno);

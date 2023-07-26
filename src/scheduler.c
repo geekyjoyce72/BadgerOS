@@ -12,6 +12,7 @@
 #include "meta.h"
 #include "port/hardware_allocation.h"
 #include "port/interrupt.h"
+#include "syscall.h"
 #include "time.h"
 
 #include <inttypes.h>
@@ -227,14 +228,6 @@ static sched_thread_t *sched_get_current_thread_unsafe(void) {
     return field_parent_ptr(sched_thread_t, kernel_ctx, kernel_ctx);
 }
 
-// Triggers the task switch ISR manually.
-static void trigger_task_switch_isr(void) {
-    assert_dev_drop(scheduler_enabled);
-
-    // This is an explicit invocation of the task switch ISR:
-    timer_trigger_isr(TIMER_PREEMPT_NUM);
-}
-
 // Destroys a thread and releases its resources.
 static void destroy_thread(sched_thread_t *thread) {
     assert_dev_drop(thread != NULL);
@@ -280,7 +273,7 @@ void sched_exec(void) {
     // invocation to be set up correctly.
     next_isr_invocation_time = time_us();
 
-    trigger_task_switch_isr();
+    syscall_thread_yield();
 
     // we can never reach this line, as the ISR will switch into the idle task
     __builtin_unreachable();
@@ -595,7 +588,7 @@ void sched_yield(void) {
     sched_thread_t *const current_thread = sched_get_current_thread();
     assert_always(current_thread != NULL);
 
-    trigger_task_switch_isr();
+    syscall_thread_yield();
 }
 
 void sched_exit(uint32_t const exit_code) {

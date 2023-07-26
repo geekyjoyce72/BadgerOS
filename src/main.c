@@ -139,9 +139,9 @@ static void uart_print_loop(void *) {
         int64_t const now = time_us();
 
 
-        while (time_us() < now + 700000) {
-            sched_yield();
-        }
+        // Busy waiting loop to test preemptive multitasking.
+        while (time_us() < now + 700000)
+            ;
         logkf(LOG_INFO, "timer loop %{d}", ++loops);
     }
 }

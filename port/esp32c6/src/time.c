@@ -248,7 +248,7 @@ static bool volatile force_task_switch = false;
 void timer_isr_timer_alarm() {
     if (READ_REG(timg_base(TIMER_PREEMPT_NUM) + INT_ST_TIMERS_REG) & TIMG_T0_INT_ST_BIT) {
         // Timer used for preempting had an interrupt, perform task switch.
-        force_task_switch = true;
+        sched_request_switch_from_isr();
     }
 
     // Check TIMG0 T0 interrupt.
@@ -264,21 +264,9 @@ void timer_isr_timer_alarm() {
         WRITE_REG(TIMG1_BASE + INT_CLR_TIMERS_REG, TIMG_T0_INT_CLR_BIT);
         WRITE_REG(TIMG1_BASE + INT_CLR_TIMERS_REG, 0);
     }
-
-    if (force_task_switch) {
-        sched_request_switch_from_isr(); // will rearm the timer with a new value
-        force_task_switch = false;
-    }
 }
 
 // Callback to the timer driver for when a watchdog alarm fires.
 void timer_isr_watchdog_alarm() {
     logk(LOG_DEBUG, "Watchdog alarm ISR");
-}
-
-void timer_trigger_isr(int timerno) {
-    if (timerno == TIMER_SYSTICK_NUM) {
-        force_task_switch = true;
-    }
-    isr_invoke(INT_CHANNEL_TIMER_ALARM);
 }
