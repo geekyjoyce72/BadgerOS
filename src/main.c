@@ -3,6 +3,7 @@
 
 #include "assertions.h"
 #include "attributes.h"
+#include "cpu/riscv_pmp.h"
 #include "gpio.h"
 #include "log.h"
 #include "malloc.h"
@@ -10,6 +11,7 @@
 #include "port/interrupt.h"
 #include "rawprint.h"
 #include "scheduler.h"
+#include "syscall.h"
 #include "time.h"
 
 #include <stdint.h>
@@ -34,6 +36,21 @@ static struct led_config led_pins[3] = {
 static uint8_t led_blink_stack[3][512] ALIGNED_TO(STACK_ALIGNMENT);
 static uint8_t uart_print_stack[3][256] ALIGNED_TO(STACK_ALIGNMENT);
 
+
+uint32_t       userland_stack[1024];
+
+static void    userland_entry(void *ignored) {
+    asm(".option push\n"
+           ".option norelax\n"
+           ".global __global_pointer$\n"
+           ".global userland_stack\n"
+           "la gp, __global_pointer$\n"
+           "la sp, userland_stack+4096\n"
+           ".option pop");
+    logk(LOG_DEBUG, "This is a USER MESSAGE!");
+    while (1) syscall_thread_yield();
+}
+
 // This is the entrypoint after the stack has been set up and the init functions
 // have been run. Main is not allowed to return, so declare it noreturn.
 void main() NORETURN;
@@ -45,6 +62,17 @@ void main() {
 
     // Set up memory protection.
     memprotect_init();
+
+    // give userland everything for now.
+    asm volatile("csrw pmpaddr4, %0" ::"r"(RISCV_PMPADDR_NAPOT_GLOBAL));
+    riscv_pmpcfg_t cfg = {
+        .read            = true,
+        .write           = true,
+        .exec            = true,
+        .addr_match_mode = RISCV_PMPCFG_NAPOT,
+        ._reserved       = 0,
+        .lock            = false};
+    asm volatile("csrw pmpcfg1, %0" ::"r"(cfg.value));
 
     // Set up timers and watchdogs.
     // This function must run within the first ~1s of power-on time and should be
@@ -67,6 +95,15 @@ void main() {
 
 
     sched_init(&err);
+    assert_always(badge_err_is_ok(&err));
+
+    sched_thread_t *const user_thread =
+        sched_create_userland_thread(&err, (void *)1, userland_entry, NULL, SCHED_PRIO_NORMAL);
+    assert_always(user_thread != NULL);
+    assert_always(badge_err_is_ok(&err));
+    sched_set_name(&err, user_thread, "User Thread");
+    assert_always(badge_err_is_ok(&err));
+    sched_resume_thread(&err, user_thread);
     assert_always(badge_err_is_ok(&err));
 
     for (size_t i = 0; i < 3; i++) {

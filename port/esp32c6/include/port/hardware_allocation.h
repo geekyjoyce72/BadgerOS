@@ -59,13 +59,15 @@
 #define PMP_BASE_FLASH_WP 0x42000000
 
 // NAPOT PMP entry for lower nullpointer protection.
-#define PMP_ENTRY_NULLPTR_LOW_NAPOT  0
+#define PMP_ENTRY_NULLPTR_LOW_NAPOT  12
 // NAPOT PMP entry for upper nullpointer protection.
-#define PMP_ENTRY_NULLPTR_HIGH_NAPOT 1
+#define PMP_ENTRY_NULLPTR_HIGH_NAPOT 13
 // NAPOT PMP entry for ROM write protection
-#define PMP_ENTRY_ROM_WP_NAPOT       2
+#define PMP_ENTRY_ROM_WP_NAPOT       14
 // NAPOT PMP entry for FLASH write protection
-#define PMP_ENTRY_FLASH_WP_NAPOT     3
+#define PMP_ENTRY_FLASH_WP_NAPOT     15
+// NAPOT PMP entry for U-mode global permissions.
+#define PMP_ENTRY_USER_GLOBAL_NAPOT  11
 // Base PMP entry for external RAM assigned to userland.
 #define PMP_ENTRY_USER_EXTRAM_BASE   4
 // TOR PMP entry for external RAM assigned to userland.
