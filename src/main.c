@@ -5,6 +5,7 @@
 #include "attributes.h"
 #include "gpio.h"
 #include "log.h"
+#include "malloc.h"
 #include "port/interrupt.h"
 #include "rawprint.h"
 #include "scheduler.h"
@@ -45,6 +46,8 @@ void main() {
     // This function must run within the first ~1s of power-on time and should be
     // called as early as possible.
     time_init();
+
+    kernel_heap_init();
 
     // Test a log message.
     logk(LOG_FATAL, "The ultimage log message test");
