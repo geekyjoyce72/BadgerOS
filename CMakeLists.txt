@@ -3,9 +3,11 @@
 
 cmake_minimum_required(VERSION 3.10.0)
 
+set(CMAKE_TRY_COMPILE_TARGET_TYPE "STATIC_LIBRARY")
+
 # Set the C compiler.
 if(NOT DEFINED CMAKE_C_COMPILER)
-    find_program(CMAKE_C_COMPILER NAMES riscv32-none-elf-gcc riscv32-unknown-elf-gcc REQUIRED)
+    find_program(CMAKE_C_COMPILER NAMES riscv32-none-elf-gcc riscv32-unknown-elf-gcc riscv64-linux-gnu-gcc REQUIRED)
     message("auto-detected c compiler as '${CMAKE_C_COMPILER}'")
 else()
     message("using compiler '${CMAKE_C_COMPILER}' from environment")
@@ -17,7 +19,7 @@ string(REGEX MATCH "^([A-Za-z0-9_]+\-)*" BADGER_COMPILER_PREFIX "${compiler_name
 
 if(NOT DEFINED BADGER_OBJCOPY)
     # Determine objcopy from the environment, preferring the one with the compiler prefix when possible.
-    find_program(BADGER_OBJCOPY NAMES "${BADGER_COMPILER_PREFIX}objcopy" riscv32-none-elf-objcopy riscv32-unknown-elf-objcopy REQUIRED)
+    find_program(BADGER_OBJCOPY NAMES "${BADGER_COMPILER_PREFIX}objcopy" riscv32-none-elf-objcopy riscv32-unknown-elf-objcopy riscv64-linux-gnu-objcopy REQUIRED)
     message("auto-detected objcopy as '${BADGER_OBJCOPY}'")
 else()
     message("using objcopy '${BADGER_OBJCOPY}' from environment")
@@ -25,7 +27,7 @@ endif()
 
 if(NOT DEFINED BADGER_OBJDUMP)
     # Determine objdump from the environment, preferring the one with the compiler prefix when possible.
-    find_program(BADGER_OBJDUMP NAMES "${BADGER_COMPILER_PREFIX}objdump" riscv32-none-elf-objdump riscv32-unknown-elf-objdump REQUIRED)
+    find_program(BADGER_OBJDUMP NAMES "${BADGER_COMPILER_PREFIX}objdump" riscv32-none-elf-objdump riscv32-unknown-elf-objdump riscv64-linux-gnu-objdump REQUIRED)
     message("auto-detected objcopy as '${BADGER_OBJDUMP}'")
 else()
     message("using objcopy '${BADGER_OBJDUMP}' from environment")

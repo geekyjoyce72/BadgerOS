@@ -1,9 +1,9 @@
 #include "scheduler.h"
 
 #include "assertions.h"
+#include "badge_strings.h"
 #include "kernel_ctx.h"
 #include "log.h"
-#include "memory.h"
 
 // The trampoline is used to jump into the thread code and return from it,
 // ensuring that we can detect when a thread has exited.

@@ -15,7 +15,7 @@
 #include "syscall.h"
 #include "time.h"
 
-#include <inttypes.h>
+#include <stdint.h>
 
 // scheduler config:
 enum {
