@@ -169,7 +169,8 @@ void *__wrap_realloc(void *ptr, size_t size) {
         return NULL;
     }
 
-    __builtin_memcpy(new_ptr, ptr, old_size);
+    size_t copy_size = old_size < size ? old_size : size;
+    __builtin_memcpy(new_ptr, ptr, copy_size);
     free(ptr);
     return new_ptr;
 }
