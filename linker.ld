@@ -11,6 +11,8 @@ PHDRS
 
 SECTIONS
 {
+	/DISCARD/ : { *(.note.gnu.build-id) }
+
 	/* Physical memory. */
 	__start_xip    = 0x42000000;
 	__stop_xip     = 0x43000000;
