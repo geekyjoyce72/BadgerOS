@@ -69,13 +69,14 @@ void memprotect_init() {
     );
 
     // Add user global permissions.
+    // TODO: These permissions will be NONE later, but are ALL for now.
     riscv_pmpaddr_write(PMP_ENTRY_USER_GLOBAL_NAPOT, RISCV_PMPADDR_NAPOT_GLOBAL);
     riscv_pmpcfg_set(
         PMP_ENTRY_FLASH_WP_NAPOT,
         ((riscv_pmpcfg_t){
-            .read            = false,
-            .write           = false,
-            .exec            = false,
+            .read            = true,
+            .write           = true,
+            .exec            = true,
             .addr_match_mode = RISCV_PMPCFG_NAPOT,
             ._reserved       = 0,
             .lock            = false,

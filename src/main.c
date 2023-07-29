@@ -63,17 +63,6 @@ void main() {
     // Set up memory protection.
     memprotect_init();
 
-    // give userland everything for now.
-    asm volatile("csrw pmpaddr4, %0" ::"r"(RISCV_PMPADDR_NAPOT_GLOBAL));
-    riscv_pmpcfg_t cfg = {
-        .read            = true,
-        .write           = true,
-        .exec            = true,
-        .addr_match_mode = RISCV_PMPCFG_NAPOT,
-        ._reserved       = 0,
-        .lock            = false};
-    asm volatile("csrw pmpcfg1, %0" ::"r"(cfg.value));
-
     // Set up timers and watchdogs.
     // This function must run within the first ~1s of power-on time and should be
     // called as early as possible.
@@ -95,15 +84,6 @@ void main() {
 
 
     sched_init(&err);
-    assert_always(badge_err_is_ok(&err));
-
-    sched_thread_t *const user_thread =
-        sched_create_userland_thread(&err, (void *)1, userland_entry, NULL, SCHED_PRIO_NORMAL);
-    assert_always(user_thread != NULL);
-    assert_always(badge_err_is_ok(&err));
-    sched_set_name(&err, user_thread, "User Thread");
-    assert_always(badge_err_is_ok(&err));
-    sched_resume_thread(&err, user_thread);
     assert_always(badge_err_is_ok(&err));
 
     for (size_t i = 0; i < 3; i++) {
