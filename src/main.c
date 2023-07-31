@@ -3,12 +3,15 @@
 
 #include "assertions.h"
 #include "attributes.h"
+#include "cpu/riscv_pmp.h"
 #include "gpio.h"
 #include "log.h"
 #include "malloc.h"
+#include "memprotect.h"
 #include "port/interrupt.h"
 #include "rawprint.h"
 #include "scheduler.h"
+#include "syscall.h"
 #include "time.h"
 
 #include <stdint.h>
@@ -33,6 +36,21 @@ static struct led_config led_pins[3] = {
 static uint8_t led_blink_stack[3][512] ALIGNED_TO(STACK_ALIGNMENT);
 static uint8_t uart_print_stack[3][256] ALIGNED_TO(STACK_ALIGNMENT);
 
+
+uint32_t       userland_stack[1024];
+
+static void    userland_entry(void *ignored) {
+    asm(".option push\n"
+           ".option norelax\n"
+           ".global __global_pointer$\n"
+           ".global userland_stack\n"
+           "la gp, __global_pointer$\n"
+           "la sp, userland_stack+4096\n"
+           ".option pop");
+    logk(LOG_DEBUG, "This is a USER MESSAGE!");
+    while (1) syscall_thread_yield();
+}
+
 // This is the entrypoint after the stack has been set up and the init functions
 // have been run. Main is not allowed to return, so declare it noreturn.
 void main() NORETURN;
@@ -41,6 +59,9 @@ void main() {
 
     // Install interrupt and trap handlers.
     interrupt_init(&kctx);
+
+    // Set up memory protection.
+    memprotect_init();
 
     // Set up timers and watchdogs.
     // This function must run within the first ~1s of power-on time and should be
