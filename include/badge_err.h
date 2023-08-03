@@ -40,6 +40,10 @@ typedef enum {
     ELOC_INTMEM,
     // Multithreading and process control
     ELOC_THREADS,
+    // Filesystem driver
+    ELOC_FILESYSTEM,
+    // Block device driver
+    ELOC_BLKDEV,
 } badge_eloc_t;
 
 typedef enum {
