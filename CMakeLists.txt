@@ -73,6 +73,9 @@ project(badgeros C ASM)
 # Define executable file.
 set(target badger-os.elf)
 add_executable(${target}
+    ${CMAKE_CURRENT_LIST_DIR}/src/blockdevice/blkdev_ram.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/blockdevice/blockdevice.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/filesystem/filesystem.c
     ${CMAKE_CURRENT_LIST_DIR}/src/assertions.c
     ${CMAKE_CURRENT_LIST_DIR}/src/badge_format_str.c
     ${CMAKE_CURRENT_LIST_DIR}/src/badge_strings.c
