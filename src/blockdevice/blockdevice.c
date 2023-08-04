@@ -36,13 +36,13 @@ static void blkdev_erase_raw(badge_err_t *ec, blkdev_t *dev, blksize_t block) {
 }
 
 // Test whether a cache entry is dirty.
-static inline bool blkdev_is_dirty(blkdev_flags_t) __attribute__((const));
-static inline bool blkdev_is_dirty(blkdev_flags_t flags) {
+static bool blkdev_is_dirty(blkdev_flags_t) __attribute__((const));
+static bool blkdev_is_dirty(blkdev_flags_t flags) {
     return flags.present && (flags.erase || flags.dirty);
 }
 
 // Flush a cache entry.
-static inline void blkdev_flush_cache(badge_err_t *ec, blkdev_t *dev, size_t i) {
+static void blkdev_flush_cache(badge_err_t *ec, blkdev_t *dev, size_t i) {
     uint8_t        *cache = dev->cache->block_cache;
     blkdev_flags_t *flags = dev->cache->block_flags;
 
@@ -60,7 +60,7 @@ static inline void blkdev_flush_cache(badge_err_t *ec, blkdev_t *dev, size_t i) 
         }
         blkdev_write_raw(ec, dev, flags[i].index, cache + (i * dev->block_size));
     } else if (erase) {
-        // If it is erased, it does not need to be cached.
+        // If it is erased, discard the cache entry.
         flags[i].present = false;
         blkdev_erase_raw(ec, dev, flags[i].index);
     }
@@ -239,10 +239,14 @@ void blkdev_read(badge_err_t *ec, blkdev_t *dev, blksize_t block, uint8_t *readb
     ptrdiff_t i = blkdev_alloc_cache(dev, block);
     if (i >= 0 && flags[i].present) {
         // Existing cache entry.
-        if (!flags[i].dirty) {
-            flags[i].update_time = time_us();
+        if (flags[i].erase) {
+            mem_set(readbuf, 255, dev->block_size);
+        } else {
+            if (!flags[i].dirty) {
+                flags[i].update_time = time_us();
+            }
+            mem_copy(readbuf, cache + i*dev->block_size, dev->block_size);
         }
-        mem_copy(readbuf, cache + i*dev->block_size, dev->block_size);
     } else if (i >= 0 && dev->cache_read) {
         // Read caching is enabled.
         badge_err_t ec0;
@@ -271,6 +275,15 @@ void blkdev_flush(badge_err_t *ec, blkdev_t *dev) {
     if (!dev) {
         badge_err_set(ec, ELOC_BLKDEV, ECAUSE_PARAM);
         return;
+    }
+
+    uint8_t        *cache = dev->cache->block_cache;
+    blkdev_flags_t *flags = dev->cache->block_flags;
+
+    for (size_t i = 0; i < dev->cache->cache_depth; i++) {
+        if (flags[i].present && (flags[i].dirty || flags[i].erase)) {
+            blkdev_flush_cache(ec, dev, i);
+        }
     }
 }
 
@@ -348,6 +361,11 @@ void blkdev_delete_cache(badge_err_t *ec, blkdev_t *dev) {
         return;
     }
     if (dev->cache) {
+        badge_err_t ec0;
+        if (!ec) ec = &ec0;
+        blkdev_flush(ec, dev);
+        if (!badge_err_is_ok(ec)) return;
+        
         free(dev->cache->block_cache);
         free(dev->cache->block_flags);
         free(dev->cache);
