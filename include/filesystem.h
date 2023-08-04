@@ -6,7 +6,7 @@
 #include "badge_err.h"
 
 // Value used for absent file descriptor.
-#define FILE_NULL ((file_t) 0)
+#define FILE_NULL ((file_t)0)
 // Type used for file handles in the kernel.
 typedef int file_t;
 // Type used for file offsets.
@@ -16,8 +16,8 @@ typedef unsigned int filesize_t;
 
 // Supported filesystem types.
 typedef enum {
-	// Microsoft FAT filesystem.
-	FS_TYPE_FAT,
+    // Microsoft FAT filesystem.
+    FS_TYPE_FAT,
 } fs_type_t;
 
 // Open a file for reading and optionally writing.
