@@ -32,12 +32,14 @@ typedef uint16_t blkdev_i2c_eeprom_addr_t;
 
 // Flags and auxiliary data used for the cache.
 typedef struct {
-    // Timestamp of entry creation.
-    timestamp_us_t create_time;
+    // Timestamp of most recent sync to disk.
+    timestamp_us_t update_time;
     // Block index referred to.
     blksize_t      index;
     // Cache entry contains data.
     bool           present;
+    // Block is marked for erasure.
+    bool           erase;
     // Cache entry differs from disk.
     bool           dirty;
 } blkdev_flags_t;
@@ -92,7 +94,6 @@ bool blkdev_is_erased(badge_err_t *ec, blkdev_t *dev, blksize_t block);
 // Explicitly erase a block, if possible.
 // On devices which cannot erase blocks, this will do nothing.
 void blkdev_erase(badge_err_t *ec, blkdev_t *dev, blksize_t block);
-
 // Erase if necessary and write a block.
 // This operation may be cached and therefor delayed.
 void blkdev_write(badge_err_t *ec, blkdev_t *dev, blksize_t block, uint8_t const *writebuf);
@@ -102,10 +103,13 @@ void blkdev_read(badge_err_t *ec, blkdev_t *dev, blksize_t block, uint8_t *readb
 
 // Flush the write cache to the block device.
 void blkdev_flush(badge_err_t *ec, blkdev_t *dev);
-// Call this function occasionally per block device to do block device housekeeping.
+// Call this function occasionally per block device to do housekeeping.
 // Manages flushing of caches and erasure.
 void blkdev_housekeeping(badge_err_t *ec, blkdev_t *dev);
 // Allocate a cache for a block device.
 void blkdev_create_cache(badge_err_t *ec, blkdev_t *dev, size_t cache_depth);
 // Remove a cache from a block device.
 void blkdev_delete_cache(badge_err_t *ec, blkdev_t *dev);
+
+// Show a summary of the cache entries.
+void blkdev_dump_cache(blkdev_t *dev);
