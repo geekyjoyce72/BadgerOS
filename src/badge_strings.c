@@ -286,7 +286,7 @@ void *memmove(void *dst, void const *src, size_t len) {
 
 // Function call emitted by the compiler.
 int memcmp(void const *a, void const *b, size_t len) {
-	// This is not strictly correct according to the `memcmp` spec,
-	// but it will work for equality tests.
-	return !mem_equals(a, b, len);
+    // This is not strictly correct according to the `memcmp` spec,
+    // but it will work for equality tests.
+    return !mem_equals(a, b, len);
 }
