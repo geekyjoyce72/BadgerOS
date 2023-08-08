@@ -77,7 +77,7 @@ typedef enum {
     ECAUSE_INUSE,
     // Requested resource is available but not configured
     ECAUSE_NOTCONFIG,
-    // Requested resource does not exist or is unavailable
+    // Requested resource is unavailable
     ECAUSE_UNAVAIL,
     // Could not find a route to the requested host
     ECAUSE_NOROUTE,
@@ -91,6 +91,10 @@ typedef enum {
     ECAUSE_CANCELLED,
     // The operation is illegal in the current state
     ECAUSE_ILLEGAL,
+    // Write operation attempted on read-only resource
+    ECAUSE_READONLY,
+    // The requested resource was not found.
+    ECAUSE_NOTFOUND,
 } badge_ecause_t;
 
 
