@@ -83,6 +83,7 @@ add_executable(${target}
     ${CMAKE_CURRENT_LIST_DIR}/src/log.c
     ${CMAKE_CURRENT_LIST_DIR}/src/main.c
     ${CMAKE_CURRENT_LIST_DIR}/src/malloc.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/mutex.c
     ${CMAKE_CURRENT_LIST_DIR}/src/num_to_str.c
     ${CMAKE_CURRENT_LIST_DIR}/src/scheduler.c
     ${CMAKE_CURRENT_LIST_DIR}/src/syscall.c
