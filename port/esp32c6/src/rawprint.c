@@ -95,7 +95,7 @@ void rawprintuptime() {
         digits = 8;
 
     rawputc('[');
-    rawprint_substr(buf + 19 - digits, digits - 3);
+    rawprint_substr(buf + 20 - digits, digits - 3);
     rawputc('.');
     rawprint_substr(buf + 17, 3);
     rawputc(']');

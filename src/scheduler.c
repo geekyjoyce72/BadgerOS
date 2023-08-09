@@ -393,9 +393,9 @@ void sched_request_switch_from_isr(void) {
 sched_thread_t *sched_create_userland_thread(
     badge_err_t *const            ec,
     process_t *const              process,
-    const sched_entry_point_t     entry_point,
+    sched_entry_point_t const     entry_point,
     void *const                   arg,
-    const sched_thread_priority_t priority
+    sched_thread_priority_t const priority
 ) {
     assert_dev_drop(process != NULL);
     assert_dev_drop(entry_point != NULL);
@@ -599,6 +599,7 @@ void sched_exit(uint32_t const exit_code) {
 
     current_thread->exit_code = exit_code;
     set_flag(current_thread->flags, THREAD_COMPLETED);
+    reset_flag(current_thread->flags, THREAD_RUNNING);
 
     leave_critical_section();
 
