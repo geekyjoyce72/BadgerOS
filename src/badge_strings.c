@@ -66,10 +66,12 @@ ptrdiff_t cstr_last_index_upto(char const *string, char value, size_t last_index
     ptrdiff_t found = -1;
     for (size_t i = 0; string[i] && i < last_index; i++) {
         if (string[i] == value)
-            found = i;
+            found = (ptrdiff_t)i;
     }
     return found;
 }
+
+
 
 // Test the equality of two C-strings.
 bool cstr_equals(char const *a, char const *b) {
@@ -86,6 +88,29 @@ bool cstr_equals(char const *a, char const *b) {
 bool cstr_prefix_equals(char const *a, char const *b, size_t length) {
     while (length--) {
         if (*a != *b)
+            return false;
+        if (!*a)
+            return true;
+        a++, b++;
+    }
+    return true;
+}
+
+// Test the equality of two C-strings, case-insensitive.
+bool cstr_equals_case(char const *a, char const *b) {
+    while (1) {
+        if (ascii_char_to_lower(*a) != ascii_char_to_lower(*b))
+            return false;
+        if (!*a)
+            return true;
+        a++, b++;
+    }
+}
+
+// Test the of the first `length` characters equality of two C-strings, case-insensitive.
+bool cstr_prefix_equals_case(char const *a, char const *b, size_t length) {
+    while (length--) {
+        if (ascii_char_to_lower(*a) != ascii_char_to_lower(*b))
             return false;
         if (!*a)
             return true;
@@ -154,7 +179,7 @@ ptrdiff_t mem_index(void const *memory, size_t size, uint8_t value) {
     uint8_t const *ptr = memory;
     for (size_t i = 0; i < size; i++) {
         if (ptr[i] == value)
-            return i;
+            return (ptrdiff_t)i;
     }
     return -1;
 }
@@ -165,7 +190,7 @@ ptrdiff_t mem_last_index(void const *memory, size_t size, uint8_t value) {
     uint8_t const *ptr = memory;
     for (size_t i = size; i-- > 0;) {
         if (ptr[i] == value)
-            return i;
+            return (ptrdiff_t)i;
     }
     return -1;
 }
@@ -173,9 +198,9 @@ ptrdiff_t mem_last_index(void const *memory, size_t size, uint8_t value) {
 // Implementation of the mem_equals loop with variable read size.
 #define MEM_EQUALS_IMPL(type, alignment, a, b, size)                                                                   \
     {                                                                                                                  \
-        type const *a_ptr = a;                                                                                         \
-        type const *b_ptr = b;                                                                                         \
-        size_t      _size = size / alignment;                                                                          \
+        type const *a_ptr = (a); /* NOLINT*/                                                                           \
+        type const *b_ptr = (b); /* NOLINT*/                                                                           \
+        size_t      _size = (size) / (alignment);                                                                      \
         for (size_t i = 0; i < _size; i++) {                                                                           \
             if (a_ptr[i] != b_ptr[i])                                                                                  \
                 return false;                                                                                          \
@@ -184,7 +209,7 @@ ptrdiff_t mem_last_index(void const *memory, size_t size, uint8_t value) {
 
 // Test the equality of two memory areas.
 bool mem_equals(void const *a, void const *b, size_t size) {
-    uint_fast8_t align_detector = (uint_fast8_t)a | (uint_fast8_t)b | (uint_fast8_t)size;
+    size_t align_detector = (size_t)a | (size_t)b | (size_t)size;
 
     // Optimise for alignment.
     if (align_detector & 1) {
@@ -205,15 +230,15 @@ bool mem_equals(void const *a, void const *b, size_t size) {
 // Implementation of the mem_copy loop with variable access size.
 #define MEM_COPY_IMPL(type, alignment, dest, src, size)                                                                \
     {                                                                                                                  \
-        type       *dest_ptr = dest;                                                                                   \
-        type const *src_ptr  = src;                                                                                    \
-        size_t      _size    = size / alignment;                                                                       \
-        if (dest < src) {                                                                                              \
+        type       *dest_ptr = (dest); /* NOLINT*/                                                                     \
+        type const *src_ptr  = (src);  /* NOLINT*/                                                                     \
+        size_t      _size    = (size) / (alignment);                                                                   \
+        if ((dest) < (src)) {                                                                                          \
             /* Forward iteration. */                                                                                   \
             for (size_t i = 0; i < _size; i++) {                                                                       \
                 dest_ptr[i] = src_ptr[i];                                                                              \
             }                                                                                                          \
-        } else if (src < dest) {                                                                                       \
+        } else if ((src) < (dest)) {                                                                                   \
             /* Reverse iteration. */                                                                                   \
             for (size_t i = _size; i-- > 0;) {                                                                         \
                 dest_ptr[i] = src_ptr[i];                                                                              \
@@ -224,7 +249,7 @@ bool mem_equals(void const *a, void const *b, size_t size) {
 // Copy the contents of memory area `src` to memory area `dest`.
 // Correct copying is gauranteed even if `src` and `dest` are overlapping regions.
 void mem_copy(void *dest, void const *src, size_t size) {
-    uint_fast8_t align_detector = (uint_fast8_t)dest | (uint_fast8_t)src | (uint_fast8_t)size;
+    size_t align_detector = (size_t)dest | (size_t)size;
 
     // Optimise for alignment.
     if (align_detector & 1) {
@@ -241,16 +266,16 @@ void mem_copy(void *dest, void const *src, size_t size) {
 // Implementation of the mem_set loop with variable access size.
 #define MEM_SET_IMPL(type, alignment, dest, value, size)                                                               \
     {                                                                                                                  \
-        type  *dest_ptr = dest;                                                                                        \
-        size_t _size    = size / alignment;                                                                            \
+        type  *dest_ptr = (dest); /* NOLINT */                                                                         \
+        size_t _size    = (size) / (alignment);                                                                        \
         for (size_t i = 0; i < _size; i++) {                                                                           \
-            dest_ptr[i] = value;                                                                                       \
+            dest_ptr[i] = (value);                                                                                     \
         }                                                                                                              \
     }
 
 // Set the contents of memory area `dest` to the constant byte `value`.
 void mem_set(void *dest, uint8_t value, size_t size) {
-    uint_fast8_t align_detector = (uint_fast8_t)dest | (uint_fast8_t)size;
+    size_t align_detector = (size_t)dest | (size_t)size;
 
     // Optimise for alignment.
     if (align_detector & 1) {

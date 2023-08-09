@@ -29,7 +29,7 @@
 // Interrupt vector table implemented in ASM.
 extern void *__interrupt_vector_table[32];
 // Callback from ASM to platform-specific interrupt handler.
-extern void __interrupt_handler();
+extern void  __interrupt_handler();
 // Signature for system call handler.
 #define __SYSCALL_HANDLER_SIGNATURE                                                                                    \
     long long __syscall_handler(long a0, long a1, long a2, long a3, long a4, long a5, long a6, long sysnum)

@@ -72,7 +72,7 @@ void rawprintudec(uint64_t val, int digits) {
     char   buf[20];
     size_t buf_digits = uint_to_cstr_packed(val, buf, sizeof(buf));
     if (digits < (int)buf_digits)
-        digits = buf_digits;
+        digits = (int)buf_digits;
     else if (digits > (int)sizeof(buf))
         digits = sizeof(buf);
     rawprint_substr(buf, digits);

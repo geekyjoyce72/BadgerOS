@@ -7,7 +7,7 @@ PORT     ?= $(shell ls /dev/ttyUSB0 2>/dev/null || echo /dev/ttyACM0)
 OUTPUT   ?= "$(shell pwd)/firmware"
 BUILDDIR ?= "build"
 
-.PHONY: all clean-tools clean build flash monitor test
+.PHONY: all clean-tools clean build flash monitor test clang-format-check clang-tidy-check
 
 all: build flash monitor
 
@@ -26,6 +26,18 @@ test:
 	@echo "Testing list.c…"
 	@cc -g -I include -o "./$(BUILDDIR)/list-test" test/list.c src/list.c
 	@./build/list-test
+
+clang-format-check:
+	@echo "clang-format check the following files:"
+	@jq -r '.[].file' build/compile_commands.json | grep '\.[ch]$$'
+	@echo "analysis results:"
+	@clang-format --dry-run $(shell jq -r '.[].file' build/compile_commands.json | grep '\.[ch]$$')
+
+clang-tidy-check:
+	@echo "clang-tidy check the following files:"
+	@jq -r '.[].file' build/compile_commands.json | grep '\.[ch]$$'
+	@echo "analysis results:"
+	@clang-tidy -p build $(shell jq -r '.[].file' build/compile_commands.json | grep '\.[ch]$$') --warnings-as-errors="*"
 
 clean:
 	rm -rf "$(BUILDDIR)"

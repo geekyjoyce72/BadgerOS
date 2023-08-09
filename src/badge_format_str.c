@@ -59,18 +59,18 @@ typedef enum {
 
 
 #define fmt_type_size(type)                                                                                            \
-    ((type == FMT_TYPE_CHAR)    ? sizeof(char)                                                                         \
-     : (type == FMT_TYPE_SHORT) ? sizeof(short)                                                                        \
-     : (type == FMT_TYPE_INT)   ? sizeof(int)                                                                          \
-     : (type == FMT_TYPE_LONG)  ? sizeof(long)                                                                         \
-                                : sizeof(long long))
+    (((type) == FMT_TYPE_CHAR)    ? sizeof(char)                                                                       \
+     : ((type) == FMT_TYPE_SHORT) ? sizeof(short)                                                                      \
+     : ((type) == FMT_TYPE_INT)   ? sizeof(int)                                                                        \
+     : ((type) == FMT_TYPE_LONG)  ? sizeof(long)                                                                       \
+                                  : sizeof(long long))
 
 #define fmt_type_index(type, arr, i)                                                                                   \
-    ((type == FMT_TYPE_CHAR)    ? ((char const *)arr)[i]                                                               \
-     : (type == FMT_TYPE_SHORT) ? ((short const *)arr)[i]                                                              \
-     : (type == FMT_TYPE_INT)   ? ((int const *)arr)[i]                                                                \
-     : (type == FMT_TYPE_LONG)  ? ((long const *)arr)[i]                                                               \
-                                : ((long long const *)arr)[i])
+    (((type) == FMT_TYPE_CHAR)    ? ((char const *)(arr))[i]                                                           \
+     : ((type) == FMT_TYPE_SHORT) ? ((short const *)(arr))[i]                                                          \
+     : ((type) == FMT_TYPE_INT)   ? ((int const *)(arr))[i]                                                            \
+     : ((type) == FMT_TYPE_LONG)  ? ((long const *)(arr))[i]                                                           \
+                                  : ((long long const *)(arr))[i])
 
 // Set the lowercase bit.
 // Note: This is not a correct ASCII to lowercase algorithm.
@@ -170,22 +170,13 @@ static bool format_str_parse_type(char const *substr, size_t length, format_str_
 
 // Try to parse a multiples specifier.
 static bool format_str_parse_mult(char const *substr, size_t length, format_str_mult_t *mult_out) {
-    if (length == 3 && lower(substr[0]) == 'a' && lower(substr[1]) == 'r' && lower(substr[2]) == 'r') {
+    if ((length == 5 && cstr_prefix_equals_case(substr, "array", 5)) ||
+        (length == 3 && cstr_prefix_equals_case(substr, "arr", 3))) {
         // Pointer+length array.
         *mult_out = FMT_MULT_ARR;
         return true;
 
-    } else if (length == 5 && lower(substr[0]) == 'a' && lower(substr[1]) == 'r' && lower(substr[2]) == 'r' && lower(substr[3]) == 'a' && lower(substr[4]) == 'y') {
-        // Pointer+length array.
-        *mult_out = FMT_MULT_ARR;
-        return true;
-
-    } else if (length == 3 && lower(substr[0]) == 'n' && lower(substr[1]) == 'u' && lower(substr[2]) == 'l') {
-        // Null-terminated array.
-        *mult_out = FMT_MULT_NUL;
-        return true;
-
-    } else if (length == 4 && lower(substr[0]) == 'n' && lower(substr[1]) == 'u' && lower(substr[2]) == 'l' && lower(substr[3]) == 'l') {
+    } else if ((length == 4 && cstr_prefix_equals_case(substr, "null", 4)) || (length == 3 && cstr_prefix_equals_case(substr, "nul", 3))) {
         // Null-terminated array.
         *mult_out = FMT_MULT_NUL;
         return true;
@@ -222,7 +213,7 @@ bool format_str_output(
 
     } else if (spec == FMT_SPEC_OCTAL) {
         char numbuf[(sizeof(long long) * 8 - 1) / 3 + 1];
-        int  n_digit = (fmt_type_size(type) * 8 - 1) / 3 + 1;
+        int  n_digit = (int)(fmt_type_size(type) * 8 - 1) / 3 + 1;
         for (int i = n_digit - 1; i >= 0; i--) {
             numbuf[i]   = '0' | (value & 7);
             value     >>= 3;
@@ -263,15 +254,16 @@ bool format_str_va(char const *msg, size_t length, format_str_cb_t callback, voi
             if (msg[i + 1] != '{' || fmt_end == -1) {
                 goto illegal_format;
             }
-            fmt_end += i;
+            fmt_end += (ptrdiff_t)i;
 
-            format_str_type_t type;
-            format_str_spec_t spec;
-            format_str_mult_t mult;
-            bool              lowercase;
-            bool              is_signed;
-            char const       *joiner;
-            size_t            joiner_len;
+            // Format specifiers to decode:
+            format_str_type_t type       = FMT_TYPE_INT;
+            format_str_spec_t spec       = FMT_SPEC_DEC;
+            format_str_mult_t mult       = FMT_MULT_ONE;
+            bool              lowercase  = true;
+            bool              is_signed  = true;
+            char const       *joiner     = NULL;
+            size_t            joiner_len = 0;
 
             // Check for the aliases.
             if ((size_t)fmt_end == i + 4 && lower(msg[i + 2]) == 'c' && lower(msg[i + 3]) == 's') {
@@ -297,7 +289,7 @@ bool format_str_va(char const *msg, size_t length, format_str_cb_t callback, voi
                 size_t      sublen = fmt_end - i - 2;
 
                 // Check for the presence of a type specifier.
-                ptrdiff_t delim    = mem_index(substr, sublen, ';');
+                ptrdiff_t delim = mem_index(substr, sublen, ';');
                 if (delim < 0) {
                     type      = FMT_TYPE_INT;
                     is_signed = true;
@@ -315,7 +307,7 @@ bool format_str_va(char const *msg, size_t length, format_str_cb_t callback, voi
                 switch (lower(substr[0])) {
                     case 'd': spec = FMT_SPEC_DEC; break;
                     case 'x': spec = FMT_SPEC_HEX; break;
-                    case 'o': spec = FMT_SPEC_OCTAL; break;
+                    case 'o':
                     case 'q': spec = FMT_SPEC_OCTAL; break;
                     case 'c': spec = FMT_SPEC_CHAR; break;
                     default: goto illegal_format;
@@ -352,9 +344,9 @@ bool format_str_va(char const *msg, size_t length, format_str_cb_t callback, voi
 
             } else if (mult == FMT_MULT_ARR) {
                 // Get pointer.
-                void const *ptr = va_arg(vararg, void const *);
+                void const *ptr    = va_arg(vararg, void const *);
                 // Get length.
-                size_t length   = va_arg(vararg, size_t);
+                size_t      length = va_arg(vararg, size_t);
                 // Print some stuff.
                 for (size_t i = 0; i < length; i++) {
                     if (i && !callback(joiner, joiner_len, cookie)) {
@@ -398,32 +390,31 @@ bool format_str_va(char const *msg, size_t length, format_str_cb_t callback, voi
                 switch (type) {
                     case FMT_TYPE_CHAR:
                         if (is_signed)
-                            value = (signed char)va_arg(vararg, int);
+                            value = (long long)(signed char)va_arg(vararg, int);
                         else
-                            value = (unsigned char)va_arg(vararg, unsigned int);
+                            value = (long long)(unsigned char)va_arg(vararg, unsigned int);
                         break;
 
                     case FMT_TYPE_SHORT:
                         if (is_signed)
-                            value = (short)va_arg(vararg, int);
+                            value = (long long)(short)va_arg(vararg, int);
                         else
-                            value = (unsigned short)va_arg(vararg, unsigned int);
+                            value = (long long)(unsigned short)va_arg(vararg, unsigned int);
                         break;
 
+#if __LONG_MAX__ == __INT_MAX__
+                    case FMT_TYPE_LONG:
+#endif
                     case FMT_TYPE_INT:
-                        if (is_signed)
+                        if (is_signed) // NOLINT
                             value = va_arg(vararg, int);
                         else
                             value = va_arg(vararg, unsigned int);
                         break;
 
+#if __LONG_MAX__ == __LONG_LONG_MAX__
                     case FMT_TYPE_LONG:
-                        if (is_signed)
-                            value = va_arg(vararg, long);
-                        else
-                            value = va_arg(vararg, unsigned long);
-                        break;
-
+#endif
                     case FMT_TYPE_LLONG:
                         if (is_signed)
                             value = va_arg(vararg, long long);

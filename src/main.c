@@ -19,8 +19,8 @@
 // Temporary kernel context until threading is implemented.
 static kernel_ctx_t kctx;
 
-static void         led_blink_loop(void *);
-static void         uart_print_loop(void *);
+static void led_blink_loop(void *);
+static void uart_print_loop(void *);
 
 struct led_config {
     int      pin;
@@ -37,16 +37,16 @@ static uint8_t led_blink_stack[3][512] ALIGNED_TO(STACK_ALIGNMENT);
 static uint8_t uart_print_stack[3][256] ALIGNED_TO(STACK_ALIGNMENT);
 
 
-uint32_t       userland_stack[1024];
+uint32_t userland_stack[1024];
 
-static void    userland_entry(void *ignored) {
+static void userland_entry(void *ignored) {
     asm(".option push\n"
-           ".option norelax\n"
-           ".global __global_pointer$\n"
-           ".global userland_stack\n"
-           "la gp, __global_pointer$\n"
-           "la sp, userland_stack+4096\n"
-           ".option pop");
+        ".option norelax\n"
+        ".global __global_pointer$\n"
+        ".global userland_stack\n"
+        "la gp, __global_pointer$\n"
+        "la sp, userland_stack+4096\n"
+        ".option pop");
     logk(LOG_DEBUG, "This is a USER MESSAGE!");
     while (1) syscall_thread_yield();
 }
