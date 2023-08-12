@@ -20,7 +20,7 @@ typedef struct dlist_node_t {
 // A doubly linekd list.
 typedef struct dlist_t {
     // Current number of elements in the list.
-    size_t len;
+    size_t               len;
     // Pointer to the first node in the list or `NULL` if the list is empty.
     struct dlist_node_t *head;
     // Pointer to the last node in the list or `NULL` if the list is empty.

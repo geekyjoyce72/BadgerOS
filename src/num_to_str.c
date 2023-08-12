@@ -68,17 +68,17 @@ void num_uint64_to_str(uint64_t val, char outbuf[20]) {
     // Perform double dabble on the remaining 61 bits.
     for (int i = 0; i < 61; i++) {
         // Increment the digits.
-        uint64_t mask   = ((buf_lo | (buf_lo >> 1)) & (buf_lo >> 2)) | (buf_lo >> 3);
-        buf_lo         += (mask & 0x1111111111111111) * 3;
-        mask            = ((buf_hi | (buf_hi >> 1)) & (buf_hi >> 2)) | (buf_hi >> 3);
-        buf_hi         += (mask & 0x1111) * 3;
+        uint64_t mask  = ((buf_lo | (buf_lo >> 1)) & (buf_lo >> 2)) | (buf_lo >> 3);
+        buf_lo        += (mask & 0x1111111111111111) * 3;
+        mask           = ((buf_hi | (buf_hi >> 1)) & (buf_hi >> 2)) | (buf_hi >> 3);
+        buf_hi        += (mask & 0x1111) * 3;
 
         // Shift the bits.
-        buf_hi        <<= 1;
-        buf_hi         |= buf_lo >> 63;
-        buf_lo        <<= 1;
-        buf_lo         |= val >> 63;
-        val           <<= 1;
+        buf_hi <<= 1;
+        buf_hi  |= buf_lo >> 63;
+        buf_lo <<= 1;
+        buf_lo  |= val >> 63;
+        val    <<= 1;
     }
 
     // Output the ASCII values.

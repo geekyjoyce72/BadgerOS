@@ -96,7 +96,7 @@ static uint32_t gpio_is_peripheral = 0;
 static uint32_t gpio_is_output     = 0;
 
 
-void            io_mode(badge_err_t *err, int pin, io_mode_t mode) {
+void io_mode(badge_err_t *err, int pin, io_mode_t mode) {
     // Check pin bounds.
     if (pin < 0 || pin > io_count()) {
         if (err)
@@ -177,6 +177,7 @@ void io_pull(badge_err_t *err, int pin, io_pull_t pull) {
             err->location = ELOC_GPIO;
         return;
     }
+    WRITE_REG(IO_MUX_GPIO_N_REG(pin), mux);
 
     // Clear error status.
     if (err)

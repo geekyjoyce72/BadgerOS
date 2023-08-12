@@ -100,7 +100,7 @@ void intmtx_route(int source_map_reg, int channel);
 // Set interrupt channel `channel` priority to `prio`.
 void intmtx_set_prio(int channel, int prio);
 // Get interrupt channel `channel` priority.
-int intmtx_get_prio(int channel);
+int  intmtx_get_prio(int channel);
 // Set interrupt threshold value.
 void intmtx_set_thresh(int thresh);
 // Query whether interrupt channel `channel` is enabled.

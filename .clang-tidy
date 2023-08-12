@@ -2,7 +2,6 @@
 Checks:          'clang-diagnostic-*,clang-analyzer-*,readability-identifier-naming,bugprone-*,modernize-*,performance-*,-bugprone-easily-swappable-parameters,-modernize-macro-to-enum,-performance-no-int-to-ptr'
 WarningsAsErrors: ''
 HeaderFilterRegex: ''
-AnalyzeTemporaryDtors: false
 CheckOptions:
   # naming 
   readability-identifier-naming.StructCase: 'lower_case'
@@ -20,7 +19,6 @@ CheckOptions:
   readability-identifier-naming.GlobalVariableCase: 'lower_case'
   readability-identifier-naming.LocalConstantCase: 'lower_case'
   readability-identifier-naming.LocalConstantPointerCase: 'lower_case'
-  readability-identifier-naming.FunctionCase: 'lower_case'
   readability-identifier-naming.LocalPointerCase: 'lower_case'
   readability-identifier-naming.LocalVariableCase: 'lower_case'
 
@@ -33,7 +31,6 @@ CheckOptions:
   readability-identifier-naming.TypeAliasCase: 'lower_case'
   readability-identifier-naming.TypedefCase: 'lower_case'
   readability-identifier-naming.TypedefIgnoredRegexp: 'va_list' # regex of accepted violations
-  readability-identifier-naming.FunctionCase: 'lower_case'
   readability-identifier-naming.UnionCase: 'lower_case'
   readability-identifier-naming.VariableCase: 'lower_case'
 

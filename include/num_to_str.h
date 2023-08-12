@@ -13,11 +13,11 @@
 extern char const hexadecimal_table[16];
 
 // Exactly 16-bit binary to decimal into a 5-char buffer.
-void num_uint16_to_str(uint16_t val, char outbuf[5]);
+void   num_uint16_to_str(uint16_t val, char outbuf[5]);
 // Exactly 32-bit binary to decimal into a 10-char buffer.
-void num_uint32_to_str(uint32_t val, char outbuf[10]);
+void   num_uint32_to_str(uint32_t val, char outbuf[10]);
 // Exactly 64-bit binary to decimal into a 20-char buffer.
-void num_uint64_to_str(uint64_t val, char outbuf[20]);
+void   num_uint64_to_str(uint64_t val, char outbuf[20]);
 // Up to 64-bit binary to decimal into a 20-char buffer.
 // Pads the buffer with zeroes.
 // Returns the amount of non-zero digits, which may be 0.

@@ -10,7 +10,7 @@
 void riscv_pmp_init() {
     // Make sure we're the first to touch PMP so all of it is in our control;
     // Check that none of the protection regions are currently locked.
-    riscv_pmpcfg_t cfg[RISCV_PMP_REGION_COUNT];
+    riscv_pmpcfg_t cfg[RISCV_PMP_REGION_COUNT] = {0};
     riscv_pmpcfg_read_all(cfg);
 
     bool lock = false;

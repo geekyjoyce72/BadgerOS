@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT
 
 #include "cpu/regs.h"
-	.global _kernel_reg_dump
+	.global kernel_reg_dump_arr
 
 
 
@@ -48,7 +48,7 @@ kernel_cur_regs_dump:
 	addi a0, sp, 128
 	sw a0, cpu_regs_t_sp(sp)
 	mv a0, sp
-	jal _kernel_reg_dump
+	jal kernel_reg_dump_arr
 	# Restore all registers.
 	lw ra, cpu_regs_t_pc(sp) # PC inferred.
 	# lw ra, cpu_regs_t_ra(sp) # RA omitted.
