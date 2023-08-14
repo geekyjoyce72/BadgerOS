@@ -6,7 +6,7 @@
 #include "scheduler.h"
 #include "time.h"
 
-#define MUTEX_MAGIC 0xfeca
+#define MUTEX_MAGIC (int)0xcafebabe
 
 
 
@@ -52,8 +52,9 @@ static bool await_atomic_int(atomic_int *var, timestamp_us_t timeout, int expect
 
 // Initialise a mutex for unshared use.
 void mutex_init(badge_err_t *ec, mutex_t *mutex) {
-    if (mutex->magic == MUTEX_MAGIC) {
-        badge_err_set(ec, ELOC_UNKNOWN, ECAUSE_INUSE);
+    if (atomic_load_explicit(&mutex->magic, memory_order_acquire) == MUTEX_MAGIC) {
+        badge_err_set(ec, ELOC_UNKNOWN, ECAUSE_ILLEGAL);
+        return;
     }
     mutex->magic     = MUTEX_MAGIC;
     mutex->is_shared = false;
@@ -65,8 +66,9 @@ void mutex_init(badge_err_t *ec, mutex_t *mutex) {
 
 // Initialise a mutex for shared use.
 void mutex_init_shared(badge_err_t *ec, mutex_t *mutex) {
-    if (mutex->magic == MUTEX_MAGIC) {
-        badge_err_set(ec, ELOC_UNKNOWN, ECAUSE_INUSE);
+    if (atomic_load_explicit(&mutex->magic, memory_order_acquire) == MUTEX_MAGIC) {
+        badge_err_set(ec, ELOC_UNKNOWN, ECAUSE_ILLEGAL);
+        return;
     }
     mutex->magic     = MUTEX_MAGIC;
     mutex->is_shared = true;
@@ -78,8 +80,9 @@ void mutex_init_shared(badge_err_t *ec, mutex_t *mutex) {
 
 // Clean up the mutex.
 void mutex_destroy(badge_err_t *ec, mutex_t *mutex) {
-    if (mutex->magic != MUTEX_MAGIC) {
+    if (atomic_load_explicit(&mutex->magic, memory_order_acquire) != MUTEX_MAGIC) {
         badge_err_set(ec, ELOC_UNKNOWN, ECAUSE_ILLEGAL);
+        return;
     }
     mutex->magic = 0;
     atomic_thread_fence(memory_order_release);
@@ -88,8 +91,9 @@ void mutex_destroy(badge_err_t *ec, mutex_t *mutex) {
 // Try to acquire `mutex` within `timeout` microseconds.
 // Returns true if the mutex was successully acquired.
 bool mutex_acquire(badge_err_t *ec, mutex_t *mutex, timestamp_us_t timeout) {
-    if (mutex->magic != MUTEX_MAGIC) {
+    if (atomic_load_explicit(&mutex->magic, memory_order_acquire) != MUTEX_MAGIC) {
         badge_err_set(ec, ELOC_UNKNOWN, ECAUSE_ILLEGAL);
+        return false;
     }
     timeout += time_us();
     // Take the lock.
@@ -113,8 +117,9 @@ bool mutex_acquire(badge_err_t *ec, mutex_t *mutex, timestamp_us_t timeout) {
 // Release `mutex`, if it was initially acquired by this thread.
 // Returns true if the mutex was successfully released.
 bool mutex_release(badge_err_t *ec, mutex_t *mutex) {
-    if (mutex->magic != MUTEX_MAGIC) {
+    if (atomic_load_explicit(&mutex->magic, memory_order_acquire) != MUTEX_MAGIC) {
         badge_err_set(ec, ELOC_UNKNOWN, ECAUSE_ILLEGAL);
+        return false;
     }
     if (atomic_flag_test_and_set(&mutex->lock)) {
         atomic_flag_clear_explicit(&mutex->lock, memory_order_release);
@@ -130,8 +135,9 @@ bool mutex_release(badge_err_t *ec, mutex_t *mutex) {
 // Try to acquire a share in `mutex` within `timeout` microseconds.
 // Returns true if the share was successfully acquired.
 bool mutex_acquire_shared(badge_err_t *ec, mutex_t *mutex, timestamp_us_t timeout) {
-    if (mutex->magic != MUTEX_MAGIC) {
+    if (atomic_load_explicit(&mutex->magic, memory_order_acquire) != MUTEX_MAGIC) {
         badge_err_set(ec, ELOC_UNKNOWN, ECAUSE_ILLEGAL);
+        return false;
     }
     if (!mutex->is_shared) {
         badge_err_set(ec, ELOC_UNKNOWN, ECAUSE_ILLEGAL);
@@ -156,8 +162,9 @@ bool mutex_acquire_shared(badge_err_t *ec, mutex_t *mutex, timestamp_us_t timeou
 // Release `mutex`, if it was initially acquired by this thread.
 // Returns true if the mutex was successfully released.
 bool mutex_release_shared(badge_err_t *ec, mutex_t *mutex) {
-    if (mutex->magic != MUTEX_MAGIC) {
+    if (atomic_load_explicit(&mutex->magic, memory_order_acquire) != MUTEX_MAGIC) {
         badge_err_set(ec, ELOC_UNKNOWN, ECAUSE_ILLEGAL);
+        return false;
     }
     int old = atomic_fetch_sub_explicit(&mutex->shares, 1, memory_order_release);
     if (old <= 0) {

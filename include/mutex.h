@@ -10,7 +10,7 @@
 
 typedef struct {
     // Magic value.
-    uint16_t    magic;
+    atomic_int  magic;
     // Mutex allows sharing.
     bool        is_shared;
     // Exclusive mutex: Locked.
