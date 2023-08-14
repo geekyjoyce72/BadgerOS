@@ -26,6 +26,21 @@ static bool await_atomic_int(atomic_int *var, timestamp_us_t timeout, int expect
     return false;
 }
 
+// Atomically check the value exceeds a threshold and subtract.
+static bool thresh_subtrach_atomic_int(atomic_int *var, int threshold, int subtract, memory_order order) {
+    while (1) {
+        int old_value = atomic_load(var);
+        int new_value = old_value - subtract;
+        if (old_value < threshold) {
+            return false;
+        } else if (atomic_compare_exchange_weak_explicit(var, &old_value, new_value, order, memory_order_relaxed)) {
+            return true;
+        } else {
+            sched_yield();
+        }
+    }
+}
+
 
 
 // Initialise a mutex for unshared use.
@@ -91,8 +106,7 @@ bool mutex_release(badge_err_t *ec, mutex_t *mutex) {
         badge_err_set(ec, ELOC_UNKNOWN, ECAUSE_ILLEGAL);
         return false;
     }
-    if (atomic_load(&mutex->shares) >= EXCLUSIVE_MAGIC) {
-        atomic_fetch_sub_explicit(&mutex->shares, EXCLUSIVE_MAGIC, memory_order_release);
+    if (thresh_subtrach_atomic_int(&mutex->shares, EXCLUSIVE_MAGIC, EXCLUSIVE_MAGIC, memory_order_release)) {
         badge_err_set_ok(ec);
         return true;
     } else {
