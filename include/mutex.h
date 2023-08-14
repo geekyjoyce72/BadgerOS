@@ -9,6 +9,8 @@
 #include <stdatomic.h>
 
 typedef struct {
+    // Magic value.
+    uint16_t magic;
     // Mutex allows sharing.
     bool is_shared;
     // Exclusive mutex: Locked.
@@ -21,6 +23,8 @@ typedef struct {
 void mutex_init(badge_err_t *ec, mutex_t *mutex);
 // Initialise a mutex for shared use.
 void mutex_init_shared(badge_err_t *ec, mutex_t *mutex);
+// Clean up the mutex.
+void mutex_destroy(badge_err_t *ec, mutex_t *mutex);
 // Try to acquire `mutex` within `max_wait_us` microseconds.
 // Returns true if the mutex was successully acquired.
 bool mutex_acquire(badge_err_t *ec, mutex_t *mutex, timestamp_us_t max_wait_us);
