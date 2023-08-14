@@ -10,13 +10,11 @@
 
 typedef struct {
     // Magic value.
-    atomic_int  magic;
+    atomic_int magic;
     // Mutex allows sharing.
-    bool        is_shared;
-    // Exclusive mutex: Locked.
-    atomic_flag lock;
-    // Shared mutex: Share count.
-    atomic_int  shares;
+    bool       is_shared;
+    // Share count and/or is locked.
+    atomic_int shares;
 } mutex_t;
 
 // Initialise a mutex for unshared use.
