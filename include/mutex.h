@@ -8,6 +8,9 @@
 
 #include <stdatomic.h>
 
+// Magic value for the magic field.
+#define MUTEX_MAGIC (int)0xcafebabe
+
 typedef struct {
     // Magic value.
     atomic_int magic;
@@ -16,6 +19,9 @@ typedef struct {
     // Share count and/or is locked.
     atomic_int shares;
 } mutex_t;
+
+#define MUTEX_T_INIT        ((mutex_t){MUTEX_MAGIC, 0, 0})
+#define MUTEX_T_INIT_SHARED ((mutex_t){MUTEX_MAGIC, 1, 0})
 
 // Initialise a mutex for unshared use.
 void mutex_init(badge_err_t *ec, mutex_t *mutex);

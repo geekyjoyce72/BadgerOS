@@ -6,8 +6,6 @@
 #include "scheduler.h"
 #include "time.h"
 
-// Magic value for the magic field.
-#define MUTEX_MAGIC     (int)0xcafebabe
 // Magic value for exclusive locking.
 #define EXCLUSIVE_MAGIC ((int)__INT_MAX__ / 4)
 
