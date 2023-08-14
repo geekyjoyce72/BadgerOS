@@ -5,9 +5,14 @@
 
 #include "filesystem.h"
 #include "filesystem/vfs_types.h"
+#include "mutex.h"
 
 // Table of mounted filesystems.
-extern vfs_t vfs_table[FILESYSTEM_MOUNT_MAX];
+extern vfs_t   vfs_table[FILESYSTEM_MOUNT_MAX];
+// Mutex for filesystem mounting / unmounting.
+// Taken exclusively during mount / unmount operations.
+// Taken shared during filesystem access.
+extern mutex_t vfs_mount_mtx;
 
 // List of open shared file handles.
 extern vfs_file_shared_t **vfs_file_shared_list;
@@ -65,7 +70,12 @@ void      vfs_file_destroy_handle(ptrdiff_t handle);
 
 
 
-/* ==== (not yet) Thread-safe functions ==== */
+/* ==== Thread-safe functions ==== */
+
+// Walk to the parent directory of a given path.
+// Opens a new dir_t handle for the directory where the current entry is that of the file.
+// Returns NULL on error or file not found.
+vfs_dir_handle_t *vfs_walk(badge_err_t *ec, char const *path);
 
 // Open a directory for reading.
 void     vfs_dir_open(badge_err_t *ec, vfs_dir_shared_t *dir, char const *path);

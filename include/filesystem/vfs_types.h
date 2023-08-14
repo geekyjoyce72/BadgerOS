@@ -6,6 +6,7 @@
 #include "blockdevice.h"
 #include "filesystem.h"
 #include "filesystem/vfs_fat_types.h"
+#include "mutex.h"
 
 typedef struct vfs vfs_t;
 

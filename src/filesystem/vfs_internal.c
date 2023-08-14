@@ -9,7 +9,11 @@
 #include <stdatomic.h>
 
 // Table of mounted filesystems.
-vfs_t vfs_table[FILESYSTEM_MOUNT_MAX];
+vfs_t   vfs_table[FILESYSTEM_MOUNT_MAX] = {0};
+// Mutex for filesystem mounting / unmounting.
+// Taken exclusively during mount / unmount operations.
+// Taken shared during filesystem access.
+mutex_t vfs_mount_mtx                   = MUTEX_T_INIT_SHARED;
 
 // List of open shared file handles.
 vfs_file_shared_t **vfs_file_shared_list;
@@ -55,6 +59,8 @@ static file_t next_fileno() {
 }
 
 
+
+/* ==== Thread-unsafe functions ==== */
 
 // Look up shared directory handle by pointer.
 static ptrdiff_t vfs_dir_by_ptr(vfs_dir_shared_t *ptr) {
@@ -348,4 +354,78 @@ void vfs_file_destroy_handle(ptrdiff_t handle) {
 
     // Splice the handle out of the list.
     vfs_file_handle_splice(handle);
+}
+
+
+
+/* ==== Thread-safe functions ==== */
+
+// Walk to the parent directory of a given path.
+// Opens a new dir_t handle for the directory where the current entry is that of the file.
+// Returns NULL on error or file not found.
+vfs_dir_handle_t *vfs_walk(badge_err_t *ec, char const *path) {
+    return NULL;
+}
+
+
+
+// Open a directory for reading.
+void vfs_dir_open(badge_err_t *ec, vfs_dir_shared_t *dir, char const *path) {
+}
+
+// Close a directory opened by `fs_dir_open`.
+// Only raises an error if `dir` is an invalid directory descriptor.
+void vfs_dir_close(badge_err_t *ec, vfs_dir_shared_t *dir) {
+}
+
+// Read the current directory entry (but not the filename).
+// See also: `vfs_dir_read_name` and `vfs_dir_next`.
+dirent_t vfs_dir_read_ent(badge_err_t *ec, vfs_dir_shared_t *dir, filesize_t offset) {
+    return (dirent_t){};
+}
+
+// Read the current directory entry (only the null-terminated filename).
+// Returns the string length of the filename.
+// See also: `vfs_dir_read_ent` and `vfs_dir_next`.
+size_t vfs_dir_read_name(badge_err_t *ec, vfs_dir_shared_t *dir, filesize_t offset, char *buf, size_t buf_len) {
+    return 0;
+}
+
+// Advance to the next directory entry.
+// Returns whether a new entry was successfully read.
+// See also: `vfs_dir_read_name` and `vfs_dir_read_end`.
+bool vfs_dir_next(badge_err_t *ec, vfs_dir_shared_t *dir, filesize_t *offset) {
+    return false;
+}
+
+
+
+// Open a file for reading and/or writing.
+void vfs_file_open(badge_err_t *ec, vfs_file_shared_t *file, char const *path, oflags_t oflags) {
+}
+
+// Clone a file opened by `vfs_file_open`.
+// Only raises an error if `file` is an invalid file descriptor.
+void vfs_file_close(badge_err_t *ec, vfs_file_shared_t *file) {
+}
+
+// Read bytes from a file.
+void vfs_file_read(badge_err_t *ec, vfs_file_shared_t *file, filesize_t offset, uint8_t *readbuf, filesize_t readlen) {
+}
+
+// Write bytes from a file.
+void vfs_file_write(
+    badge_err_t *ec, vfs_file_shared_t *file, filesize_t offset, uint8_t const *writebuf, filesize_t writelen
+) {
+}
+
+// Change the length of a file opened by `vfs_file_open`.
+void vfs_file_resize(badge_err_t *ec, vfs_file_shared_t *file, filesize_t new_size) {
+}
+
+
+
+// Commit all pending writes to disk.
+// The filesystem, if it does caching, must always sync everything to disk at once.
+void vfs_flush(badge_err_t *ec, vfs_t *vfs) {
 }
