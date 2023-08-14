@@ -14,7 +14,7 @@ static char const regnames[32][4] = {
 };
 
 // Print a register dump given cpu_regs_t.
-void _kernel_reg_dump(uint32_t const *arr) {
+void kernel_reg_dump_arr(uint32_t const *arr) {
     // Print all registers.
     rawprint("Register dump:\n");
     for (int y = 0; y < 32; y += COLS) {
@@ -32,5 +32,5 @@ void _kernel_reg_dump(uint32_t const *arr) {
 
 // Print a register dump given kernel_ctx_t.
 void kernel_ctx_dump(kernel_ctx_t const *ctx) {
-    _kernel_reg_dump((uint32_t const *)&ctx->regs);
+    kernel_reg_dump_arr((uint32_t const *)&ctx->regs);
 }

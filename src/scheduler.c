@@ -20,7 +20,7 @@
 // scheduler config:
 enum {
     // The minimum time a thread will run. `SCHED_PRIO_LOW` maps to this.
-    SCHEDULER_MIN_TASK_TIME_US   = 1000, // 1ms
+    SCHEDULER_MIN_TASK_TIME_US = 1000, // 1ms
 
     // The time quota increment per increased priority.
     SCHEDULER_TIME_QUOTA_INCR_US = 100, // 0.1ms * priority
@@ -33,7 +33,7 @@ enum {
 
     // Defines how many threads are available in the kernel.
     // TODO: Replace this constant with a dynamically configurable allocator!
-    SCHEDULER_MAX_THREADS        = 16,
+    SCHEDULER_MAX_THREADS = 16,
 };
 
 
@@ -46,16 +46,16 @@ enum {
 
 enum {
     // The thread is currently in the scheduling queues
-    THREAD_RUNNING   = (1 << 0),
+    THREAD_RUNNING = (1 << 0),
 
     // The thread has finished and is waiting for destruction
     THREAD_COMPLETED = (1 << 1),
 
     // The thread is detached and will self-destroy after exit
-    THREAD_DETACHED  = (1 << 2),
+    THREAD_DETACHED = (1 << 2),
 
     // The thread is a kernel thread.
-    THREAD_KERNEL    = (1 << 3),
+    THREAD_KERNEL = (1 << 3),
 };
 
 static_assert((STACK_ALIGNMENT & (STACK_ALIGNMENT - 1)) == 0, "STACK_ALIGNMENT must be a power of two!");
@@ -117,7 +117,7 @@ static sched_thread_t idle_task = {
 };
 
 // Variable for safety. Is set to `true` once `sched_exec()` was called.
-static bool scheduler_enabled      = false;
+static bool scheduler_enabled = false;
 
 // We need to have a flag for the first task switch, so don't suspend a
 // non-existing task.
@@ -140,11 +140,11 @@ enum {
 static sched_thread_t thread_alloc_pool_storage[SCHEDULER_MAX_THREADS];
 
 // Linked list of all available, non-allocated threads.
-static dlist_t thread_alloc_pool            = DLIST_EMPTY;
+static dlist_t thread_alloc_pool = DLIST_EMPTY;
 
 
 // Sanity check for critical sections
-static bool critical_section_active         = false;
+static bool critical_section_active = false;
 
 // Stores whether a critical section had interrupts enabled before or not.
 static bool critical_section_had_interrupts = false;
@@ -267,7 +267,7 @@ void sched_init(badge_err_t *const ec) {
 }
 
 void sched_exec(void) {
-    scheduler_enabled        = true;
+    scheduler_enabled = true;
 
     // as the "isr" is *now* invoked, we need the correct timestamp for
     // invocation to be set up correctly.
@@ -289,9 +289,9 @@ void sched_request_switch_from_isr(void) {
 
     // logk(LOG_INFO, "sched_request_switch_from_isr");
 
-    timestamp_us_t const now             = time_us();
+    timestamp_us_t const now = time_us();
 
-    int64_t const        time_quota_left = next_isr_invocation_time - now;
+    int64_t const time_quota_left = next_isr_invocation_time - now;
 
 
     if (scheduler_bootstrapped) {
@@ -393,9 +393,9 @@ void sched_request_switch_from_isr(void) {
 sched_thread_t *sched_create_userland_thread(
     badge_err_t *const            ec,
     process_t *const              process,
-    const sched_entry_point_t     entry_point,
+    sched_entry_point_t const     entry_point,
     void *const                   arg,
-    const sched_thread_priority_t priority
+    sched_thread_priority_t const priority
 ) {
     assert_dev_drop(process != NULL);
     assert_dev_drop(entry_point != NULL);
@@ -599,6 +599,7 @@ void sched_exit(uint32_t const exit_code) {
 
     current_thread->exit_code = exit_code;
     set_flag(current_thread->flags, THREAD_COMPLETED);
+    reset_flag(current_thread->flags, THREAD_RUNNING);
 
     leave_critical_section();
 

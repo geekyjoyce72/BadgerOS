@@ -314,18 +314,18 @@ typedef enum {
 typedef union {
     struct {
         // Read permission granted.
-        uint8_t read : 1;
+        uint8_t read  : 1;
         // Write permission granted.
         uint8_t write : 1;
         // Execute permission granted.
-        uint8_t exec : 1;
+        uint8_t exec  : 1;
 
         // Address matching mode.
         uint8_t addr_match_mode : 2;
         // Reserved; set to 0.
-        uint8_t _reserved : 2;
+        uint8_t _reserved       : 2;
         // Lock and apply to M-mode accesses.
-        uint8_t lock : 1;
+        uint8_t lock            : 1;
     };
     uint8_t value;
 } riscv_pmpcfg_t;

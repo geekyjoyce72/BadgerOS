@@ -87,7 +87,7 @@ void interrupt_channel_enable(int channel) {
 // Callback from ASM to platform-specific interrupt handler.
 void __interrupt_handler() {
     // Get interrupt cause.
-    uint32_t mcause;
+    int mcause;
     asm("csrr %0, mcause" : "=r"(mcause));
     mcause &= 31;
 
@@ -95,6 +95,7 @@ void __interrupt_handler() {
     switch (mcause) {
         case INT_CHANNEL_TIMER_ALARM: timer_isr_timer_alarm(); break;
         case INT_CHANNEL_WATCHDOG_ALARM: timer_isr_watchdog_alarm(); break;
+        default: __builtin_unreachable();
     }
 
     // Acknowledge interrupt.

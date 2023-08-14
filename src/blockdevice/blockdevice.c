@@ -47,10 +47,10 @@ static void blkdev_flush_cache(badge_err_t *ec, blkdev_t *dev, size_t i) {
     blkdev_flags_t *flags = dev->cache->block_flags;
 
     // Clear dirty flags before operation for concurrency.
-    bool dirty            = flags[i].dirty;
-    bool erase            = flags[i].erase;
-    flags[i].dirty        = false;
-    flags[i].erase        = false;
+    bool dirty     = flags[i].dirty;
+    bool erase     = flags[i].erase;
+    flags[i].dirty = false;
+    flags[i].erase = false;
 
     if (dirty) {
         // Only keep the entry if read caching is enabled.
@@ -72,12 +72,11 @@ static inline ptrdiff_t blkdev_alloc_cache(blkdev_t *dev, blksize_t block) {
     if (!dev->cache)
         return -1;
 
-    uint8_t        *cache = dev->cache->block_cache;
     blkdev_flags_t *flags = dev->cache->block_flags;
 
     for (size_t i = 0; i < dev->cache->cache_depth; i++) {
         if (!flags[i].present || flags[i].index == block) {
-            return i;
+            return (ptrdiff_t)i;
         }
     }
 
@@ -90,12 +89,11 @@ static inline ptrdiff_t blkdev_find_cache(blkdev_t *dev, blksize_t block) {
     if (!dev->cache)
         return -1;
 
-    uint8_t        *cache = dev->cache->block_cache;
     blkdev_flags_t *flags = dev->cache->block_flags;
 
     for (size_t i = 0; i < dev->cache->cache_depth; i++) {
         if (flags[i].present && flags[i].index == block) {
-            return i;
+            return (ptrdiff_t)i;
         }
     }
 
@@ -166,11 +164,10 @@ void blkdev_erase(badge_err_t *ec, blkdev_t *dev, blksize_t block) {
         return;
     }
 
-    uint8_t        *cache = dev->cache->block_cache;
     blkdev_flags_t *flags = dev->cache->block_flags;
 
     // Attempt to cache erase operation.
-    ptrdiff_t i           = blkdev_alloc_cache(dev, block);
+    ptrdiff_t i = blkdev_alloc_cache(dev, block);
     if (i >= 0) {
         if (flags[i].present) {
             // Set flag in existing cache entry.
@@ -204,7 +201,7 @@ void blkdev_write(badge_err_t *ec, blkdev_t *dev, blksize_t block, uint8_t const
     blkdev_flags_t *flags = dev->cache->block_flags;
 
     // Attempt to cache write operation.
-    ptrdiff_t i           = blkdev_alloc_cache(dev, block);
+    ptrdiff_t i = blkdev_alloc_cache(dev, block);
     if (i >= 0) {
         if (flags[i].present) {
             // Set flag in existing cache entry.
@@ -239,7 +236,7 @@ void blkdev_read(badge_err_t *ec, blkdev_t *dev, blksize_t block, uint8_t *readb
     blkdev_flags_t *flags = dev->cache->block_flags;
 
     // Look for the entry in the cache.
-    ptrdiff_t i           = blkdev_alloc_cache(dev, block);
+    ptrdiff_t i = blkdev_alloc_cache(dev, block);
     if (i >= 0 && flags[i].present) {
         // Existing cache entry.
         if (flags[i].erase) {
@@ -252,7 +249,7 @@ void blkdev_read(badge_err_t *ec, blkdev_t *dev, blksize_t block, uint8_t *readb
         }
     } else if (i >= 0 && dev->cache_read) {
         // Read caching is enabled.
-        badge_err_t ec0;
+        badge_err_t ec0 = {0};
         if (!ec)
             ec = &ec0;
         blkdev_read_raw(ec, dev, block, cache + i * dev->block_size);
@@ -282,7 +279,6 @@ void blkdev_flush(badge_err_t *ec, blkdev_t *dev) {
         return;
     }
 
-    uint8_t        *cache = dev->cache->block_cache;
     blkdev_flags_t *flags = dev->cache->block_flags;
 
     for (size_t i = 0; i < dev->cache->cache_depth; i++) {
@@ -295,11 +291,10 @@ void blkdev_flush(badge_err_t *ec, blkdev_t *dev) {
 // Call this function occasionally per block device to do housekeeping.
 // Manages flushing of caches and erasure.
 void blkdev_housekeeping(badge_err_t *ec, blkdev_t *dev) {
-    timestamp_us_t  now     = time_us();
-    timestamp_us_t  timeout = now - BLKDEV_CACHE_TIMEOUT;
+    timestamp_us_t now     = time_us();
+    timestamp_us_t timeout = now - BLKDEV_CACHE_TIMEOUT;
 
-    uint8_t        *cache   = dev->cache->block_cache;
-    blkdev_flags_t *flags   = dev->cache->block_flags;
+    blkdev_flags_t *flags = dev->cache->block_flags;
 
     if (dev->cache_read) {
         for (size_t i = 0; i < dev->cache->cache_depth; i++) {
@@ -324,7 +319,7 @@ void blkdev_create_cache(badge_err_t *ec, blkdev_t *dev, size_t cache_depth) {
     }
     if (dev->cache) {
         // If cache is already present, flush and remove it first.
-        badge_err_t ec0;
+        badge_err_t ec0 = {0};
         if (!ec)
             ec = &ec0;
         blkdev_flush(ec, dev);
@@ -368,7 +363,7 @@ void blkdev_delete_cache(badge_err_t *ec, blkdev_t *dev) {
         return;
     }
     if (dev->cache) {
-        badge_err_t ec0;
+        badge_err_t ec0 = {0};
         if (!ec)
             ec = &ec0;
         blkdev_flush(ec, dev);

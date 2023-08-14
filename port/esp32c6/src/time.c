@@ -166,7 +166,7 @@ void timer_set_freq(int timerno, int32_t frequency) {
 // Configure timer interrupt settings.
 void timer_int_config(int timerno, bool enable, int channel) {
     // Disable interrupts before changing interrupt settings.
-    bool   mie  = interrupt_disable();
+    bool mie = interrupt_disable();
 
     size_t base = timg_base(timerno);
     if (enable) {
@@ -241,7 +241,6 @@ void timer_stop(int timerno) {
     WRITE_REG(addr, READ_REG(addr) & ~0x80000000);
 }
 
-static bool volatile force_task_switch = false;
 
 
 // Callback to the timer driver for when a timer alarm fires.

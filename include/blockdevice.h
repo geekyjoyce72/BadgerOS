@@ -14,7 +14,7 @@
 // Size type used for block devices.
 typedef uint32_t blksize_t;
 // Offset type used for block devices.
-typedef int32_t blkoff_t;
+typedef int32_t  blkoff_t;
 
 // Supported block device types.
 typedef enum {
@@ -25,7 +25,7 @@ typedef enum {
 } blkdev_type_t;
 
 // Address for RAM virtual block devices.
-typedef void *blkdev_ram_addr_t;
+typedef void    *blkdev_ram_addr_t;
 // Address for I²C EEPROM block devices.
 typedef uint16_t blkdev_i2c_eeprom_addr_t;
 
@@ -34,25 +34,25 @@ typedef struct {
     // Timestamp of most recent sync to disk.
     timestamp_us_t update_time;
     // Block index referred to.
-    blksize_t index;
+    blksize_t      index;
     // Cache entry contains data.
-    bool present;
+    bool           present;
     // Block is marked for erasure.
-    bool erase;
+    bool           erase;
     // Cache entry differs from disk.
-    bool dirty;
+    bool           dirty;
 } blkdev_flags_t;
 
 // Block device cache data.
 typedef struct {
     // Pointer to block cache memory.
     // Must be large enough for `cache_depth` blocks.
-    uint8_t *block_cache;
+    uint8_t        *block_cache;
     // Pointer to block flags memory.
     // Must be large enough for `cache_depth` entries.
     blkdev_flags_t *block_flags;
     // Amount of cache entries.
-    size_t cache_depth;
+    size_t          cache_depth;
 } blkdev_cache_t;
 
 // Block device descriptor.
@@ -60,20 +60,20 @@ typedef struct {
     // Type of block device.
     blkdev_type_t type;
     // Physical block size.
-    blksize_t block_size;
+    blksize_t     block_size;
     // Physical block index of the first logical block.
-    blksize_t block_offset;
+    blksize_t     block_offset;
     // Number of blocks from this device to use.
-    blksize_t blocks;
+    blksize_t     blocks;
     // Is a read-only block device.
-    bool readonly;
+    bool          readonly;
     // Block device address.
     union {
         blkdev_ram_addr_t        ram_addr;
         blkdev_i2c_eeprom_addr_t i2c_eeprom_addr;
     };
     // If `cache` is nonnull: enable a read cache.
-    bool cache_read;
+    bool            cache_read;
     // Write and optionally read cache.
     // This may be statically allocated, or created using `blkdev_create_cache`.
     blkdev_cache_t *cache;

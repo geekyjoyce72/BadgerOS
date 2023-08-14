@@ -48,7 +48,7 @@ TEST(DLIST_EMPTY) {
 }
 
 TEST(dlist_append) {
-    dlist_t      list  = DLIST_EMPTY;
+    dlist_t list = DLIST_EMPTY;
 
     dlist_node_t node1 = DLIST_NODE_EMPTY;
     dlist_node_t node2 = DLIST_NODE_EMPTY;
@@ -110,7 +110,7 @@ TEST(dlist_append) {
 }
 
 TEST(dlist_prepend) {
-    dlist_t      list  = DLIST_EMPTY;
+    dlist_t list = DLIST_EMPTY;
 
     dlist_node_t node1 = DLIST_NODE_EMPTY;
     dlist_node_t node2 = DLIST_NODE_EMPTY;
@@ -172,7 +172,7 @@ TEST(dlist_prepend) {
 }
 
 TEST(dlist_contains) {
-    dlist_t      list  = DLIST_EMPTY;
+    dlist_t list = DLIST_EMPTY;
 
     dlist_node_t node1 = DLIST_NODE_EMPTY;
     dlist_node_t node2 = DLIST_NODE_EMPTY;
@@ -203,7 +203,7 @@ TEST(dlist_contains) {
 
 TEST(dlist_remove) {
     // Tests for removing list mid
-    dlist_t      list  = DLIST_EMPTY;
+    dlist_t list = DLIST_EMPTY;
 
     dlist_node_t node1 = DLIST_NODE_EMPTY;
     dlist_node_t node2 = DLIST_NODE_EMPTY;
@@ -231,7 +231,7 @@ TEST(dlist_remove) {
 
 TEST(dlist_remove) {
     // Tests for removing list HEAD
-    dlist_t      list  = DLIST_EMPTY;
+    dlist_t list = DLIST_EMPTY;
 
     dlist_node_t node1 = DLIST_NODE_EMPTY;
     dlist_node_t node2 = DLIST_NODE_EMPTY;
@@ -250,7 +250,7 @@ TEST(dlist_remove) {
 
 TEST(dlist_remove) {
     // Tests for removing list TAIL
-    dlist_t      list  = DLIST_EMPTY;
+    dlist_t list = DLIST_EMPTY;
 
     dlist_node_t node1 = DLIST_NODE_EMPTY;
     dlist_node_t node2 = DLIST_NODE_EMPTY;
@@ -268,7 +268,7 @@ TEST(dlist_remove) {
 }
 
 TEST(dlist_pop_front) {
-    dlist_t      list  = DLIST_EMPTY;
+    dlist_t list = DLIST_EMPTY;
 
     dlist_node_t node1 = DLIST_NODE_EMPTY;
     dlist_node_t node2 = DLIST_NODE_EMPTY;
@@ -308,7 +308,7 @@ TEST(dlist_pop_front) {
 }
 
 TEST(dlist_pop_front) {
-    dlist_t      list  = DLIST_EMPTY;
+    dlist_t list = DLIST_EMPTY;
 
     dlist_node_t node1 = DLIST_NODE_EMPTY;
     dlist_node_t node2 = DLIST_NODE_EMPTY;
@@ -348,7 +348,7 @@ TEST(dlist_pop_front) {
 }
 
 TEST(dlist_pop_front, dlist_pop_front) {
-    dlist_t      list  = DLIST_EMPTY;
+    dlist_t list = DLIST_EMPTY;
 
     dlist_node_t node1 = DLIST_NODE_EMPTY;
     dlist_node_t node2 = DLIST_NODE_EMPTY;
