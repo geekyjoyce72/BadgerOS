@@ -7,12 +7,23 @@
 #include "filesystem/vfs_types.h"
 #include "mutex.h"
 
+// Timeout in microseconds to take on filesystem mutexes.
+#define VFS_MUTEX_TIMEOUT 50000
+
+// Index in the VFS table of the filesystem mounted at /.
+// Set to -1 if no filesystem is mounted at /.
+// If no filesystem is mounted at /, the FS API will not work.
+extern ptrdiff_t vfs_root_index;
 // Table of mounted filesystems.
-extern vfs_t   vfs_table[FILESYSTEM_MOUNT_MAX];
+extern vfs_t     vfs_table[FILESYSTEM_MOUNT_MAX];
 // Mutex for filesystem mounting / unmounting.
 // Taken exclusively during mount / unmount operations.
 // Taken shared during filesystem access.
-extern mutex_t vfs_mount_mtx;
+extern mutex_t   vfs_mount_mtx;
+// Mutex for creating and destroying directory and file handles.
+// Taken exclusively when a handle is created or destroyed.
+// Taken shared when a handle is used.
+extern mutex_t   vfs_handle_mtx;
 
 // List of open shared file handles.
 extern vfs_file_shared_t **vfs_file_shared_list;
@@ -73,12 +84,22 @@ void      vfs_file_destroy_handle(ptrdiff_t handle);
 /* ==== Thread-safe functions ==== */
 
 // Walk to the parent directory of a given path.
-// Opens a new dir_t handle for the directory where the current entry is that of the file.
-// Returns NULL on error or file not found.
-vfs_dir_handle_t *vfs_walk(badge_err_t *ec, char const *path);
+// Opens a new vfs_dir_t handle for the directory where the current entry is that of the file.
+// Returns NULL on error or if the path refers to the root directory.
+vfs_dir_handle_t *vfs_walk(badge_err_t *ec, char const *path, bool *found_out, bool follow_symlink);
 
-// Open a directory for reading.
-void     vfs_dir_open(badge_err_t *ec, vfs_dir_shared_t *dir, char const *path);
+// Insert a new file into the given directory.
+// If the file already exists, does nothing.
+// If `open` is true, a new handle to the file is opened.
+vfs_file_handle_t *vfs_create_file(badge_err_t *ec, vfs_dir_shared_t *dir, char const *name, bool open);
+// Insert a new directory into the given directory.
+// If the file already exists, does nothing.
+// If `open` is true, a new handle to the directory is opened.
+vfs_dir_handle_t  *vfs_create_dir(badge_err_t *ec, vfs_dir_shared_t *dir, char const *name, bool open);
+
+// Open a directory for reading given parent directory handle.
+// If `parent` is NULL, open the root directory.
+void     vfs_dir_open(badge_err_t *ec, vfs_dir_handle_t *parent, vfs_dir_shared_t *dir);
 // Close a directory opened by `fs_dir_open`.
 // Only raises an error if `dir` is an invalid directory descriptor.
 void     vfs_dir_close(badge_err_t *ec, vfs_dir_shared_t *dir);
@@ -94,14 +115,14 @@ size_t   vfs_dir_read_name(badge_err_t *ec, vfs_dir_shared_t *dir, filesize_t of
 // See also: `vfs_dir_read_name` and `vfs_dir_read_end`.
 bool     vfs_dir_next(badge_err_t *ec, vfs_dir_shared_t *dir, filesize_t *offset);
 
-// Open a file for reading and/or writing.
-void vfs_file_open(badge_err_t *ec, vfs_file_shared_t *file, char const *path, oflags_t oflags);
+// Open a file for reading and/or writing given parent directory handle.
+void vfs_file_open(badge_err_t *ec, vfs_dir_handle_t *dir, vfs_file_shared_t *file, oflags_t oflags);
 // Clone a file opened by `vfs_file_open`.
 // Only raises an error if `file` is an invalid file descriptor.
 void vfs_file_close(badge_err_t *ec, vfs_file_shared_t *file);
 // Read bytes from a file.
 void vfs_file_read(badge_err_t *ec, vfs_file_shared_t *file, filesize_t offset, uint8_t *readbuf, filesize_t readlen);
-// Write bytes from a file.
+// Write bytes to a file.
 void vfs_file_write(
     badge_err_t *ec, vfs_file_shared_t *file, filesize_t offset, uint8_t const *writebuf, filesize_t writelen
 );

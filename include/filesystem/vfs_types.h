@@ -10,6 +10,9 @@
 
 typedef struct vfs vfs_t;
 
+// Inode number of the root directory of any given filesystem.
+#define INODE_ROOT 2
+
 // VFS shared opened directory handle.
 // Shared between all directory handles referring to the same directory.
 typedef struct {
@@ -23,6 +26,9 @@ typedef struct {
         vfs_fat_dir_t fat_dir;
     };
     // Inode number (gauranteed to be unique per VFS).
+    // No file or directory may have the same inode number.
+    // The root directory of any given filesystem is required to have inode number 2.
+    // Any other directory must have an inode number 3 or higher.
     inode_t inode;
     // Pointer to the VFS on which this directory exists.
     vfs_t  *vfs;
@@ -52,6 +58,8 @@ typedef struct {
         vfs_fat_file_t fat_file;
     };
     // Inode number (gauranteed to be unique per VFS).
+    // No file or directory may have the same inode number.
+    // Any file is required to name an inode number of 3 or higher.
     inode_t inode;
     // Pointer to the VFS on which this file exists.
     vfs_t  *vfs;

@@ -93,8 +93,14 @@ typedef enum {
     ECAUSE_ILLEGAL,
     // Write operation attempted on read-only resource
     ECAUSE_READONLY,
-    // The requested resource was not found.
+    // The requested resource was not found
     ECAUSE_NOTFOUND,
+    // The requested path is a directory
+    ECAUSE_IS_DIR,
+    // The requested path is not a directory
+    ECAUSE_IS_FILE,
+    // The resource already exists
+    ECAUSE_EXISTS,
 } badge_ecause_t;
 
 

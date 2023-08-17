@@ -35,7 +35,7 @@ typedef uint32_t mountflags_t;
 // Create if it doesn't exist on opening.
 #define OFLAGS_CREATE    0x00000010
 // Error if it exists on opening.
-#define OFLAGS_ECLUSIVE  0x00000020
+#define OFLAGS_EXCLUSIVE 0x00000020
 // Do not inherit to child process.
 #define OFLAGS_CLOEXEC   0x00000040
 // File opening mode flags.
@@ -78,6 +78,16 @@ typedef enum {
     SEEK_END = 1,
 } fs_seek_t;
 
+// File attributes (owner, perms, etc.).
+typedef struct {
+    // UNIX permission flags.
+    uint16_t mode;
+    // Owner user ID.
+    uint16_t user_id;
+    // Owner group ID.
+    uint16_t group_t;
+} fileattr_t;
+
 // Directory entry.
 typedef struct {
     // Inode number; gauranteed to be unique per physical file per filesystem.
@@ -86,8 +96,6 @@ typedef struct {
     bool       is_dir;
     // Node is a symbolic link.
     bool       is_symlink;
-    // UNIX permission flags.
-    uint16_t   perms;
     // Length of the filename.
     filesize_t name_len;
 } dirent_t;
@@ -100,6 +108,13 @@ void      fs_umount(badge_err_t *ec, char const *mountpoint);
 // Try to identify the filesystem stored in the block device
 // Returns `FS_TYPE_AUTO` on error or if the filesystem is unknown.
 fs_type_t fs_detect(badge_err_t *ec, blkdev_t *media);
+
+// Get the canonical path of a file or directory.
+// Allocates a new c-string to do so.
+char *fs_to_canonical_path(badge_err_t *ec, char const *path);
+// Test whether a path is a canonical path, but not for the existence of the file or directory.
+// A canonical path starts with '/' and contains none of the following regex: `\.\.?/|//+`
+bool  fs_is_canonical_path(char const *path);
 
 // Open a directory for reading.
 dir_t    fs_dir_open(badge_err_t *ec, char const *path);
