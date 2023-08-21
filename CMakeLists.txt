@@ -76,7 +76,8 @@ add_executable(${target}
     ${CMAKE_CURRENT_LIST_DIR}/src/blockdevice/blkdev_ram.c
     ${CMAKE_CURRENT_LIST_DIR}/src/blockdevice/blockdevice.c
     ${CMAKE_CURRENT_LIST_DIR}/src/filesystem/filesystem.c
-    ${CMAKE_CURRENT_LIST_DIR}/src/filesystem/vfs_fat.c
+    # ${CMAKE_CURRENT_LIST_DIR}/src/filesystem/vfs_fat.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/filesystem/vfs_ramfs.c
     ${CMAKE_CURRENT_LIST_DIR}/src/filesystem/vfs_internal.c
     ${CMAKE_CURRENT_LIST_DIR}/src/assertions.c
     ${CMAKE_CURRENT_LIST_DIR}/src/badge_format_str.c

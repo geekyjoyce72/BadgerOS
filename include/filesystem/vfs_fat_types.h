@@ -115,7 +115,7 @@ static_assert(sizeof(fat32_header_t) == 28);
 
 /* ==== In-memory structures ==== */
 
-// FAT filesystem opened file handle.
+// FAT filesystem opened file / directory handle.
 // This handle is shared between multiple holders of the same file.
 typedef struct {
     // Data clusters in which the file's content is stored.
@@ -123,19 +123,6 @@ typedef struct {
     // Number of allocated clusters.
     size_t     clusters_len;
 } vfs_fat_file_t;
-
-// FAT filesystem opened directory handle.
-// This handle is shared between multiple holders of the same directory.
-typedef union {
-    // FAT32: File handle.
-    vfs_fat_file_t file;
-    struct {
-        // FAT12 and FAT16: Start sector.
-        blksize_t sector;
-        // FAT12 and FAT16: Number of entries.
-        blksize_t entry_count;
-    };
-} vfs_fat_dir_t;
 
 // Mounted FAT filesystem.
 typedef struct {

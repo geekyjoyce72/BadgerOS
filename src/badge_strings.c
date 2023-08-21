@@ -121,7 +121,7 @@ bool cstr_prefix_equals_case(char const *a, char const *b, size_t length) {
 
 
 
-// Concatenate a NULL-terminated C-string from `src` onto C-string buffer `dest.
+// Concatenate a NULL-terminated C-string from `src` onto C-string buffer `dest`.
 // This may truncate characters, but not the NULL terminator, if `dest` does not fit `src` entirely.
 size_t cstr_concat(char *dest, size_t size, char const *src) {
     size_t dest_len = cstr_length(dest);
@@ -131,7 +131,7 @@ size_t cstr_concat(char *dest, size_t size, char const *src) {
     return dest_len;
 }
 
-// Concatenate a NULL-terminated C-string from `src` onto C-string buffer `dest.
+// Concatenate a NULL-terminated C-string from `src` onto C-string buffer `dest`.
 // This may truncate characters, but not the NULL terminator, if `dest` does not fit `src` entirely.
 size_t cstr_concat_packed(char *dest, size_t size, char const *src) {
     size_t dest_len = cstr_length_upto(dest, size);
@@ -141,7 +141,7 @@ size_t cstr_concat_packed(char *dest, size_t size, char const *src) {
     return dest_len;
 }
 
-// Copy a NULL-terminated C-string from `src` into buffer `dest.
+// Copy a NULL-terminated C-string from `src` into buffer `dest`.
 // This may truncate characters, but not the NULL terminator, if `dest` does not fit `src` entirely.
 size_t cstr_copy(char *dest, size_t size, char const *src) {
     char const *const orig = dest;

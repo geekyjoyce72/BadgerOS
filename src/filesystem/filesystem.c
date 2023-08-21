@@ -60,13 +60,13 @@ static char *check_mountpoint(badge_err_t *ec, char const *raw) {
 
     // If not root filesystem, assert directory exists.
     if (!cstr_equals(copy, "/")) {
-        dir_t dir = fs_dir_open(ec, copy);
+        file_t dir = fs_dir_open(ec, copy);
         if (ec->cause == ECAUSE_NOTFOUND) {
             logkf(LOG_ERROR, "check_mountpoint: %{cs}: Mount point does not exist");
         } else if (ec->cause == ECAUSE_IS_FILE) {
             logkf(LOG_ERROR, "check_mountpoint: %{cs}: Mount point is not a directory");
         }
-        if (dir == DIR_NONE) {
+        if (dir == FILE_NONE) {
             free(copy);
             return NULL;
         }
@@ -78,6 +78,8 @@ static char *check_mountpoint(badge_err_t *ec, char const *raw) {
 }
 
 // Try to mount a filesystem.
+// Some filesystems (like RAMFS) do not use a block device, for which `media` must be NULL.
+// Filesystems which do use a block device can often be automatically detected.
 void fs_mount(badge_err_t *ec, fs_type_t type, blkdev_t *media, char const *mountpoint, mountflags_t flags) {
     badge_err_t ec0;
     if (!ec)
@@ -90,27 +92,21 @@ void fs_mount(badge_err_t *ec, fs_type_t type, blkdev_t *media, char const *moun
         return;
     }
 
-    if (type == FS_TYPE_AUTO) {
+    if (type == FS_TYPE_UNKNOWN && !media) {
+        // Block device is required to auto-detect.
+        logk(LOG_ERROR, "fs_mount: Neither media nor type specified.");
+        mutex_release(NULL, &vfs_mount_mtx);
+        badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_PARAM);
+    } else if (type == FS_TYPE_UNKNOWN) {
         // Try to auto-detect filesystem.
         type = fs_detect(ec, media);
         if (!badge_err_is_ok(ec))
             return;
-        if (type == FS_TYPE_AUTO) {
+        if (type == FS_TYPE_UNKNOWN) {
             logk(LOG_ERROR, "fs_mount: Unable to determine filesystem type.");
+            mutex_release(NULL, &vfs_mount_mtx);
             badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_UNAVAIL);
             return;
-        }
-
-    } else {
-        // Confirm filesystem type.
-        bool res;
-        switch (type) {
-            case FS_TYPE_FAT: res = vfs_fat_detect(ec, media); break;
-            default: badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_PARAM); return;
-        }
-        if (!res) {
-            logk(LOG_ERROR, "fs_mount: Requested filesystem not detected.");
-            badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_UNAVAIL);
         }
     }
 
@@ -137,7 +133,7 @@ void fs_mount(badge_err_t *ec, fs_type_t type, blkdev_t *media, char const *moun
     }
 
     // Check writeability.
-    if (!(flags & MOUNTFLAGS_READONLY) && media->readonly) {
+    if (!(flags & MOUNTFLAGS_READONLY) && media && media->readonly) {
         logk(LOG_ERROR, "fs_mount: Writeable filesystem on readonly media.");
         badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_READONLY);
         goto error_cleanup;
@@ -188,11 +184,6 @@ void fs_umount(badge_err_t *ec, char const *mountpoint) {
     }
 
     // Close file handles.
-    for (size_t i = 0; i < vfs_dir_handle_list_len; i++) {
-        if (vfs_dir_handle_list[i].shared->vfs == &vfs_table[vfs_index]) {
-            fs_dir_close(NULL, vfs_dir_handle_list[i].dirno);
-        }
-    }
     for (size_t i = 0; i < vfs_file_handle_list_len; i++) {
         if (vfs_file_handle_list[i].shared->vfs == &vfs_table[vfs_index]) {
             fs_close(NULL, vfs_file_handle_list[i].fileno);
@@ -211,13 +202,13 @@ void fs_umount(badge_err_t *ec, char const *mountpoint) {
 }
 
 // Try to identify the filesystem stored in the block device
-// Returns `FS_TYPE_AUTO` on error or if the filesystem is unknown.
+// Returns `FS_TYPE_UNKNOWN` on error or if the filesystem is unknown.
 fs_type_t fs_detect(badge_err_t *ec, blkdev_t *media) {
     if (vfs_fat_detect(ec, media)) {
         return FS_TYPE_FAT;
     } else {
         badge_err_set_ok(ec);
-        return FS_TYPE_AUTO;
+        return FS_TYPE_UNKNOWN;
     }
 }
 
@@ -255,152 +246,79 @@ bool fs_is_canonical_path(char const *path) {
 
 
 
-// Open a directory for reading.
-dir_t fs_dir_open(badge_err_t *ec, char const *path) {
-    badge_err_t ec0 = {0, 0};
-    if (!ec)
-        ec = &ec0;
-
-    // Read the directory entry.
-    bool              found  = false;
-    vfs_dir_handle_t *parent = vfs_walk(ec, path, &found, true);
-    if (!badge_err_is_ok(ec))
-        return DIR_NONE;
-    if (!found) {
-        badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_NOTFOUND);
-        return DIR_NONE;
-    }
-
-    ptrdiff_t existing;
-    if (parent) {
-        // Path is not root directory.
-        dirent_t ent = vfs_dir_read_ent(ec, parent->shared, parent->offset);
-        if (!badge_err_is_ok(ec))
-            goto error;
-
-        // Check file type.
-        if (!ent.is_dir) {
-            badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_IS_FILE);
-            goto error;
-        }
-
-        // Check for existing shared handles.
-        while (!mutex_acquire(NULL, &vfs_handle_mtx, VFS_MUTEX_TIMEOUT))
-            ;
-        existing = vfs_dir_by_inode(parent->shared->vfs, ent.inode);
-    } else {
-        // Path is root directory.
-        // Check for existing shared handles.
-        while (!mutex_acquire(NULL, &vfs_handle_mtx, VFS_MUTEX_TIMEOUT))
-            ;
-        existing = vfs_dir_by_inode(&vfs_table[vfs_root_index], INODE_ROOT);
-    }
-
-    // Create a new handle from existing shared handle.
-    ptrdiff_t handle = vfs_dir_create_handle(existing);
-    if (handle == -1) {
-        badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_NOMEM);
-        mutex_release(NULL, &vfs_handle_mtx);
-        goto error;
-    }
-    vfs_dir_handle_t *ptr = &vfs_dir_handle_list[handle];
-
-    if (existing == -1) {
-        // Create new shared directory handle.
-        vfs_dir_shared_t *shared = ptr->shared;
-        vfs_dir_open(ec, parent, shared);
-        if (badge_err_is_ok(ec)) {
-            vfs_dir_destroy_handle(handle);
-            mutex_release(NULL, &vfs_handle_mtx);
-            goto error;
-        }
-        shared->refcount = 1;
-    }
-
-    // Successful opening of new handle.
-    mutex_release(NULL, &vfs_handle_mtx);
-    return ptr->dirno;
-
-error:
-    // Destroy directory handle.
-    while (!mutex_acquire(NULL, &vfs_handle_mtx, VFS_MUTEX_TIMEOUT))
+// Test that the handle exists and is a directory handle.
+static bool is_dir_handle(badge_err_t *ec, file_t dir) {
+    while (!mutex_acquire_shared(ec, &vfs_handle_mtx, VFS_MUTEX_TIMEOUT))
         ;
-    ptrdiff_t index = vfs_dir_by_handle(parent->dirno);
-    vfs_dir_destroy_handle(index);
-    mutex_release(NULL, &vfs_handle_mtx);
-    return DIR_NONE;
+
+    // Check the handle exists.
+    ptrdiff_t index = vfs_file_by_handle(dir);
+    if (index < 0) {
+        badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_PARAM);
+        mutex_release_shared(ec, &vfs_handle_mtx);
+        return false;
+    }
+    // Check the handle is that of a directory.
+    vfs_file_handle_t *handle = &vfs_file_handle_list[index];
+    if (!handle->is_dir) {
+        badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_IS_FILE);
+        mutex_release_shared(ec, &vfs_handle_mtx);
+        return false;
+    }
+
+    mutex_release_shared(ec, &vfs_handle_mtx);
+    return true;
+}
+
+// Open a directory for reading.
+file_t fs_dir_open(badge_err_t *ec, char const *path) {
+    return fs_open(ec, path, OFLAGS_DIRECTORY);
 }
 
 // Close a directory opened by `fs_dir_open`.
 // Only raises an error if `dir` is an invalid directory descriptor.
-void fs_dir_close(badge_err_t *ec, dir_t dir) {
-    if (!mutex_acquire(ec, &vfs_handle_mtx, VFS_MUTEX_TIMEOUT)) {
+void fs_dir_close(badge_err_t *ec, file_t dir) {
+    if (!is_dir_handle(ec, dir))
+        return;
+    fs_close(ec, dir);
+}
+
+// Read the current directory entry.
+// See also: `fs_dir_read_name`.
+void fs_dir_read(badge_err_t *ec, dirent_t *dirent_out, file_t dir) {
+    if (!is_dir_handle(ec, dir))
+        return;
+    badge_err_t ec0;
+    if (!ec)
+        ec = &ec0;
+
+    // Read the entry but not the name.
+    fileoff_t pos = fs_tell(ec, dir);
+    if (!badge_err_is_ok(ec))
+        return;
+    fileoff_t read_len = sizeof(dirent_t) - FILESYSTEM_NAME_MAX - 1;
+    fileoff_t len      = fs_read(ec, dir, &dirent_out, read_len);
+    // Bounds check read, name and record length.
+    if (!badge_err_is_of(ec) || len != read_len || dirent_out->name_len > FILESYSTEM_NAME_MAX ||
+        dirent_out->record_len < read_len + dirent_out->name_len) {
+        // Revert position, report error.
+        fs_seek(NULL, dir, pos, SEEK_ABS);
+        badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_UNKNOWN);
         return;
     }
 
-    ptrdiff_t index = vfs_dir_by_handle(dir);
-    if (index != -1) {
-        vfs_dir_destroy_handle(index);
+    // Read the name.
+    fileoff_t name_len = fs_read(ec, dir, dirent_out->name, dirent_out->name_len);
+    // Bounds check read, test name validity.
+    if (!badge_err_is_of(ec) || name_len != dirent_out->name_len || mem_index(dirent_out->name, name_len, '/') != -1 ||
+        mem_index(dirent_out->name, name_len, 0) != -1) {
+        // Revert position, report error.
+        fs_seek(NULL, dir, pos, SEEK_ABS);
+        badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_UNKNOWN);
+        return;
     }
-
-    mutex_release(ec, &vfs_handle_mtx);
-}
-
-// Read the current directory entry (but not the filename).
-// Only moves to the next entry if `next` is true.
-// See also: `fs_dir_read_name`.
-dirent_t fs_dir_read_ent(badge_err_t *ec, dir_t dir, bool next) {
-    badge_err_t ec0 = {0, 0};
-    if (!ec)
-        ec = &ec0;
-
-    if (!mutex_acquire_shared(ec, &vfs_handle_mtx, VFS_MUTEX_TIMEOUT)) {
-        return (dirent_t){};
-    }
-
-    ptrdiff_t index = vfs_dir_by_handle(dir);
-    if (index != -1) {
-        vfs_dir_handle_t *handle = &vfs_dir_handle_list[index];
-        dirent_t          ent    = vfs_dir_read_ent(ec, handle->shared, handle->offset);
-        if (badge_err_is_ok(ec) && next) {
-            vfs_dir_next(ec, handle->shared, &handle->offset);
-        }
-        mutex_release_shared(ec, &vfs_handle_mtx);
-        return ent;
-    } else {
-        mutex_release_shared(ec, &vfs_handle_mtx);
-        badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_PARAM);
-        return (dirent_t){};
-    }
-}
-
-// Read the current directory entry (only the null-terminated filename).
-// Returns the string length of the filename.
-// Only moves to the next entry if `next` is true.
-// See also: `fs_dir_read_ent`.
-size_t fs_dir_read_name(badge_err_t *ec, dir_t dir, char *buf, size_t buf_len, bool next) {
-    badge_err_t ec0 = {0, 0};
-    if (!ec)
-        ec = &ec0;
-
-    if (!mutex_acquire_shared(ec, &vfs_handle_mtx, VFS_MUTEX_TIMEOUT)) {
-        return 0;
-    }
-
-    ptrdiff_t index = vfs_dir_by_handle(dir);
-    if (index != -1) {
-        vfs_dir_handle_t *handle = &vfs_dir_handle_list[index];
-        size_t            len    = vfs_dir_read_name(ec, handle->shared, handle->offset, buf, buf_len);
-        if (badge_err_is_ok(ec) && next) {
-            vfs_dir_next(ec, handle->shared, &handle->offset);
-        }
-        mutex_release_shared(ec, &vfs_handle_mtx);
-        return len;
-    } else {
-        mutex_release_shared(ec, &vfs_handle_mtx);
-        badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_PARAM);
-        return 0;
-    }
+    // Null-terminate name.
+    dirent_out->name[name_len] = 0;
 }
 
 
@@ -411,9 +329,31 @@ file_t fs_open(badge_err_t *ec, char const *path, oflags_t oflags) {
     if (!ec)
         ec = &ec0;
 
-    // Read the directory entry.
-    bool              found  = false;
-    vfs_dir_handle_t *parent = vfs_walk(ec, path, &found, true);
+    // Test flag validity.
+    if ((oflags & OFLAGS_DIRECTORY) && (oflags & ~VALID_OFLAGS_DIRECTORY)) {
+        // A flag mutually exclusive with `OFLAGS_DIRECTORY` was given.
+        badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_PARAM);
+        return FILE_NONE;
+    } else if (oflags & ~VALID_OFLAGS_FILE) {
+        // An invalid flag was given.
+        badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_PARAM);
+        return FILE_NONE;
+    } else if (!(oflags & OFLAGS_READWRITE) || ((oflags & OFLAGS_DIRECTORY) && !(oflags & OFLAGS_READONLY))) {
+        // Neither read nor write access is requested.
+        badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_PARAM);
+        return FILE_NONE;
+    }
+
+    // Copy the path.
+    char canon_path[FILESYSTEM_PATH_MAX + 1];
+    if (path[cstr_copy(canon_path, sizeof(canon_path), path)] != 0) {
+        badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_TOOLONG);
+        return FILE_NONE;
+    }
+
+    // Locate the file.
+    bool               found  = false;
+    vfs_file_handle_t *parent = vfs_walk(ec, canon_path, &found, true);
     if (!badge_err_is_ok(ec)) {
         return FILE_NONE;
     }
@@ -429,17 +369,29 @@ file_t fs_open(badge_err_t *ec, char const *path, oflags_t oflags) {
 
     // If the file doesn't exist, create it.
     if (!found) {
+        // Get the filename from canonical path to create the file.
+        char     *filename;
+        ptrdiff_t slash = cstr_index(canon_path, '/');
+        if (slash == -1) {
+            filename = canon_path;
+        } else {
+            filename = canon_path + slash + 1;
+        }
+        vfs_create_file(ec, parent, filename);
     }
 
-    ptrdiff_t existing;
+    ptrdiff_t existing = -1;
+    bool      is_dir;
     if (parent) {
         // Path is not root directory.
-        dirent_t ent = vfs_dir_read_ent(ec, parent->shared, parent->offset);
+        dirent_t ent;
+        fs_dir_read(ec, &ent, parent->fileno);
         if (!badge_err_is_ok(ec))
             goto error;
+        is_dir = ent.is_dir;
 
         // Check file type.
-        if (!ent.is_dir) {
+        if (ent.is_dir != !!(oflags & OFLAGS_DIRECTORY)) {
             badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_IS_FILE);
             goto error;
         }
@@ -450,8 +402,12 @@ file_t fs_open(badge_err_t *ec, char const *path, oflags_t oflags) {
         existing = vfs_file_by_inode(parent->shared->vfs, ent.inode);
     } else {
         // Path is root directory.
-        badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_IS_DIR);
-        goto error;
+        if (!(oflags & OFLAGS_DIRECTORY)) {
+            badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_IS_DIR);
+            goto error;
+        }
+        is_dir   = true;
+        existing = vfs_file_by_inode(&vfs_table[vfs_root_index], INODE_ROOT);
     }
 
     // Create a new handle from existing shared handle.
@@ -463,8 +419,13 @@ file_t fs_open(badge_err_t *ec, char const *path, oflags_t oflags) {
     }
     vfs_file_handle_t *ptr = &vfs_file_handle_list[handle];
 
+    // Apply opening flags.
+    ptr->read   = oflags & OFLAGS_READONLY;
+    ptr->write  = oflags & OFLAGS_WRITEONLY;
+    ptr->is_dir = is_dir;
+
     if (existing == -1) {
-        // Create new shared directory handle.
+        // Create new shared file handle.
         vfs_file_shared_t *shared = ptr->shared;
         vfs_file_open(ec, parent, shared, oflags);
         if (badge_err_is_ok(ec)) {
@@ -474,13 +435,13 @@ file_t fs_open(badge_err_t *ec, char const *path, oflags_t oflags) {
         }
         shared->refcount = 1;
     }
+    if (is_dir) {
+        // Cache all the directory entries.
+        vfs_dir_read(ec, ptr);
+    }
 
     // Successful opening of new handle.
     mutex_release(NULL, &vfs_handle_mtx);
-
-    // Apply opening flags.
-    ptr->read  = oflags & OFLAGS_READONLY;
-    ptr->write = oflags & OFLAGS_WRITEONLY;
 
     return ptr->fileno;
 
@@ -488,25 +449,71 @@ error:
     // Destroy directory handle.
     while (!mutex_acquire(NULL, &vfs_handle_mtx, VFS_MUTEX_TIMEOUT))
         ;
-    ptrdiff_t index = vfs_dir_by_handle(parent->dirno);
-    vfs_dir_destroy_handle(index);
+    ptrdiff_t index = vfs_dir_by_handle(parent->fileno);
+    vfs_file_destroy_handle(index);
     mutex_release(NULL, &vfs_handle_mtx);
     return FILE_NONE;
 }
 
-// Clone a file opened by `fs_open`.
+// Close a file opened by `fs_open`.
 // Only raises an error if `file` is an invalid file descriptor.
 void fs_close(badge_err_t *ec, file_t file) {
+    while (!mutex_acquire(NULL, &vfs_handle_mtx, VFS_MUTEX_TIMEOUT))
+        ;
+
+    ptrdiff_t index = vfs_file_by_handle(file);
+    if (index == -1) {
+        badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_PARAM);
+    } else {
+        badge_err_set_ok(ec);
+        vfs_file_destroy_handle(index);
+    }
+
+    mutex_release(NULL, &vfs_handle_mtx);
 }
 
 // Read bytes from a file.
 // Returns the amount of data successfully read.
-filesize_t fs_read(badge_err_t *ec, file_t file, uint8_t *readbuf, filesize_t readlen) {
+fileoff_t fs_read(badge_err_t *ec, file_t file, uint8_t *readbuf, fileoff_t readlen) {
+    if (readlen < 0) {
+        badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_PARAM);
+        mutex_release_shared(NULL, &vfs_handle_mtx);
+        return 0;
+    }
+    if (!mutex_acquire_shared(NULL, &vfs_handle_mtx, VFS_MUTEX_TIMEOUT)) {
+        badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_TIMEOUT);
+        return 0;
+    }
+
+    // Look up the handle.
+    ptrdiff_t index = vfs_file_by_handle(file);
+    if (index == -1) {
+        badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_PARAM);
+        mutex_release_shared(NULL, &vfs_handle_mtx);
+        return 0;
+    }
+    vfs_file_handle_t *ptr = &vfs_file_handle_list[index];
+
+    // Read data from the handle.
+    if (ptr->is_dir) {
+        if (readlen + ptr->offset < 0 || readlen + ptr->offset > ptr->dir_cache_size) {
+            readlen = ptr->dir_cache_size - ptr->offset;
+        }
+        mem_copy(readbuf, ptr->dir_cache + ptr->offset, readlen);
+        ptr->offset += readlen;
+    } else {
+        if (readlen + ptr->offset < 0 || readlen + ptr->offset > ptr->shared->size) {
+            readlen = ptr->shared->size - ptr->offset;
+        }
+        vfs_file_read(ec, ptr->shared, ptr->offset, readbuf, readlen);
+    }
+
+    mutex_release_shared(NULL, &vfs_handle_mtx);
 }
 
 // Write bytes to a file.
 // Returns the amount of data successfully written.
-filesize_t fs_write(badge_err_t *ec, file_t file, uint8_t const *writebuf, filesize_t writelen) {
+fileoff_t fs_write(badge_err_t *ec, file_t file, uint8_t const *writebuf, fileoff_t writelen) {
 }
 
 // Get the current offset in the file.

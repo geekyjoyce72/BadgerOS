@@ -46,38 +46,22 @@ bool vfs_fat_detect(badge_err_t *ec, blkdev_t *dev) {
 
 
 
-// Open a directory for reading.
-void     vfs_fat_dir_open(badge_err_t *ec, vfs_dir_shared_t *dir, char const *path);
-// Close a directory opened by `fs_dir_open`.
-// Only raises an error if `dir` is an invalid directory descriptor.
-void     vfs_fat_dir_close(badge_err_t *ec, vfs_dir_shared_t *dir);
-// Read the current directory entry (but not the filename).
-// See also: `vfs_fat_dir_read_name` and `vfs_fat_dir_next`.
-dirent_t vfs_fat_dir_read_ent(badge_err_t *ec, vfs_dir_shared_t *dir, filesize_t offset);
-// Read the current directory entry (only the null-terminated filename).
-// Returns the string length of the filename.
-// See also: `vfs_fat_dir_read_ent` and `vfs_fat_dir_next`.
-size_t   vfs_fat_dir_read_name(badge_err_t *ec, vfs_dir_shared_t *dir, filesize_t offset, char *buf, size_t buf_len);
-// Advance to the next directory entry.
-// Returns whether a new entry was successfully read.
-// See also: `vfs_fat_dir_read_name` and `vfs_fat_dir_read_end`.
-bool     vfs_fat_dir_next(badge_err_t *ec, vfs_dir_shared_t *dir, filesize_t *offset);
-
+// Atomically read all directory entries and cache them into the directory handle.
+// Refer to `dirent_t` for the structure of the cache.
+void vfs_fat_dir_read(badge_err_t *ec, vfs_file_handle_t *dir);
 // Open a file for reading and/or writing.
 void vfs_fat_file_open(badge_err_t *ec, vfs_file_shared_t *file, char const *path, oflags_t oflags);
 // Clone a file opened by `vfs_fat_file_open`.
 // Only raises an error if `file` is an invalid file descriptor.
 void vfs_fat_file_close(badge_err_t *ec, vfs_file_shared_t *file);
 // Read bytes from a file.
-void vfs_fat_file_read(
-    badge_err_t *ec, vfs_file_shared_t *file, filesize_t offset, uint8_t *readbuf, filesize_t readlen
-);
+void vfs_fat_file_read(badge_err_t *ec, vfs_file_shared_t *file, fileoff_t offset, uint8_t *readbuf, fileoff_t readlen);
 // Write bytes from a file.
 void vfs_fat_file_write(
-    badge_err_t *ec, vfs_file_shared_t *file, filesize_t offset, uint8_t const *writebuf, filesize_t writelen
+    badge_err_t *ec, vfs_file_shared_t *file, fileoff_t offset, uint8_t const *writebuf, fileoff_t writelen
 );
 // Change the length of a file opened by `vfs_fat_file_open`.
-void vfs_fat_file_resize(badge_err_t *ec, vfs_file_shared_t *file, filesize_t new_size);
+void vfs_fat_file_resize(badge_err_t *ec, vfs_file_shared_t *file, fileoff_t new_size);
 
 // Commit all pending writes to disk.
 // The filesystem, if it does caching, must always sync everything to disk at once.
