@@ -248,8 +248,9 @@ bool fs_is_canonical_path(char const *path) {
 
 // Test that the handle exists and is a directory handle.
 static bool is_dir_handle(badge_err_t *ec, file_t dir) {
-    while (!mutex_acquire_shared(ec, &vfs_handle_mtx, VFS_MUTEX_TIMEOUT))
-        ;
+    if (!mutex_acquire_shared(ec, &vfs_handle_mtx, TIMESTAMP_US_MAX)) {
+        __builtin_unreachable();
+    }
 
     // Check the handle exists.
     ptrdiff_t index = vfs_file_by_handle(dir);
@@ -397,8 +398,9 @@ file_t fs_open(badge_err_t *ec, char const *path, oflags_t oflags) {
         }
 
         // Check for existing shared handles.
-        while (!mutex_acquire(NULL, &vfs_handle_mtx, VFS_MUTEX_TIMEOUT))
-            ;
+        if (!mutex_acquire_shared(ec, &vfs_handle_mtx, TIMESTAMP_US_MAX)) {
+            __builtin_unreachable();
+        }
         existing = vfs_file_by_inode(parent->shared->vfs, ent.inode);
     } else {
         // Path is root directory.
@@ -447,8 +449,9 @@ file_t fs_open(badge_err_t *ec, char const *path, oflags_t oflags) {
 
 error:
     // Destroy directory handle.
-    while (!mutex_acquire(NULL, &vfs_handle_mtx, VFS_MUTEX_TIMEOUT))
-        ;
+    if (!mutex_acquire_shared(ec, &vfs_handle_mtx, TIMESTAMP_US_MAX)) {
+        __builtin_unreachable();
+    }
     ptrdiff_t index = vfs_dir_by_handle(parent->fileno);
     vfs_file_destroy_handle(index);
     mutex_release(NULL, &vfs_handle_mtx);
@@ -458,8 +461,9 @@ error:
 // Close a file opened by `fs_open`.
 // Only raises an error if `file` is an invalid file descriptor.
 void fs_close(badge_err_t *ec, file_t file) {
-    while (!mutex_acquire(NULL, &vfs_handle_mtx, VFS_MUTEX_TIMEOUT))
-        ;
+    if (!mutex_acquire_shared(ec, &vfs_handle_mtx, TIMESTAMP_US_MAX)) {
+        __builtin_unreachable();
+    }
 
     ptrdiff_t index = vfs_file_by_handle(file);
     if (index == -1) {
