@@ -101,7 +101,13 @@ bool mutex_acquire(badge_err_t *ec, mutex_t *mutex, timestamp_us_t timeout) {
         badge_err_set(ec, ELOC_UNKNOWN, ECAUSE_ILLEGAL);
         return false;
     }
-    timeout += time_us();
+    // Compute timeout.
+    timestamp_us_t now = time_us();
+    if (timeout < 0 || now + timeout < now) {
+        timeout = TIMESTAMP_US_MAX;
+    } else {
+        timeout += now;
+    }
     // Await the shared portion to reach 0 and then lock.
     if (await_swap_atomic_int(&mutex->shares, timeout, 0, EXCLUSIVE_MAGIC, memory_order_acquire)) {
         // If that succeeds, the mutex was acquired.
@@ -121,7 +127,7 @@ bool mutex_release(badge_err_t *ec, mutex_t *mutex) {
         badge_err_set(ec, ELOC_UNKNOWN, ECAUSE_ILLEGAL);
         return false;
     }
-    if (await_swap_atomic_int(&mutex->shares, time_us() + 10000000, EXCLUSIVE_MAGIC, 0, memory_order_release)) {
+    if (await_swap_atomic_int(&mutex->shares, TIMESTAMP_US_MAX, EXCLUSIVE_MAGIC, 0, memory_order_release)) {
         // Successful release.
         badge_err_set_ok(ec);
         return true;
@@ -143,7 +149,13 @@ bool mutex_acquire_shared(badge_err_t *ec, mutex_t *mutex, timestamp_us_t timeou
         badge_err_set(ec, ELOC_UNKNOWN, ECAUSE_ILLEGAL);
         return false;
     }
-    timeout += time_us();
+    // Compute timeout.
+    timestamp_us_t now = time_us();
+    if (timeout < 0 || now + timeout < now) {
+        timeout = TIMESTAMP_US_MAX;
+    } else {
+        timeout += now;
+    }
     // Take a share.
     if (thresh_add_atomic_int(&mutex->shares, timeout, EXCLUSIVE_MAGIC, memory_order_acquire)) {
         // If that succeeds, the mutex was successfully acquired.

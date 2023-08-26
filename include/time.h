@@ -9,6 +9,13 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#define FREQUENCY_HZ_MIN INT32_MIN
+#define FREQUENCY_HZ_MAX INT32_MAX
+#define TIMESTAMP_US_MIN INT64_MIN
+#define TIMESTAMP_US_MAX INT64_MAX
+#define TIMER_VALUE_MIN  INT64_MIN
+#define TIMER_VALUE_MAX  INT64_MAX
+
 typedef int32_t frequency_hz_t;
 typedef int64_t timestamp_us_t;
 typedef int64_t timer_value_t;
