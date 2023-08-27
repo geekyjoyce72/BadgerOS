@@ -55,6 +55,8 @@ typedef struct {
     bool      read;
     // Handle refers to a directory.
     bool      is_dir;
+    // Handle mutex for concurrency.
+    mutex_t   mutex;
 
     // Directories: Cached size.
     fileoff_t dir_cache_size;

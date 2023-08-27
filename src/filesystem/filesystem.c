@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: MIT
 
 #include "badge_strings.h"
-#include "filesystem/vfs_fat.h"
 #include "filesystem/vfs_internal.h"
+#include "filesystem/vfs_ramfs.h"
 #include "log.h"
 #include "malloc.h"
 
@@ -149,8 +149,9 @@ void fs_mount(badge_err_t *ec, fs_type_t type, blkdev_t *media, char const *moun
 
     // Delegate to filesystem-specific mount.
     switch (type) {
-        case FS_TYPE_FAT: vfs_fat_mount(ec, &vfs_table[vfs_index]); break;
-        default: __builtin_unreachable();
+        // case FS_TYPE_FAT: vfs_fat_mount(ec, &vfs_table[vfs_index]); break;
+        case FS_TYPE_RAMFS: vfs_ramfs_mount(ec, &vfs_table[vfs_index]); break;
+        default: badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_PARAM); break;
     }
     if (!badge_err_is_ok(ec)) {
         logk(LOG_ERROR, "fs_mount: Mount error reported by VFS.");
@@ -192,7 +193,8 @@ void fs_umount(badge_err_t *ec, char const *mountpoint) {
 
     // Delegate to filesystem-specific mount.
     switch (vfs_table[vfs_index].type) {
-        case FS_TYPE_FAT: vfs_fat_umount(&vfs_table[vfs_index]); break;
+        // case FS_TYPE_FAT: vfs_fat_umount(&vfs_table[vfs_index]); break;
+        case FS_TYPE_RAMFS: vfs_ramfs_umount(&vfs_table[vfs_index]); break;
         default: __builtin_unreachable();
     }
 
@@ -204,22 +206,16 @@ void fs_umount(badge_err_t *ec, char const *mountpoint) {
 // Try to identify the filesystem stored in the block device
 // Returns `FS_TYPE_UNKNOWN` on error or if the filesystem is unknown.
 fs_type_t fs_detect(badge_err_t *ec, blkdev_t *media) {
-    if (vfs_fat_detect(ec, media)) {
-        return FS_TYPE_FAT;
-    } else {
-        badge_err_set_ok(ec);
-        return FS_TYPE_UNKNOWN;
-    }
+    (void)media;
+    // if (vfs_fat_detect(ec, media)) {
+    //     return FS_TYPE_FAT;
+    // } else {
+    badge_err_set_ok(ec);
+    return FS_TYPE_UNKNOWN;
+    // }
 }
 
 
-
-// Get the canonical path of a file or directory.
-// Allocates a new c-string to do so.
-char *fs_to_canonical_path(badge_err_t *ec, char const *path) {
-    badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_UNSUPPORTED);
-    return NULL;
-}
 
 // Test whether a path is a canonical path, but not for the existence of the file or directory.
 // A canonical path starts with '/' and contains none of the following regex: `\.\.?/|\.\.?$|//+`
@@ -242,6 +238,7 @@ bool fs_is_canonical_path(char const *path) {
         }
         path = path + index + 1;
     }
+    return true;
 }
 
 
@@ -300,7 +297,7 @@ void fs_dir_read(badge_err_t *ec, dirent_t *dirent_out, file_t dir) {
     fileoff_t read_len = sizeof(dirent_t) - FILESYSTEM_NAME_MAX - 1;
     fileoff_t len      = fs_read(ec, dir, &dirent_out, read_len);
     // Bounds check read, name and record length.
-    if (!badge_err_is_of(ec) || len != read_len || dirent_out->name_len > FILESYSTEM_NAME_MAX ||
+    if (!badge_err_is_ok(ec) || len != read_len || dirent_out->name_len > FILESYSTEM_NAME_MAX ||
         dirent_out->record_len < read_len + dirent_out->name_len) {
         // Revert position, report error.
         fs_seek(NULL, dir, pos, SEEK_ABS);
@@ -311,7 +308,7 @@ void fs_dir_read(badge_err_t *ec, dirent_t *dirent_out, file_t dir) {
     // Read the name.
     fileoff_t name_len = fs_read(ec, dir, dirent_out->name, dirent_out->name_len);
     // Bounds check read, test name validity.
-    if (!badge_err_is_of(ec) || name_len != dirent_out->name_len || mem_index(dirent_out->name, name_len, '/') != -1 ||
+    if (!badge_err_is_ok(ec) || name_len != dirent_out->name_len || mem_index(dirent_out->name, name_len, '/') != -1 ||
         mem_index(dirent_out->name, name_len, 0) != -1) {
         // Revert position, report error.
         fs_seek(NULL, dir, pos, SEEK_ABS);
@@ -326,7 +323,7 @@ void fs_dir_read(badge_err_t *ec, dirent_t *dirent_out, file_t dir) {
 
 // Open a file for reading and/or writing.
 file_t fs_open(badge_err_t *ec, char const *path, oflags_t oflags) {
-    badge_err_t ec0 = {0, 0};
+    badge_err_t ec0;
     if (!ec)
         ec = &ec0;
 
@@ -437,10 +434,6 @@ file_t fs_open(badge_err_t *ec, char const *path, oflags_t oflags) {
         }
         shared->refcount = 1;
     }
-    if (is_dir) {
-        // Cache all the directory entries.
-        vfs_dir_read(ec, ptr);
-    }
 
     // Successful opening of new handle.
     mutex_release(NULL, &vfs_handle_mtx);
@@ -452,7 +445,7 @@ error:
     if (!mutex_acquire_shared(ec, &vfs_handle_mtx, TIMESTAMP_US_MAX)) {
         __builtin_unreachable();
     }
-    ptrdiff_t index = vfs_dir_by_handle(parent->fileno);
+    ptrdiff_t index = vfs_file_by_handle(parent->fileno);
     vfs_file_destroy_handle(index);
     mutex_release(NULL, &vfs_handle_mtx);
     return FILE_NONE;
@@ -478,7 +471,7 @@ void fs_close(badge_err_t *ec, file_t file) {
 
 // Read bytes from a file.
 // Returns the amount of data successfully read.
-fileoff_t fs_read(badge_err_t *ec, file_t file, uint8_t *readbuf, fileoff_t readlen) {
+fileoff_t fs_read(badge_err_t *ec, file_t file, void *readbuf, fileoff_t readlen) {
     if (readlen < 0) {
         badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_PARAM);
         mutex_release_shared(NULL, &vfs_handle_mtx);
@@ -498,38 +491,153 @@ fileoff_t fs_read(badge_err_t *ec, file_t file, uint8_t *readbuf, fileoff_t read
     }
     vfs_file_handle_t *ptr = &vfs_file_handle_list[index];
 
+    // Check permission.
+    if (!ptr->read) {
+        badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_PERM);
+        mutex_release_shared(NULL, &vfs_handle_mtx);
+        return 0;
+    }
+
     // Read data from the handle.
+    mutex_acquire(NULL, &ptr->mutex, TIMESTAMP_US_MAX);
     if (ptr->is_dir) {
-        if (readlen + ptr->offset < 0 || readlen + ptr->offset > ptr->dir_cache_size) {
-            readlen = ptr->dir_cache_size - ptr->offset;
+        // Directory reads go through cache.
+        if (ptr->offset == 0) {
+            vfs_dir_read(ec, ptr);
         }
-        mem_copy(readbuf, ptr->dir_cache + ptr->offset, readlen);
-        ptr->offset += readlen;
+        if (ptr->offset != 0 || badge_err_is_ok(ec)) {
+            if (readlen + ptr->offset < 0 || readlen + ptr->offset > ptr->dir_cache_size) {
+                readlen = ptr->dir_cache_size - ptr->offset;
+            }
+            mem_copy(readbuf, ptr->dir_cache + ptr->offset, readlen);
+            ptr->offset += readlen;
+        }
+
     } else {
+        // File reads go through VFS.
         if (readlen + ptr->offset < 0 || readlen + ptr->offset > ptr->shared->size) {
             readlen = ptr->shared->size - ptr->offset;
         }
         vfs_file_read(ec, ptr->shared, ptr->offset, readbuf, readlen);
     }
+    mutex_release(NULL, &ptr->mutex);
 
     mutex_release_shared(NULL, &vfs_handle_mtx);
+    return readlen;
 }
 
 // Write bytes to a file.
 // Returns the amount of data successfully written.
-fileoff_t fs_write(badge_err_t *ec, file_t file, uint8_t const *writebuf, fileoff_t writelen) {
+fileoff_t fs_write(badge_err_t *ec, file_t file, void const *writebuf, fileoff_t writelen) {
+    if (writelen < 0) {
+        badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_PARAM);
+        mutex_release_shared(NULL, &vfs_handle_mtx);
+        return 0;
+    }
+    if (!mutex_acquire_shared(NULL, &vfs_handle_mtx, VFS_MUTEX_TIMEOUT)) {
+        badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_TIMEOUT);
+        return 0;
+    }
+
+    // Look up the handle.
+    ptrdiff_t index = vfs_file_by_handle(file);
+    if (index == -1) {
+        badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_PARAM);
+        mutex_release_shared(NULL, &vfs_handle_mtx);
+        return 0;
+    }
+    vfs_file_handle_t *ptr = &vfs_file_handle_list[index];
+
+    // Check permission.
+    if (!ptr->write) {
+        badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_PERM);
+        mutex_release_shared(NULL, &vfs_handle_mtx);
+        return 0;
+    }
+
+    // Read data from the handle.
+    mutex_acquire(NULL, &ptr->mutex, TIMESTAMP_US_MAX);
+    // File writes go through VFS.
+    if (writelen + ptr->offset < 0) {
+        // Integer overflow: Assume no space.
+        badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_NOSPACE);
+        mutex_release(NULL, &ptr->mutex);
+        mutex_release_shared(NULL, &vfs_handle_mtx);
+        return 0;
+    }
+    vfs_file_write(ec, ptr->shared, ptr->offset, writebuf, writelen);
+    mutex_release(NULL, &ptr->mutex);
+
+    mutex_release_shared(NULL, &vfs_handle_mtx);
+    return writelen;
 }
 
 // Get the current offset in the file.
 fileoff_t fs_tell(badge_err_t *ec, file_t file) {
+    if (!mutex_acquire_shared(NULL, &vfs_handle_mtx, VFS_MUTEX_TIMEOUT)) {
+        badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_TIMEOUT);
+        return 0;
+    }
+
+    // Look up the handle.
+    ptrdiff_t index = vfs_file_by_handle(file);
+    if (index == -1) {
+        badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_PARAM);
+        mutex_release_shared(NULL, &vfs_handle_mtx);
+        return 0;
+    }
+    vfs_file_handle_t *ptr = &vfs_file_handle_list[index];
+
+    // Get the position atomically.
+    mutex_acquire(NULL, &ptr->mutex, TIMESTAMP_US_MAX);
+    fileoff_t ret = ptr->offset;
+    mutex_release(NULL, &ptr->mutex);
+
+    mutex_release_shared(NULL, &vfs_handle_mtx);
+    return ret;
 }
 
 // Set the current offset in the file.
 // Returns the new offset in the file.
 fileoff_t fs_seek(badge_err_t *ec, file_t file, fileoff_t off, fs_seek_t seekmode) {
+    if (!mutex_acquire_shared(NULL, &vfs_handle_mtx, VFS_MUTEX_TIMEOUT)) {
+        badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_TIMEOUT);
+        return 0;
+    }
+
+    // Look up the handle.
+    ptrdiff_t index = vfs_file_by_handle(file);
+    if (index == -1) {
+        badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_PARAM);
+        mutex_release_shared(NULL, &vfs_handle_mtx);
+        return 0;
+    }
+    vfs_file_handle_t *ptr = &vfs_file_handle_list[index];
+
+    // Update the position atomically.
+    mutex_acquire(NULL, &ptr->mutex, TIMESTAMP_US_MAX);
+    badge_err_set_ok(ec);
+    switch (seekmode) {
+        case SEEK_ABS: ptr->offset = off; break;
+        case SEEK_CUR: ptr->offset += off; break;
+        case SEEK_END: ptr->offset = ptr->shared->size + off; break;
+        default: badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_PARAM); break;
+    }
+    // Clamp offset.
+    if (ptr->offset < 0) {
+        ptr->offset = 0;
+    } else if (ptr->offset > ptr->shared->size) {
+        ptr->offset = ptr->shared->size;
+    }
+    mutex_release(NULL, &ptr->mutex);
+
+    mutex_release_shared(NULL, &vfs_handle_mtx);
+    return ptr->offset;
 }
 
 // Force any write caches to be flushed for a given file.
 // If the file is `FILE_NONE`, all open files are flushed.
 void fs_flush(badge_err_t *ec, file_t file) {
+    (void)file;
+    badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_UNSUPPORTED);
 }

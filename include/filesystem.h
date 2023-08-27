@@ -82,6 +82,24 @@ typedef enum {
     SEEK_END = 1,
 } fs_seek_t;
 
+// EXT2/3/4, unix file types.
+typedef enum {
+    // Unix socket
+    FILETYPE_SOCK = 12,
+    // Symbolic link
+    FILETYPE_LINK = 10,
+    // Regular file
+    FILETYPE_REG  = 8,
+    // Block device
+    FILETYPE_BLK  = 6,
+    // Directory
+    FILETYPE_DIR  = 4,
+    // Character device
+    FILETYPE_CHR  = 2,
+    // FIFO
+    FILETYPE_FIFO = 1,
+} filetype_t;
+
 // Directory entry as read from a directory handle.
 // The `record_len` field indicates the total size of the `dirent_t` and is therefor the offset to the next `dirent_t`.
 // If `record_len < sizeof(dirent_t)`, `name` is smaller.
@@ -115,7 +133,7 @@ typedef struct stat {
     // TODO: User ID type?
     int       uid;
     // Owner group ID.
-    // TODO Group ID type?
+    // TODO: Group ID type?
     int       gid;
     // File size in bytes.
     fileoff_t size;
@@ -132,13 +150,9 @@ void      fs_umount(badge_err_t *ec, char const *mountpoint);
 // Returns `FS_TYPE_UNKNOWN` on error or if the filesystem is unknown.
 fs_type_t fs_detect(badge_err_t *ec, blkdev_t *media);
 
-// Get the canonical path of a file or directory.
-// Allocates a new c-string to do so.
-char *fs_to_canonical_path(badge_err_t *ec, char const *path);
 // Test whether a path is a canonical path, but not for the existence of the file or directory.
 // A canonical path starts with '/' and contains none of the following regex: `\.\.?/|//+`
-bool  fs_is_canonical_path(char const *path);
-
+bool fs_is_canonical_path(char const *path);
 // Get file status given path.
 bool fs_stat(badge_err_t *ec, stat_t *stat_out, char const *path);
 // Get file status given path.
@@ -163,10 +177,10 @@ file_t    fs_open(badge_err_t *ec, char const *path, oflags_t oflags);
 void      fs_close(badge_err_t *ec, file_t file);
 // Read bytes from a file.
 // Returns the amount of data successfully read.
-fileoff_t fs_read(badge_err_t *ec, file_t file, uint8_t *readbuf, fileoff_t readlen);
+fileoff_t fs_read(badge_err_t *ec, file_t file, void *readbuf, fileoff_t readlen);
 // Write bytes to a file.
 // Returns the amount of data successfully written.
-fileoff_t fs_write(badge_err_t *ec, file_t file, uint8_t const *writebuf, fileoff_t writelen);
+fileoff_t fs_write(badge_err_t *ec, file_t file, void const *writebuf, fileoff_t writelen);
 // Get the current offset in the file.
 fileoff_t fs_tell(badge_err_t *ec, file_t file);
 // Set the current offset in the file.

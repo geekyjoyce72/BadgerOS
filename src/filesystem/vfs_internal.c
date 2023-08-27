@@ -174,6 +174,7 @@ ptrdiff_t vfs_file_create_handle(ptrdiff_t shared) {
         .offset = 0,
         .shared = vfs_file_shared_list[shared],
         .fileno = next_fileno(),
+        .mutex  = MUTEX_T_INIT,
     };
 
     return handle;

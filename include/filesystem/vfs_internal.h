@@ -73,12 +73,13 @@ vfs_file_handle_t *vfs_walk(badge_err_t *ec, char *path, bool *found_out, bool f
 
 // Insert a new file into the given directory.
 // If the file already exists, does nothing.
-// If `open` is true, a new handle to the file is opened.
 void vfs_create_file(badge_err_t *ec, vfs_file_handle_t *dir, char const *name);
 // Insert a new directory into the given directory.
 // If the file already exists, does nothing.
-// If `open` is true, a new handle to the directory is opened.
 void vfs_create_dir(badge_err_t *ec, vfs_file_handle_t *dir, char const *name);
+// Unlink a file from the given directory.
+// If this is the last reference to an inode, the inode is deleted.
+void vfs_unlink(badge_err_t *ec, vfs_file_handle_t *dir, char const *name);
 
 // Atomically read all directory entries and cache them into the directory handle.
 // Refer to `dirent_t` for the structure of the cache.
@@ -89,8 +90,11 @@ void vfs_file_open(badge_err_t *ec, vfs_file_handle_t *dir, vfs_file_shared_t *f
 // Only raises an error if `file` is an invalid file descriptor.
 void vfs_file_close(badge_err_t *ec, vfs_file_shared_t *file);
 // Read bytes from a file.
+// The entire read succeeds or the entire read fails, never partial read.
 void vfs_file_read(badge_err_t *ec, vfs_file_shared_t *file, fileoff_t offset, uint8_t *readbuf, fileoff_t readlen);
 // Write bytes to a file.
+// If the file is not large enough, it expanded.
+// The entire write succeeds or the entire write fails, never partial write.
 void vfs_file_write(
     badge_err_t *ec, vfs_file_shared_t *file, fileoff_t offset, uint8_t const *writebuf, fileoff_t writelen
 );

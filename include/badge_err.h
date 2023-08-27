@@ -101,6 +101,8 @@ typedef enum {
     ECAUSE_IS_FILE,
     // The resource already exists
     ECAUSE_EXISTS,
+    // The resource is out of space
+    ECAUSE_NOSPACE,
 } badge_ecause_t;
 
 
