@@ -5,16 +5,21 @@ The goal is the allow future badge users to get both the performance that native
 
 _(1) MCH2025 is a preliminary name, MCH2025 is an event that will be organised by IFCAT in 2025._
 
+
+
 # Contributing
+
+We are an open-source project, so we can always use more hands!
+If you're looking for things to help with, look for the [issues with the PoC (Proof of Concept) milestone](https://github.com/badgeteam/BadgerOS/issues/33).
 
 Make sure to check out the [style guide](docs/styleguide.md) so your code can fit right in.
 If you're unsure where to put your code, look into the [project structure](docs/project-structure.md).
 
-# Documents
+If you're not sure what to do but want to help, message us:
+- [robotman2412](https://t.me/robotman2412) on telegram
+- [Badge.team](https://t.me/+StQpEWyhnb96Y88p) telegram group
 
-[OS specification doc](https://docs.google.com/document/d/1qgpeLhjLZvecd4yATPb-9B1IthdMw18idM6reSSEXS8/edit?usp=sharing)
 
-[OS notes doc](https://docs.google.com/document/d/1y2fYwdAGRNWYJmHFczQzzb913dGTHXzgqrCjLKwj9k8/edit?usp=sharing)
 
 # Prerequisites
 
@@ -32,6 +37,8 @@ To flash to an ESP:
 Optional recommends:
 
 - `picocom`
+
+
 
 # Build system
 
