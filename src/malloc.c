@@ -1,6 +1,11 @@
+
+// SPDX-License-Identifier: MIT
+
 #include <stddef.h>
 
 #ifdef BADGEROS_KERNEL
+#include "log.h"
+
 extern char __start_free_sram[];
 extern char __stop_free_sram[];
 
@@ -38,11 +43,11 @@ char              *mem_end;
 char              *mem_end_max;
 free_blk_header_t *free_lists;
 
-void               kernel_heap_init();
-void               try_split(free_blk_header_t *fp, size_t needed);
-void              *find_fit(size_t size);
+void  kernel_heap_init();
+void  try_split(free_blk_header_t *fp, size_t needed);
+void *find_fit(size_t size);
 
-size_t             min_class_size[] = {MBLK_SIZE, 64, 128, 256, 1024};
+size_t min_class_size[] = {MBLK_SIZE, 64, 128, 256, 1024};
 
 #ifndef BADGEROS_KERNEL
 void print_heap() {
@@ -52,6 +57,18 @@ void print_heap() {
 
         while (fp->next != &free_lists[i]) {
             printf("\tFree block of size: %zi\n", fp->next->size);
+            fp = fp->next;
+        }
+    }
+}
+#else
+void  print_heap() {
+    for (int i = 0; i < NUM_SIZE_CLASSES; i++) {
+        logkf(LOG_DEBUG, "Bucket size: %{size;d}", min_class_size[i]);
+        free_blk_header_t *fp = &free_lists[i];
+
+        while (fp->next != &free_lists[i]) {
+            logkf(LOG_DEBUG, "\tFree block 0x%{size;x} of size: %{size;d}", fp->next, fp->next->size);
             fp = fp->next;
         }
     }
@@ -93,6 +110,8 @@ void *find_fit(size_t size) {
 }
 
 void try_split(free_blk_header_t *fp, size_t needed) {
+    if (fp->size < needed)
+        return;
     size_t             remaining = fp->size - needed;
     free_blk_header_t *sp;
 
@@ -117,8 +136,8 @@ void *__wrap_malloc(size_t size) {
     size_t *header;
     size_t  blk_size = ALIGN(size + sizeof(free_blk_header_t));
 
-    blk_size         = (blk_size < MBLK_SIZE) ? MBLK_SIZE : blk_size;
-    header           = find_fit(blk_size);
+    blk_size = (blk_size < MBLK_SIZE) ? MBLK_SIZE : blk_size;
+    header   = find_fit(blk_size);
 
     if (header) {
         *header = ((free_blk_header_t *)header)->size | 1;
@@ -164,7 +183,7 @@ void *__wrap_realloc(void *ptr, size_t size) {
     free_blk_header_t *header   = (free_blk_header_t *)((char *)ptr - sizeof(free_blk_header_t));
     size_t             old_size = header->size & ~1L;
 
-    char              *new_ptr  = malloc(size);
+    char *new_ptr = malloc(size);
     if (!new_ptr) {
         return NULL;
     }
