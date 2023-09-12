@@ -101,6 +101,7 @@ void *find_fit(size_t size) {
             fp                 = free_lists[i].next;
             free_lists[i].next = fp->next;
             fp->next->prior    = &free_lists[i];
+            logkf(LOG_DEBUG, "0x%{size;x} %{size;d}", fp, fp->size);
             try_split(fp, size);
             return fp;
         }
@@ -160,8 +161,8 @@ void __wrap_free(void *ptr) {
     size_t             size   = header->size;
     header->size              = *(size_t *)header & ~1L;
 
-    for (int i = 0; i < NUM_SIZE_CLASSES; i++) {
-        if (min_class_size[i] >= size) {
+    for (int i = NUM_SIZE_CLASSES - 1; i >= 0; i--) {
+        if (min_class_size[i] <= size) {
             header->next       = free_lists[i].next;
             header->prior      = &free_lists[i];
             free_lists[i].next = free_lists[i].next->prior = header;
