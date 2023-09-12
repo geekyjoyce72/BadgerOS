@@ -4,6 +4,8 @@
 #include "filesystem/vfs_internal.h"
 
 #include "assertions.h"
+#include "badge_strings.h"
+#include "filesystem/vfs_ramfs.h"
 #include "malloc.h"
 
 #include <stdatomic.h>
@@ -39,6 +41,35 @@ size_t             vfs_file_handle_list_cap;
 
 // Next file / directory handle number.
 static atomic_int vfs_handle_no = 0;
+
+// Abstraction for return thing from VFS.
+#define vfs_impl_return(type, method, ...)                                                                             \
+    do {                                                                                                               \
+        switch (type) {                                                                                                \
+            case FS_TYPE_RAMFS: vfs_ramfs_##method(__VA_ARGS__); return;                                               \
+            default: __builtin_unreachable();                                                                          \
+        }                                                                                                              \
+    } while (0)
+
+// Abstraction for call function from VFS.
+#define vfs_impl_call(type, rettype, method, ...)                                                                      \
+    ({                                                                                                                 \
+        rettype vfs_impl_call_rv;                                                                                      \
+        switch (type) {                                                                                                \
+            case FS_TYPE_RAMFS: vfs_impl_call_rv = vfs_ramfs_##method(__VA_ARGS__); break;                             \
+            default: __builtin_unreachable();                                                                          \
+        }                                                                                                              \
+        vfs_impl_call_rv;                                                                                              \
+    })
+
+// Abstraction for call function returning void from VFS.
+#define vfs_impl_call_void(type, method, ...)                                                                          \
+    do {                                                                                                               \
+        switch (type) {                                                                                                \
+            case FS_TYPE_RAMFS: vfs_ramfs_##method(__VA_ARGS__); break;                                                \
+            default: __builtin_unreachable();                                                                          \
+        }                                                                                                              \
+    } while (0)
 
 
 
@@ -104,7 +135,7 @@ static void vfs_file_handle_splice(ptrdiff_t i) {
 }
 
 // Find a shared file handle by inode, if any.
-ptrdiff_t vfs_file_by_inode(vfs_t *vfs, inode_t inode) {
+ptrdiff_t vfs_shared_by_inode(vfs_t *vfs, inode_t inode) {
     for (size_t i = 0; i < vfs_file_shared_list_len; i++) {
         if (vfs_file_shared_list[i]->vfs == vfs && vfs_file_shared_list[i]->inode == inode) {
             return i;
@@ -123,35 +154,45 @@ ptrdiff_t vfs_file_by_handle(file_t fileno) {
     return -1;
 }
 
+// Create a new empty shared file handle.
+ptrdiff_t vfs_file_create_shared() {
+    if (vfs_file_shared_list_len >= vfs_file_shared_list_cap) {
+        // Expand list.
+        size_t new_cap = vfs_file_shared_list_cap * 2;
+        if (new_cap < 2)
+            new_cap = 2;
+        void *mem = realloc(vfs_file_shared_list, sizeof(*vfs_file_shared_list) * new_cap);
+        if (!mem)
+            return -1;
+        vfs_file_shared_list     = mem;
+        vfs_file_shared_list_cap = new_cap;
+    }
+
+    // Allocate new shared handle.
+    ptrdiff_t          shared = vfs_file_shared_list_len;
+    vfs_file_shared_t *shptr  = malloc(sizeof(vfs_file_shared_t));
+    if (!shptr)
+        return -1;
+    *shptr = (vfs_file_shared_t){
+        .refcount = 0,
+        .size     = 0,
+        .inode    = 0,
+        .vfs      = NULL,
+    };
+    vfs_file_shared_list_len++;
+
+    return shared;
+}
+
 // Create a new file handle.
 // If `shared` is -1, a new empty shared handle is created.
 ptrdiff_t vfs_file_create_handle(ptrdiff_t shared) {
     if (shared == -1) {
-        if (vfs_file_shared_list_len >= vfs_file_shared_list_cap) {
-            // Expand list.
-            size_t new_cap = vfs_file_shared_list_cap * 2;
-            if (new_cap < 2)
-                new_cap = 2;
-            void *mem = realloc(vfs_file_shared_list, sizeof(*vfs_file_shared_list) * new_cap);
-            if (!mem)
-                return -1;
-            vfs_file_shared_list     = mem;
-            vfs_file_shared_list_cap = new_cap;
-        }
-
         // Allocate new shared handle.
-        shared                   = vfs_file_shared_list_len;
-        vfs_file_shared_t *shptr = malloc(sizeof(vfs_file_shared_t));
-        if (!shptr)
-            return -1;
-        *shptr = (vfs_file_shared_t){
-            .refcount = 0,
-            .size     = 0,
-            .inode    = 0,
-            .vfs      = NULL,
-        };
-        vfs_file_shared_list_len++;
-    } else if (shared < -1) {
+        shared = vfs_file_create_shared();
+    }
+    if (shared < 0) {
+        // Failed to allocate or illegal argument.
         return -1;
     }
 
@@ -180,6 +221,11 @@ ptrdiff_t vfs_file_create_handle(ptrdiff_t shared) {
     return handle;
 }
 
+// Destroy a shared file handle assuming the underlying file is already closed.
+void vfs_file_destroy_shared(ptrdiff_t shared) {
+    vfs_file_shared_splice(shared);
+}
+
 // Delete a file handle.
 // If this is the last handle referring to one file, the shared handle is closed too.
 void vfs_file_destroy_handle(ptrdiff_t handle) {
@@ -202,19 +248,14 @@ void vfs_file_destroy_handle(ptrdiff_t handle) {
 
 /* ==== Thread-safe functions ==== */
 
-// Find the filesystem and location given an absolute path.
-// Raises an error if the leading '/' is omitted.
-//
-// If `follow_symlink` is true, all symlinks are resolved.
-// Otherwise, if the last element in the absolute path is a symlink, it is not resolved.
-//
-// Updates the first `FILESYSTEM_PATH_MAX` characters of `path` to be the canonical path.
-// If the file is not found, the value of path is undefined.
-//
-// Opens a new handle for the directory where the current entry is that of the file.
-// Returns NULL on error or if the path refers to the root directory.
-vfs_file_handle_t *vfs_walk(badge_err_t *ec, char *path, bool *found_out, bool follow_symlink) {
-    return NULL;
+// Open the root directory of the root filesystem.
+void vfs_root_open(badge_err_t *ec, vfs_file_shared_t *dir) {
+    mutex_acquire(NULL, &vfs_handle_mtx, TIMESTAMP_US_MAX);
+
+    vfs_t *vfs = &vfs_table[vfs_root_index];
+    vfs_impl_call_void(vfs->type, root_open, ec, vfs, dir);
+
+    mutex_release(NULL, &vfs_handle_mtx);
 }
 
 
@@ -222,38 +263,95 @@ vfs_file_handle_t *vfs_walk(badge_err_t *ec, char *path, bool *found_out, bool f
 // Insert a new file into the given directory.
 // If the file already exists, does nothing.
 // If `open` is true, a new handle to the file is opened.
-void vfs_create_file(badge_err_t *ec, vfs_file_handle_t *dir, char const *name) {
+void vfs_create_file(badge_err_t *ec, vfs_file_shared_t *dir, char const *name) {
+    vfs_impl_call_void(dir->vfs->type, create_file, ec, dir->vfs, dir, name);
 }
 
 // Insert a new directory into the given directory.
 // If the file already exists, does nothing.
 // If `open` is true, a new handle to the directory is opened.
-void vfs_create_dir(badge_err_t *ec, vfs_file_handle_t *dir, char const *name) {
+void vfs_create_dir(badge_err_t *ec, vfs_file_shared_t *dir, char const *name) {
+    vfs_impl_call_void(dir->vfs->type, create_dir, ec, dir->vfs, dir, name);
+}
+
+// Unlink a file from the given directory.
+// If this is the last reference to an inode, the inode is deleted.
+void vfs_unlink(badge_err_t *ec, vfs_file_shared_t *dir, char const *name) {
+    vfs_impl_call_void(dir->vfs->type, unlink, ec, dir->vfs, dir, name);
+}
+
+
+
+// Atomically read all directory entries and cache them into the directory handle.
+// Refer to `dirent_t` for the structure of the cache.
+void vfs_dir_read(badge_err_t *ec, vfs_file_handle_t *dir) {
+    vfs_impl_call_void(dir->shared->vfs->type, dir_read, ec, dir->shared->vfs, dir);
+}
+
+// Atomically read the directory entry with the matching name.
+// Returns true if the entry was found.
+bool vfs_dir_find_ent(badge_err_t *ec, vfs_file_shared_t *dir, dirent_t *ent, char const *name) {
+    vfs_impl_return(dir->vfs->type, dir_find_ent, ec, dir->vfs, dir, ent, name);
 }
 
 
 
 // Open a file for reading and/or writing given parent directory handle.
-void vfs_file_open(badge_err_t *ec, vfs_file_handle_t *dir, vfs_file_shared_t *file, oflags_t oflags) {
+// Also handles OFLAGS_EXCLUSIVE and OFLAGS_CREATE.
+void vfs_file_open(
+    badge_err_t *ec, vfs_file_shared_t *dir, vfs_file_shared_t *file, char const *name, oflags_t oflags
+) {
+    vfs_t *vfs = dir->vfs;
+
+    // Handle opening flags related to file creation.
+    if (oflags & (OFLAGS_EXCLUSIVE | OFLAGS_CREATE)) {
+        // Test for file existence.
+        bool exists = vfs_impl_call(vfs->type, bool, exists, ec, vfs, dir, name);
+
+        if ((oflags & OFLAGS_EXCLUSIVE) && exists) {
+            badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_EXISTS);
+            return;
+
+        } else if (!(oflags & OFLAGS_CREATE) && !exists) {
+            badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_NOTFOUND);
+            return;
+
+        } else if (oflags & OFLAGS_DIRECTORY) {
+            // Create directory as requested.
+            vfs_impl_call_void(vfs->type, create_dir, ec, vfs, dir, name);
+
+        } else {
+            // Create file as requested.
+            vfs_impl_call_void(vfs->type, create_file, ec, vfs, dir, name);
+        }
+    }
+
+    // Open the file in question.
+    vfs_impl_call_void(vfs->type, file_open, ec, vfs, dir, file, name);
 }
 
-// Clone a file opened by `vfs_file_open`.
+// Close a file opened by `vfs_file_open`.
 // Only raises an error if `file` is an invalid file descriptor.
 void vfs_file_close(badge_err_t *ec, vfs_file_shared_t *file) {
+    vfs_t *vfs = file->vfs;
+    vfs_impl_call_void(vfs->type, file_close, ec, vfs, file);
 }
 
 // Read bytes from a file.
 void vfs_file_read(badge_err_t *ec, vfs_file_shared_t *file, fileoff_t offset, uint8_t *readbuf, fileoff_t readlen) {
+    vfs_impl_call_void(file->vfs->type, file_read, ec, file->vfs, file, offset, readbuf, readlen);
 }
 
 // Write bytes to a file.
 void vfs_file_write(
     badge_err_t *ec, vfs_file_shared_t *file, fileoff_t offset, uint8_t const *writebuf, fileoff_t writelen
 ) {
+    vfs_impl_call_void(file->vfs->type, file_write, ec, file->vfs, file, offset, writebuf, writelen);
 }
 
 // Change the length of a file opened by `vfs_file_open`.
 void vfs_file_resize(badge_err_t *ec, vfs_file_shared_t *file, fileoff_t new_size) {
+    vfs_impl_call_void(file->vfs->type, file_resize, ec, file->vfs, file, new_size);
 }
 
 
@@ -261,4 +359,5 @@ void vfs_file_resize(badge_err_t *ec, vfs_file_shared_t *file, fileoff_t new_siz
 // Commit all pending writes to disk.
 // The filesystem, if it does caching, must always sync everything to disk at once.
 void vfs_flush(badge_err_t *ec, vfs_t *vfs) {
+    vfs_impl_call_void(vfs->type, flush, ec, vfs);
 }

@@ -103,6 +103,8 @@ typedef enum {
     ECAUSE_EXISTS,
     // The resource is out of space
     ECAUSE_NOSPACE,
+    // The resource is not empty.
+    ECAUSE_NOTEMPTY,
 } badge_ecause_t;
 
 

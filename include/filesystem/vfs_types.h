@@ -11,9 +11,6 @@
 
 typedef struct vfs vfs_t;
 
-// Inode number of the root directory of any given filesystem.
-#define INODE_ROOT 2
-
 // VFS shared opened file handle.
 // Shared between all file handles referring to the same file.
 typedef struct {
@@ -80,6 +77,8 @@ struct vfs {
     blkdev_t *media;
     // Filesystem type.
     fs_type_t type;
+    // Inode number given to the root directory.
+    inode_t   inode_root;
     // Filesystem-specific information.
     union {
         // RAMFS.

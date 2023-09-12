@@ -10,6 +10,20 @@
 
 #include <stdatomic.h>
 
+// Maximum name length of RAMFS.
+#define VFS_RAMFS_NAME_MAX 255
+#if FILESYSTEM_NAME_MAX < VFS_RAMFS_NAME_MAX
+#undef VFS_RAMFS_NAME_MAX
+#define VFS_RAMFS_NAME_MAX FILESYSTEM_NAME_MAX
+#endif
+
+// Bit position of file type in mode field.
+#define VFS_RAMFS_MODE_BIT  12
+// Bit mask of file type in mode field.
+#define VFS_RAMFS_MODE_MASK 0xf000
+
+
+
 /* ==== In-memory structures ==== */
 
 // File data storage.
@@ -35,14 +49,14 @@ typedef struct {
 // RAMFS directory entry.
 typedef struct {
     // Entry size.
-    fileoff_t size;
-    // Node is a directory.
-    bool      is_dir;
-    // Node is a symbolic link.
-    bool      is_symlink;
+    size_t  size;
+    // Inode number.
+    inode_t inode;
     // Name length.
-    uint8_t   name_len;
-} ramfs_dirent_t;
+    size_t  name_len;
+    // Filename.
+    char    name[VFS_RAMFS_NAME_MAX + 1];
+} vfs_ramfs_dirent_t;
 
 // RAM filesystem file / directory handle.
 // This handle is shared between multiple holders of the same file.

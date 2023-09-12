@@ -9,6 +9,143 @@
 
 
 
+// Replace a handle with the root directory of the root filesystem.
+static void root_reopen(badge_err_t *ec, vfs_file_handle_t *dir) {
+    fs_seek(ec, dir->fileno, 0, SEEK_ABS);
+
+    mutex_acquire(NULL, &vfs_handle_mtx, TIMESTAMP_US_MAX);
+
+    mutex_release(NULL, &vfs_handle_mtx);
+}
+
+// Walk the filesystem and locate a path relative to `dir`.
+// If the first character is '/', `dir` is first replaced by the root directory.
+//
+// If `follow_symlink` is true, all symlinks are resolved.
+// Otherwise, if the last element in the absolute path is a symlink, it is not resolved.
+//
+// May use the first `FILESYSTEM_PATH_MAX` characters of `path` as a path buffer.
+// Regardless of whether the file is found, the real filename will be the segment after the last '/'.
+//
+// Replaces the value of `dir` to be the shared directory handle of the parent directory of the subject file.
+// If the subject file is a directory, it may also be named "." or ".." in which the parent directory will be itself or
+// a subdirectory respectively. The root directory of the root filesystem may also be it's own parent for "..".
+//
+// If the file exists, reads the directory entry into `ent`.
+//
+// Returns the offset into `path` of the canonical filename if the parent directory exists, or -1 if the parent
+// directory does not exist.
+static ptrdiff_t walk(badge_err_t *ec, vfs_file_handle_t *dir, char path[FILESYSTEM_PATH_MAX + 1], dirent_t *ent) {
+    assert_dev_drop(dir != NULL);
+    badge_err_t ec0;
+    if (!ec)
+        ec = &ec0;
+
+    // First character of the next filename.
+    ptrdiff_t begin = 0;
+    // One pas last character of the next filename.
+    ptrdiff_t end   = 0;
+    // Current length of the path string.
+    ptrdiff_t len   = cstr_length(path);
+    // Whether the file was found.
+    bool      found = false;
+
+    // Deduplicate forward slashes.
+    for (size_t i = 0; i < len;) {
+        if (path[i] == '/' && path[i + 1] == '/') {
+            cstr_copy(path + i + 1, FILESYSTEM_PATH_MAX + 1, path + i + 2);
+            len--;
+        } else {
+            i++;
+        }
+    }
+
+    // Absolute paths starting with '/'.
+    if (path[0] == '/') {
+        root_reopen(ec, dir);
+        if (!badge_err_is_ok(ec))
+            return -1;
+    }
+
+    // Locate the relative file on disk.
+    while (begin < len) {
+        // Test for directory.
+        if (path[begin] == '/') {
+            if (!dir->is_dir) {
+                badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_IS_FILE);
+                return false;
+            }
+            begin++;
+            continue;
+        }
+
+        // Find the next delimiter.
+        end = cstr_index_from(path, '/', begin);
+        if (end < 0)
+            end = begin + 1;
+
+        // Read current directory.
+        char tmp  = path[end];
+        path[end] = 0;
+        found     = vfs_dir_find_ent(ec, dir, ent, path + begin);
+        path[end] = tmp;
+
+        if (!found && path[end] == '/' && path[end + 1] != 0) {
+            // An intermediate directory was not found.
+            badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_NOTFOUND);
+            begin = -1;
+            break;
+        } else if (!found) {
+            // The final file or directory was not found.
+            badge_err_set_ok(ec);
+            break;
+        }
+    }
+
+    // Remove trailing forward slashes.
+    while (len > 1 && path[len - 1] == '/') {
+        path[len - 1] = 0;
+        len--;
+    }
+
+    return begin;
+}
+
+// Open a new file handle to the root directory.
+static vfs_file_handle_t *root_open(badge_err_t *ec) {
+    badge_err_t ec0;
+    if (!ec)
+        ec = &ec0;
+    mutex_acquire(NULL, &vfs_handle_mtx, TIMESTAMP_US_MAX);
+
+    ptrdiff_t          existing = vfs_shared_by_inode(&vfs_table[vfs_root_index], vfs_table[vfs_root_index].inode_root);
+    ptrdiff_t          handle   = vfs_file_create_handle(existing);
+    vfs_file_handle_t *ptr      = &vfs_file_handle_list[handle];
+
+    if (existing == -1) {
+        // Open new shared handle.
+        vfs_root_open(ec, ptr->shared);
+        if (!badge_err_is_ok(ec)) {
+            vfs_file_destroy_handle(handle);
+            mutex_release(NULL, &vfs_handle_mtx);
+            return NULL;
+        }
+    }
+
+    // Create file handle.
+    ptr->offset         = 0;
+    ptr->write          = false;
+    ptr->read           = true;
+    ptr->is_dir         = true;
+    ptr->dir_cache      = NULL;
+    ptr->dir_cache_size = 0;
+
+    mutex_release(NULL, &vfs_handle_mtx);
+    return ptr;
+}
+
+
+
 // Check the validity of a mount point.
 // Creates a copy of the mount point if it is valid.
 static char *check_mountpoint(badge_err_t *ec, char const *raw) {
@@ -86,11 +223,7 @@ void fs_mount(badge_err_t *ec, fs_type_t type, blkdev_t *media, char const *moun
         ec = &ec0;
 
     // Take the filesystem mounting mutex.
-    if (!mutex_acquire(NULL, &vfs_mount_mtx, VFS_MUTEX_TIMEOUT)) {
-        logk(LOG_ERROR, "fs_mount: Timeout while acquiring mutex.");
-        badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_TIMEOUT);
-        return;
-    }
+    mutex_acquire(NULL, &vfs_mount_mtx, TIMESTAMP_US_MAX);
 
     if (type == FS_TYPE_UNKNOWN && !media) {
         // Block device is required to auto-detect.
@@ -218,7 +351,7 @@ fs_type_t fs_detect(badge_err_t *ec, blkdev_t *media) {
 
 
 // Test whether a path is a canonical path, but not for the existence of the file or directory.
-// A canonical path starts with '/' and contains none of the following regex: `\.\.?/|\.\.?$|//+`
+// A canonical path starts with '/' and contains none of the following regex: `\.\.?/|/\.\.?$|//+`
 bool fs_is_canonical_path(char const *path) {
     if (*path != '/') {
         return false;
@@ -245,9 +378,7 @@ bool fs_is_canonical_path(char const *path) {
 
 // Test that the handle exists and is a directory handle.
 static bool is_dir_handle(badge_err_t *ec, file_t dir) {
-    if (!mutex_acquire_shared(ec, &vfs_handle_mtx, TIMESTAMP_US_MAX)) {
-        __builtin_unreachable();
-    }
+    mutex_acquire_shared(ec, &vfs_handle_mtx, TIMESTAMP_US_MAX);
 
     // Check the handle exists.
     ptrdiff_t index = vfs_file_by_handle(dir);
@@ -350,42 +481,28 @@ file_t fs_open(badge_err_t *ec, char const *path, oflags_t oflags) {
     }
 
     // Locate the file.
-    bool               found  = false;
-    vfs_file_handle_t *parent = vfs_walk(ec, canon_path, &found, true);
+    vfs_file_handle_t *parent = root_open(ec);
     if (!badge_err_is_ok(ec)) {
         return FILE_NONE;
     }
-
-    // Check file exists.
-    if (found && (oflags & OFLAGS_EXCLUSIVE)) {
-        badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_EXISTS);
-        goto error;
-    } else if (!found && !(oflags & OFLAGS_CREATE) && !(oflags & OFLAGS_EXCLUSIVE)) {
-        badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_NOTFOUND);
-        goto error;
+    dirent_t ent;
+    bool     found = walk(ec, parent, canon_path, &ent);
+    if (!badge_err_is_ok(ec)) {
+        return FILE_NONE;
     }
-
-    // If the file doesn't exist, create it.
-    if (!found) {
-        // Get the filename from canonical path to create the file.
-        char     *filename;
-        ptrdiff_t slash = cstr_index(canon_path, '/');
-        if (slash == -1) {
-            filename = canon_path;
-        } else {
-            filename = canon_path + slash + 1;
-        }
-        vfs_create_file(ec, parent, filename);
+    // Get the filename from canonical path.
+    char     *filename;
+    ptrdiff_t slash = cstr_last_index(canon_path, '/');
+    if (slash == -1) {
+        filename = canon_path;
+    } else {
+        filename = canon_path + slash + 1;
     }
 
     ptrdiff_t existing = -1;
     bool      is_dir;
-    if (parent) {
-        // Path is not root directory.
-        dirent_t ent;
-        fs_dir_read(ec, &ent, parent->fileno);
-        if (!badge_err_is_ok(ec))
-            goto error;
+    if (found) {
+        // File exists.
         is_dir = ent.is_dir;
 
         // Check file type.
@@ -395,18 +512,13 @@ file_t fs_open(badge_err_t *ec, char const *path, oflags_t oflags) {
         }
 
         // Check for existing shared handles.
-        if (!mutex_acquire_shared(ec, &vfs_handle_mtx, TIMESTAMP_US_MAX)) {
-            __builtin_unreachable();
-        }
-        existing = vfs_file_by_inode(parent->shared->vfs, ent.inode);
+        mutex_acquire_shared(ec, &vfs_handle_mtx, TIMESTAMP_US_MAX);
+        existing = vfs_shared_by_inode(parent->shared->vfs, ent.inode);
+
     } else {
-        // Path is root directory.
-        if (!(oflags & OFLAGS_DIRECTORY)) {
-            badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_IS_DIR);
-            goto error;
-        }
-        is_dir   = true;
-        existing = vfs_file_by_inode(&vfs_table[vfs_root_index], INODE_ROOT);
+        // File does not exist.
+        is_dir   = (oflags & OFLAGS_DIRECTORY);
+        existing = -1;
     }
 
     // Create a new handle from existing shared handle.
@@ -426,7 +538,7 @@ file_t fs_open(badge_err_t *ec, char const *path, oflags_t oflags) {
     if (existing == -1) {
         // Create new shared file handle.
         vfs_file_shared_t *shared = ptr->shared;
-        vfs_file_open(ec, parent, shared, oflags);
+        vfs_file_open(ec, parent->shared, shared, filename, oflags);
         if (badge_err_is_ok(ec)) {
             vfs_file_destroy_handle(handle);
             mutex_release(NULL, &vfs_handle_mtx);
@@ -442,9 +554,7 @@ file_t fs_open(badge_err_t *ec, char const *path, oflags_t oflags) {
 
 error:
     // Destroy directory handle.
-    if (!mutex_acquire_shared(ec, &vfs_handle_mtx, TIMESTAMP_US_MAX)) {
-        __builtin_unreachable();
-    }
+    mutex_acquire_shared(ec, &vfs_handle_mtx, TIMESTAMP_US_MAX);
     ptrdiff_t index = vfs_file_by_handle(parent->fileno);
     vfs_file_destroy_handle(index);
     mutex_release(NULL, &vfs_handle_mtx);
@@ -454,9 +564,7 @@ error:
 // Close a file opened by `fs_open`.
 // Only raises an error if `file` is an invalid file descriptor.
 void fs_close(badge_err_t *ec, file_t file) {
-    if (!mutex_acquire_shared(ec, &vfs_handle_mtx, TIMESTAMP_US_MAX)) {
-        __builtin_unreachable();
-    }
+    mutex_acquire(ec, &vfs_handle_mtx, TIMESTAMP_US_MAX);
 
     ptrdiff_t index = vfs_file_by_handle(file);
     if (index == -1) {
@@ -477,10 +585,7 @@ fileoff_t fs_read(badge_err_t *ec, file_t file, void *readbuf, fileoff_t readlen
         mutex_release_shared(NULL, &vfs_handle_mtx);
         return 0;
     }
-    if (!mutex_acquire_shared(NULL, &vfs_handle_mtx, VFS_MUTEX_TIMEOUT)) {
-        badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_TIMEOUT);
-        return 0;
-    }
+    mutex_acquire_shared(NULL, &vfs_handle_mtx, TIMESTAMP_US_MAX);
 
     // Look up the handle.
     ptrdiff_t index = vfs_file_by_handle(file);
@@ -534,10 +639,7 @@ fileoff_t fs_write(badge_err_t *ec, file_t file, void const *writebuf, fileoff_t
         mutex_release_shared(NULL, &vfs_handle_mtx);
         return 0;
     }
-    if (!mutex_acquire_shared(NULL, &vfs_handle_mtx, VFS_MUTEX_TIMEOUT)) {
-        badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_TIMEOUT);
-        return 0;
-    }
+    mutex_acquire_shared(NULL, &vfs_handle_mtx, TIMESTAMP_US_MAX);
 
     // Look up the handle.
     ptrdiff_t index = vfs_file_by_handle(file);
@@ -574,10 +676,7 @@ fileoff_t fs_write(badge_err_t *ec, file_t file, void const *writebuf, fileoff_t
 
 // Get the current offset in the file.
 fileoff_t fs_tell(badge_err_t *ec, file_t file) {
-    if (!mutex_acquire_shared(NULL, &vfs_handle_mtx, VFS_MUTEX_TIMEOUT)) {
-        badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_TIMEOUT);
-        return 0;
-    }
+    mutex_acquire_shared(NULL, &vfs_handle_mtx, TIMESTAMP_US_MAX);
 
     // Look up the handle.
     ptrdiff_t index = vfs_file_by_handle(file);
@@ -600,10 +699,7 @@ fileoff_t fs_tell(badge_err_t *ec, file_t file) {
 // Set the current offset in the file.
 // Returns the new offset in the file.
 fileoff_t fs_seek(badge_err_t *ec, file_t file, fileoff_t off, fs_seek_t seekmode) {
-    if (!mutex_acquire_shared(NULL, &vfs_handle_mtx, VFS_MUTEX_TIMEOUT)) {
-        badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_TIMEOUT);
-        return 0;
-    }
+    mutex_acquire_shared(NULL, &vfs_handle_mtx, TIMESTAMP_US_MAX);
 
     // Look up the handle.
     ptrdiff_t index = vfs_file_by_handle(file);

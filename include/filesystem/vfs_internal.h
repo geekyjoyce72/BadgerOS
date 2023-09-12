@@ -7,9 +7,6 @@
 #include "filesystem/vfs_types.h"
 #include "mutex.h"
 
-// Timeout in microseconds to take on filesystem mutexes.
-#define VFS_MUTEX_TIMEOUT 50000
-
 // Index in the VFS table of the filesystem mounted at /.
 // Set to -1 if no filesystem is mounted at /.
 // If no filesystem is mounted at /, the FS API will not work.
@@ -44,9 +41,13 @@ extern size_t             vfs_file_handle_list_cap;
 /* ==== Thread-unsafe functions ==== */
 
 // Find a shared file handle by inode, if any.
-ptrdiff_t vfs_file_by_inode(vfs_t *vfs, inode_t inode);
+ptrdiff_t vfs_shared_by_inode(vfs_t *vfs, inode_t inode);
 // Get a file handle by number.
 ptrdiff_t vfs_file_by_handle(file_t fileno);
+// Create a new empty shared file handle.
+ptrdiff_t vfs_file_create_shared();
+// Destroy a shared file handle assuming the underlying file is already closed.
+void      vfs_file_destroy_shared(ptrdiff_t shared);
 // Create a new file handle.
 // If `shared` is -1, a new shared empty handle is created.
 ptrdiff_t vfs_file_create_handle(ptrdiff_t shared);
@@ -58,35 +59,30 @@ void      vfs_file_destroy_handle(ptrdiff_t handle);
 
 /* ==== Thread-safe functions ==== */
 
-// Find the filesystem and location given an absolute path.
-// Raises an error if the leading '/' is omitted.
-//
-// If `follow_symlink` is true, all symlinks are resolved.
-// Otherwise, if the last element in the absolute path is a symlink, it is not resolved.
-//
-// Updates the first `FILESYSTEM_PATH_MAX` characters of `path` to be the canonical path.
-// If the file is not found, the value of path is undefined.
-//
-// Opens a new handle for the directory where the current entry is that of the file.
-// Returns NULL on error or if the path refers to the root directory.
-vfs_file_handle_t *vfs_walk(badge_err_t *ec, char *path, bool *found_out, bool follow_symlink);
+// Open the root directory of the root filesystem.
+void vfs_root_open(badge_err_t *ec, vfs_file_shared_t *dir);
 
 // Insert a new file into the given directory.
 // If the file already exists, does nothing.
-void vfs_create_file(badge_err_t *ec, vfs_file_handle_t *dir, char const *name);
+void vfs_create_file(badge_err_t *ec, vfs_file_shared_t *dir, char const *name);
 // Insert a new directory into the given directory.
 // If the file already exists, does nothing.
-void vfs_create_dir(badge_err_t *ec, vfs_file_handle_t *dir, char const *name);
+void vfs_create_dir(badge_err_t *ec, vfs_file_shared_t *dir, char const *name);
 // Unlink a file from the given directory.
 // If this is the last reference to an inode, the inode is deleted.
-void vfs_unlink(badge_err_t *ec, vfs_file_handle_t *dir, char const *name);
+void vfs_unlink(badge_err_t *ec, vfs_file_shared_t *dir, char const *name);
 
 // Atomically read all directory entries and cache them into the directory handle.
 // Refer to `dirent_t` for the structure of the cache.
 void vfs_dir_read(badge_err_t *ec, vfs_file_handle_t *dir);
+// Atomically read the directory entry with the matching name.
+// Returns true if the entry was found.
+bool vfs_dir_find_ent(badge_err_t *ec, vfs_file_shared_t *dir, dirent_t *ent, char const *name);
+
 // Open a file for reading and/or writing given parent directory handle.
-void vfs_file_open(badge_err_t *ec, vfs_file_handle_t *dir, vfs_file_shared_t *file, oflags_t oflags);
-// Clone a file opened by `vfs_file_open`.
+// Also handles OFLAGS_EXCLUSIVE and OFLAGS_CREATE.
+void vfs_file_open(badge_err_t *ec, vfs_file_shared_t *dir, vfs_file_shared_t *file, char const *name, oflags_t oflags);
+// Close a file opened by `vfs_file_open`.
 // Only raises an error if `file` is an invalid file descriptor.
 void vfs_file_close(badge_err_t *ec, vfs_file_shared_t *file);
 // Read bytes from a file.
