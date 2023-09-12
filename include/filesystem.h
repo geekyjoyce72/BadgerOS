@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "attributes.h"
 #include "badge_err.h"
 #include "blockdevice.h"
 

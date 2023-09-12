@@ -16,6 +16,8 @@ typedef struct vfs vfs_t;
 typedef struct {
     // Reference count.
     size_t    refcount;
+    // Index in the shared file handle table.
+    ptrdiff_t index;
     // Current file size.
     fileoff_t size;
     // Filesystem-specific information.

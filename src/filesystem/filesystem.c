@@ -10,10 +10,108 @@
 
 
 // Replace a handle with the root directory of the root filesystem.
+// If this method fails, the old value is preserved.
 static void root_reopen(badge_err_t *ec, vfs_file_handle_t *dir) {
-    fs_seek(ec, dir->fileno, 0, SEEK_ABS);
-
+    badge_err_t ec0;
+    if (!ec)
+        ec = &ec0;
     mutex_acquire(NULL, &vfs_handle_mtx, TIMESTAMP_US_MAX);
+
+    // Create or obtain a new shared handle.
+    ptrdiff_t          shared = vfs_shared_by_inode(&vfs_table[vfs_root_index], vfs_table[vfs_root_index].inode_root);
+    vfs_file_shared_t *shptr;
+    if (shared == -1) {
+        // Open new handle.
+        shared = vfs_file_create_shared();
+        if (shared == -1) {
+            mutex_release(NULL, &vfs_handle_mtx);
+            badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_NOMEM);
+            return;
+        }
+        shptr = vfs_file_shared_list[shared];
+
+        // Open root directory.
+        vfs_root_open(ec, shptr);
+        if (!badge_err_is_ok(ec)) {
+            vfs_file_destroy_shared(shared);
+            mutex_release(NULL, &vfs_handle_mtx);
+            return;
+        }
+        shptr->refcount = 0;
+
+    } else {
+        // Use existing handle.
+        shptr = vfs_file_shared_list[shared];
+    }
+
+    // Switch to new handle.
+    vfs_file_shared_t *old = dir->shared;
+    dir->shared            = shptr;
+    shptr->refcount++;
+
+    // Clean up old handle.
+    old->refcount--;
+    if (old->refcount == 0) {
+        vfs_file_close(ec, old);
+        assert_dev_drop(badge_err_is_ok(ec));
+        vfs_file_destroy_shared(old->index);
+    } else {
+        badge_err_set_ok(ec);
+    }
+
+    mutex_release(NULL, &vfs_handle_mtx);
+}
+
+// Replace a directory handle with the handle of one of it's entries.
+// If this method fails, the old value is preserved.
+static void dir_reopen(badge_err_t *ec, vfs_file_handle_t *dir, dirent_t const *ent) {
+    badge_err_t ec0;
+    if (!ec)
+        ec = &ec0;
+    mutex_acquire(NULL, &vfs_handle_mtx, TIMESTAMP_US_MAX);
+
+    // TODO: This is the location in which mounted filesystems are handled.
+    // Create or obtain a new shared handle.
+    ptrdiff_t          shared = vfs_shared_by_inode(dir->shared->vfs, ent->inode);
+    vfs_file_shared_t *shptr;
+    if (shared == -1) {
+        // Open new handle.
+        shared = vfs_file_create_shared();
+        if (shared == -1) {
+            mutex_release(NULL, &vfs_handle_mtx);
+            badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_NOMEM);
+            return;
+        }
+        shptr = vfs_file_shared_list[shared];
+
+        // Open entry.
+        vfs_file_open(ec, dir->shared, shptr, ent->name, 0);
+        if (!badge_err_is_ok(ec)) {
+            vfs_file_destroy_shared(shared);
+            mutex_release(NULL, &vfs_handle_mtx);
+            return;
+        }
+        shptr->refcount = 0;
+
+    } else {
+        // Use existing handle.
+        shptr = vfs_file_shared_list[shared];
+    }
+
+    // Switch to new handle.
+    vfs_file_shared_t *old = dir->shared;
+    dir->shared            = shptr;
+    shptr->refcount++;
+
+    // Clean up old handle.
+    old->refcount--;
+    if (old->refcount == 0) {
+        vfs_file_close(ec, old);
+        assert_dev_drop(badge_err_is_ok(ec));
+        vfs_file_destroy_shared(old->index);
+    } else {
+        badge_err_set_ok(ec);
+    }
 
     mutex_release(NULL, &vfs_handle_mtx);
 }
@@ -51,7 +149,7 @@ static ptrdiff_t walk(badge_err_t *ec, vfs_file_handle_t *dir, char path[FILESYS
     bool      found = false;
 
     // Deduplicate forward slashes.
-    for (size_t i = 0; i < len;) {
+    for (ptrdiff_t i = 0; i < len;) {
         if (path[i] == '/' && path[i + 1] == '/') {
             cstr_copy(path + i + 1, FILESYSTEM_PATH_MAX + 1, path + i + 2);
             len--;
@@ -85,20 +183,31 @@ static ptrdiff_t walk(badge_err_t *ec, vfs_file_handle_t *dir, char path[FILESYS
             end = begin + 1;
 
         // Read current directory.
-        char tmp  = path[end];
-        path[end] = 0;
-        found     = vfs_dir_find_ent(ec, dir, ent, path + begin);
-        path[end] = tmp;
+        char tmp    = path[end];
+        path[end]   = 0;
+        found       = vfs_dir_find_ent(ec, dir->shared, ent, path + begin);
+        path[end]   = tmp;
+        // Whether the current entry represents an intermediate directory.
+        bool is_int = path[end] == '/' && path[end + 1] != 0;
 
-        if (!found && path[end] == '/' && path[end + 1] != 0) {
+        if (!found && is_int) {
             // An intermediate directory was not found.
             badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_NOTFOUND);
             begin = -1;
             break;
-        } else if (!found) {
-            // The final file or directory was not found.
+
+        } else if (!is_int) {
+            // The final file or directory.
             badge_err_set_ok(ec);
             break;
+
+        } else /* found && is_int */ {
+            // An intermediate directory to open.
+            dir_reopen(ec, dir, ent);
+            if (!badge_err_is_ok(ec)) {
+                begin = -1;
+                break;
+            }
         }
     }
 
@@ -289,6 +398,11 @@ void fs_mount(badge_err_t *ec, fs_type_t type, blkdev_t *media, char const *moun
     if (!badge_err_is_ok(ec)) {
         logk(LOG_ERROR, "fs_mount: Mount error reported by VFS.");
         goto error_cleanup;
+    }
+
+    if (cstr_equals(mountpoint, "/")) {
+        // Set root mountpoint index.
+        vfs_root_index = vfs_index;
     }
 
     // At this point, the filesystem is ready for use.

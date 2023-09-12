@@ -249,7 +249,7 @@ bool mem_equals(void const *a, void const *b, size_t size) {
 // Copy the contents of memory area `src` to memory area `dest`.
 // Correct copying is gauranteed even if `src` and `dest` are overlapping regions.
 void mem_copy(void *dest, void const *src, size_t size) {
-    size_t align_detector = (size_t)dest | (size_t)size;
+    size_t align_detector = (size_t)dest | (size_t)src | (size_t)size;
 
     // Optimise for alignment.
     if (align_detector & 1) {

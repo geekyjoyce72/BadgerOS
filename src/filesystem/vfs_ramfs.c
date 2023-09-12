@@ -5,32 +5,8 @@
 
 #include "assertions.h"
 #include "badge_strings.h"
+#include "log.h"
 #include "malloc.h"
-
-
-
-// Atomically allocate memory within the quota.
-static void *ramfs_malloc(badge_err_t *ec, vfs_t *vfs, size_t cap) {
-    (void)ec;
-    (void)vfs;
-    // TODO.
-    return malloc(cap);
-}
-
-// Atomically resize memory within the quota.
-static void *ramfs_realloc(badge_err_t *ec, vfs_t *vfs, void *mem, size_t cap) {
-    (void)ec;
-    (void)vfs;
-    // TODO.
-    return realloc(mem, cap);
-}
-
-// Atomically free memory within the quota.
-static void ramfs_free(vfs_t *vfs, void *mem) {
-    (void)vfs;
-    // TODO.
-    free(mem);
-}
 
 
 
@@ -38,8 +14,9 @@ static void ramfs_free(vfs_t *vfs, void *mem) {
 static bool resize_inode(badge_err_t *ec, vfs_t *vfs, vfs_ramfs_inode_t *inode, size_t size) {
     if (inode->cap >= 2 * size) {
         // If capacity is too large, try to save some memory.
-        void *mem = ramfs_realloc(ec, vfs, inode->buf, inode->cap / 2);
-        if (mem) {
+        size_t cap = inode->cap / 2;
+        void  *mem = realloc(inode->buf, inode->cap / 2);
+        if (mem || cap == 0) {
             inode->cap /= 2;
             inode->buf  = mem;
         }
@@ -49,6 +26,7 @@ static bool resize_inode(badge_err_t *ec, vfs_t *vfs, vfs_ramfs_inode_t *inode, 
     } else if (inode->cap >= size) {
         // If capacity is large enough, don't bother resizing.
         inode->len = size;
+        badge_err_set_ok(ec);
         return true;
 
     } else {
@@ -57,7 +35,7 @@ static bool resize_inode(badge_err_t *ec, vfs_t *vfs, vfs_ramfs_inode_t *inode, 
         while (cap < size) {
             cap *= 2;
         }
-        void *mem = ramfs_realloc(ec, vfs, inode->buf, cap);
+        void *mem = realloc(inode->buf, cap);
         if (mem) {
             inode->cap = cap;
             inode->buf = mem;
@@ -83,7 +61,7 @@ static void pop_inode_refcount(vfs_t *vfs, vfs_ramfs_inode_t *inode) {
     inode->links--;
     if (inode->links == 0) {
         // Free inode.
-        ramfs_free(vfs, inode->buf);
+        free(inode->buf);
         vfs->ramfs.inode_usage[inode->inode] = false;
     }
 }
@@ -215,14 +193,15 @@ void vfs_ramfs_mount(badge_err_t *ec, vfs_t *vfs) {
     atomic_store_explicit(&vfs->ramfs.ram_usage, 0, memory_order_relaxed);
     vfs->ramfs.ram_limit      = 65536;
     vfs->ramfs.inode_list_len = 32;
-    vfs->ramfs.inode_list     = ramfs_malloc(ec, vfs, sizeof(*vfs->ramfs.inode_list) * vfs->ramfs.inode_list_len);
+    vfs->ramfs.inode_list     = malloc(sizeof(*vfs->ramfs.inode_list) * vfs->ramfs.inode_list_len);
     if (!badge_err_is_ok(ec))
         return;
-    vfs->ramfs.inode_usage = ramfs_malloc(ec, vfs, sizeof(*vfs->ramfs.inode_usage) * vfs->ramfs.inode_list_len);
+    vfs->ramfs.inode_usage = malloc(sizeof(*vfs->ramfs.inode_usage) * vfs->ramfs.inode_list_len);
     if (!badge_err_is_ok(ec)) {
-        ramfs_free(vfs, vfs->ramfs.inode_list);
+        free(vfs->ramfs.inode_list);
         return;
     }
+    vfs->inode_root = VFS_RAMFS_INODE_ROOT;
     mutex_init_shared(ec, &vfs->ramfs.mtx);
 
     // Clear inode usage.
@@ -244,15 +223,15 @@ void vfs_ramfs_mount(badge_err_t *ec, vfs_t *vfs) {
 
     vfs_ramfs_dirent_t ent = {
         .size     = sizeof(ent) - VFS_RAMFS_NAME_MAX - 1 + sizeof(size_t),
-        .inode    = 2,
+        .inode    = VFS_RAMFS_INODE_ROOT,
         .name_len = 1,
         .name     = {'.', 0},
     };
     insert_dirent(ec, vfs, iptr, &ent);
     if (!badge_err_is_ok(ec)) {
-        ramfs_free(vfs, iptr->buf);
-        ramfs_free(vfs, vfs->ramfs.inode_list);
-        ramfs_free(vfs, vfs->ramfs.inode_usage);
+        free(iptr->buf);
+        free(vfs->ramfs.inode_list);
+        free(vfs->ramfs.inode_usage);
         mutex_destroy(NULL, &vfs->ramfs.mtx);
     }
 
@@ -261,9 +240,9 @@ void vfs_ramfs_mount(badge_err_t *ec, vfs_t *vfs) {
     ent.name[2]  = 0;
     insert_dirent(ec, vfs, iptr, &ent);
     if (!badge_err_is_ok(ec)) {
-        ramfs_free(vfs, iptr->buf);
-        ramfs_free(vfs, vfs->ramfs.inode_list);
-        ramfs_free(vfs, vfs->ramfs.inode_usage);
+        free(iptr->buf);
+        free(vfs->ramfs.inode_list);
+        free(vfs->ramfs.inode_usage);
         mutex_destroy(NULL, &vfs->ramfs.mtx);
     }
 }
@@ -271,8 +250,8 @@ void vfs_ramfs_mount(badge_err_t *ec, vfs_t *vfs) {
 // Unmount a ramfs filesystem.
 void vfs_ramfs_umount(vfs_t *vfs) {
     mutex_destroy(NULL, &vfs->ramfs.mtx);
-    ramfs_free(vfs, vfs->ramfs.inode_list);
-    ramfs_free(vfs, vfs->ramfs.inode_usage);
+    free(vfs->ramfs.inode_list);
+    free(vfs->ramfs.inode_usage);
 }
 
 
@@ -390,7 +369,7 @@ bool vfs_ramfs_exists(badge_err_t *ec, vfs_t *vfs, vfs_file_shared_t *dir, char 
 // Determine the record length for converting a RAMFS dirent to a BadgerOS dirent.
 // Returns the record length for a matching `dirent_t`.
 static inline size_t measure_dirent(vfs_ramfs_dirent_t *ent) {
-    size_t ent_size  = sizeof(dirent_t) - FILESYSTEM_NAME_MAX - 1 + cstr_length(ent->name) + 1;
+    size_t ent_size  = offsetof(dirent_t, name) + cstr_length(ent->name) + 1;
     ent_size        += (~ent_size + 1) % sizeof(size_t);
     return ent_size;
 }
@@ -400,13 +379,13 @@ static inline size_t measure_dirent(vfs_ramfs_dirent_t *ent) {
 static inline size_t convert_dirent(vfs_t *vfs, dirent_t *out, vfs_ramfs_dirent_t *in) {
     vfs_ramfs_inode_t *iptr = &vfs->ramfs.inode_list[in->inode];
 
-    out->record_len  = sizeof(dirent_t) - FILESYSTEM_NAME_MAX - 1 + cstr_length(in->name) + 1;
+    out->record_len  = offsetof(dirent_t, name) + in->name_len + 1;
     out->record_len += (size_t)(~out->record_len + 1) % sizeof(size_t);
     out->inode       = in->inode;
     out->is_dir      = (iptr->mode & VFS_RAMFS_MODE_MASK) == FILETYPE_DIR << VFS_RAMFS_MODE_BIT;
     out->is_symlink  = (iptr->mode & VFS_RAMFS_MODE_MASK) == FILETYPE_LINK << VFS_RAMFS_MODE_BIT;
-    out->name_len    = cstr_length(in->name);
-    mem_copy(out->name, in->name, cstr_length(in->name + 1));
+    out->name_len    = in->name_len;
+    mem_copy(out->name, in->name, in->name_len + 1);
 
     return out->record_len;
 }
@@ -422,12 +401,14 @@ void vfs_ramfs_dir_read(badge_err_t *ec, vfs_t *vfs, vfs_file_handle_t *dir) {
     size_t cap = 0;
     while (off < iptr->len) {
         vfs_ramfs_dirent_t *ent  = (vfs_ramfs_dirent_t *)(iptr->buf + off);
-        cap                     += measure_dirent((vfs_ramfs_dirent_t *)(iptr->buf + off));
+        cap                     += measure_dirent(ent);
         off                     += ent->size;
     }
 
+    print_heap();
     // Allocate memory.
     void *mem = realloc(dir->dir_cache, cap);
+    print_heap();
     if (!mem) {
         mutex_release_shared(NULL, &vfs->ramfs.mtx);
         badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_NOMEM);
@@ -443,7 +424,10 @@ void vfs_ramfs_dir_read(badge_err_t *ec, vfs_t *vfs, vfs_file_handle_t *dir) {
         vfs_ramfs_dirent_t *in  = (vfs_ramfs_dirent_t *)(iptr->buf + off);
         dirent_t           *out = (dirent_t *)(dir->dir_cache + out_off);
         convert_dirent(vfs, out, in);
-        off += in->size;
+        logk_hexdump(LOG_DEBUG, "Convert in:", in, in->size);
+        logk_hexdump(LOG_DEBUG, "Convert out:", out, out->record_len);
+        off     += in->size;
+        out_off += out->record_len;
     }
 
     mutex_release_shared(NULL, &vfs->ramfs.mtx);

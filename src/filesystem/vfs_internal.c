@@ -46,7 +46,7 @@ static atomic_int vfs_handle_no = 0;
 #define vfs_impl_return(type, method, ...)                                                                             \
     do {                                                                                                               \
         switch (type) {                                                                                                \
-            case FS_TYPE_RAMFS: vfs_ramfs_##method(__VA_ARGS__); return;                                               \
+            case FS_TYPE_RAMFS: return vfs_ramfs_##method(__VA_ARGS__);                                                \
             default: __builtin_unreachable();                                                                          \
         }                                                                                                              \
     } while (0)
@@ -175,6 +175,7 @@ ptrdiff_t vfs_file_create_shared() {
         return -1;
     *shptr = (vfs_file_shared_t){
         .refcount = 0,
+        .index    = shared,
         .size     = 0,
         .inode    = 0,
         .vfs      = NULL,

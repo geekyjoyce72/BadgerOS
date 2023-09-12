@@ -103,7 +103,7 @@ bool mutex_acquire(badge_err_t *ec, mutex_t *mutex, timestamp_us_t timeout) {
     }
     // Compute timeout.
     timestamp_us_t now = time_us();
-    if (timeout < 0 || now + timeout < now) {
+    if (timeout < 0 || timeout - TIMESTAMP_US_MAX + now >= 0) {
         timeout = TIMESTAMP_US_MAX;
     } else {
         timeout += now;
