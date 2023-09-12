@@ -72,10 +72,6 @@ void debug_func(void *arg) {
     // Get the VFS handle.
     vfs_t *vfs = &vfs_table[vfs_root_index];
 
-    // Dump raw RAMFS dirents.
-    vfs_ramfs_inode_t *inode = &vfs->ramfs.inode_list[vfs->inode_root];
-    logk_hexdump(LOG_DEBUG, "raw dirents:", inode->buf, inode->len);
-
     // Open root directory.
     logk(LOG_DEBUG, "Raw opening root directory");
     vfs_file_shared_t shared;
@@ -92,11 +88,40 @@ void debug_func(void *arg) {
     handle.shared         = &shared;
     handle.fileno         = 1;
 
+    // Create a file.
+    logk(LOG_DEBUG, "Raw creating file b.txt");
+    vfs_ramfs_create_file(&ec, vfs, &shared, "b.txt");
+    assert_always(badge_err_is_ok(&ec));
+
+    // Dump raw RAMFS dirents.
+    vfs_ramfs_inode_t *inode = &vfs->ramfs.inode_list[vfs->inode_root];
+    logk_hexdump(LOG_DEBUG, "raw dirents:", inode->buf, inode->len);
+
     // List root directory.
     logk(LOG_DEBUG, "Raw reading directory");
     vfs_ramfs_dir_read(&ec, vfs, &handle);
     assert_always(badge_err_is_ok(&ec));
-    logk_hexdump_vaddr(LOG_DEBUG, "dirent cache:", handle.dir_cache, handle.dir_cache_size, 0);
+    logk_hexdump(LOG_DEBUG, "dirent cache:", handle.dir_cache, handle.dir_cache_size);
+
+    // Open the file.
+    logk(LOG_DEBUG, "Raw opening file b.txt");
+    vfs_file_shared_t fshared;
+    vfs_ramfs_file_open(&ec, vfs, &shared, &fshared, "b.txt");
+    assert_always(badge_err_is_ok(&ec));
+
+    // Write to the file.
+    char const payload[] = "Hello, World!";
+    logk(LOG_DEBUG, "Resize");
+    vfs_ramfs_file_resize(&ec, vfs, &fshared, sizeof(payload));
+    assert_always(badge_err_is_ok(&ec));
+    logk(LOG_DEBUG, "Write");
+    vfs_ramfs_file_write(&ec, vfs, &fshared, 0, payload, sizeof(payload));
+    assert_always(badge_err_is_ok(&ec));
+    logk(LOG_DEBUG, "Read");
+    char buffer[sizeof(payload)];
+    vfs_ramfs_file_read(&ec, vfs, &fshared, 0, buffer, sizeof(buffer));
+    assert_always(badge_err_is_ok(&ec));
+    logk_hexdump(LOG_DEBUG, "Read data:", buffer, sizeof(buffer));
 
 
 

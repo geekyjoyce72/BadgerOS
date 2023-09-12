@@ -191,6 +191,7 @@ void vfs_ramfs_mount(badge_err_t *ec, vfs_t *vfs) {
 
     // TODO: Parameters.
     atomic_store_explicit(&vfs->ramfs.ram_usage, 0, memory_order_relaxed);
+    vfs->type                 = FS_TYPE_RAMFS;
     vfs->ramfs.ram_limit      = 65536;
     vfs->ramfs.inode_list_len = 32;
     vfs->ramfs.inode_list     = malloc(sizeof(*vfs->ramfs.inode_list) * vfs->ramfs.inode_list_len);
@@ -369,7 +370,7 @@ bool vfs_ramfs_exists(badge_err_t *ec, vfs_t *vfs, vfs_file_shared_t *dir, char 
 // Determine the record length for converting a RAMFS dirent to a BadgerOS dirent.
 // Returns the record length for a matching `dirent_t`.
 static inline size_t measure_dirent(vfs_ramfs_dirent_t *ent) {
-    size_t ent_size  = offsetof(dirent_t, name) + cstr_length(ent->name) + 1;
+    size_t ent_size  = offsetof(dirent_t, name) + ent->name_len + 1;
     ent_size        += (~ent_size + 1) % sizeof(size_t);
     return ent_size;
 }
@@ -393,7 +394,7 @@ static inline size_t convert_dirent(vfs_t *vfs, dirent_t *out, vfs_ramfs_dirent_
 // Atomically read all directory entries and cache them into the directory handle.
 // Refer to `dirent_t` for the structure of the cache.
 void vfs_ramfs_dir_read(badge_err_t *ec, vfs_t *vfs, vfs_file_handle_t *dir) {
-    mutex_acquire(NULL, &vfs->ramfs.mtx, TIMESTAMP_US_MAX);
+    mutex_acquire_shared(NULL, &vfs->ramfs.mtx, TIMESTAMP_US_MAX);
     size_t             off  = 0;
     vfs_ramfs_inode_t *iptr = dir->shared->ramfs_file;
 
@@ -405,10 +406,8 @@ void vfs_ramfs_dir_read(badge_err_t *ec, vfs_t *vfs, vfs_file_handle_t *dir) {
         off                     += ent->size;
     }
 
-    print_heap();
     // Allocate memory.
     void *mem = realloc(dir->dir_cache, cap);
-    print_heap();
     if (!mem) {
         mutex_release_shared(NULL, &vfs->ramfs.mtx);
         badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_NOMEM);
@@ -424,8 +423,6 @@ void vfs_ramfs_dir_read(badge_err_t *ec, vfs_t *vfs, vfs_file_handle_t *dir) {
         vfs_ramfs_dirent_t *in  = (vfs_ramfs_dirent_t *)(iptr->buf + off);
         dirent_t           *out = (dirent_t *)(dir->dir_cache + out_off);
         convert_dirent(vfs, out, in);
-        logk_hexdump(LOG_DEBUG, "Convert in:", in, in->size);
-        logk_hexdump(LOG_DEBUG, "Convert out:", out, out->record_len);
         off     += in->size;
         out_off += out->record_len;
     }
@@ -451,15 +448,15 @@ bool vfs_ramfs_dir_find_ent(badge_err_t *ec, vfs_t *vfs, vfs_file_shared_t *dir,
 
 // Open a file handle for the root directory.
 void vfs_ramfs_root_open(badge_err_t *ec, vfs_t *vfs, vfs_file_shared_t *file) {
-    mutex_acquire(NULL, &vfs->ramfs.mtx, TIMESTAMP_US_MAX);
+    mutex_acquire_shared(NULL, &vfs->ramfs.mtx, TIMESTAMP_US_MAX);
 
     // Install in shared file handle.
     vfs_ramfs_inode_t *iptr = &vfs->ramfs.inode_list[VFS_RAMFS_INODE_ROOT];
     file->ramfs_file        = iptr;
-    file->inode             = iptr->inode;
+    file->inode             = VFS_RAMFS_INODE_ROOT;
     file->vfs               = vfs;
 
-    mutex_release(NULL, &vfs->ramfs.mtx);
+    mutex_release_shared(NULL, &vfs->ramfs.mtx);
     badge_err_set_ok(ec);
 }
 

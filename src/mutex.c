@@ -151,7 +151,7 @@ bool mutex_acquire_shared(badge_err_t *ec, mutex_t *mutex, timestamp_us_t timeou
     }
     // Compute timeout.
     timestamp_us_t now = time_us();
-    if (timeout < 0 || now + timeout < now) {
+    if (timeout < 0 || timeout - TIMESTAMP_US_MAX + now >= 0) {
         timeout = TIMESTAMP_US_MAX;
     } else {
         timeout += now;

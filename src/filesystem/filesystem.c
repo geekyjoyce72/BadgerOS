@@ -183,8 +183,9 @@ static ptrdiff_t walk(badge_err_t *ec, vfs_file_handle_t *dir, char path[FILESYS
             end = begin + 1;
 
         // Read current directory.
-        char tmp    = path[end];
-        path[end]   = 0;
+        char tmp  = path[end];
+        path[end] = 0;
+        logkf(LOG_DEBUG, "Walk %{cs}", path + begin);
         found       = vfs_dir_find_ent(ec, dir->shared, ent, path + begin);
         path[end]   = tmp;
         // Whether the current entry represents an intermediate directory.
@@ -233,6 +234,7 @@ static vfs_file_handle_t *root_open(badge_err_t *ec) {
 
     if (existing == -1) {
         // Open new shared handle.
+        logkf(LOG_DEBUG, "ptr=%{size;x}, shared=%{size;x}", ptr, ptr->shared);
         vfs_root_open(ec, ptr->shared);
         if (!badge_err_is_ok(ec)) {
             vfs_file_destroy_handle(handle);
@@ -403,6 +405,9 @@ void fs_mount(badge_err_t *ec, fs_type_t type, blkdev_t *media, char const *moun
     if (cstr_equals(mountpoint, "/")) {
         // Set root mountpoint index.
         vfs_root_index = vfs_index;
+        logkf(LOG_DEBUG, "root_index=%{ptrdiff;d}", vfs_root_index);
+        vfs_t *vfs = &vfs_table[vfs_root_index];
+        logkf(LOG_DEBUG, "vfs=%{size;x}, type=%{d}, mount=%{cs}", vfs, vfs->type, vfs->mountpoint);
     }
 
     // At this point, the filesystem is ready for use.
@@ -595,12 +600,14 @@ file_t fs_open(badge_err_t *ec, char const *path, oflags_t oflags) {
     }
 
     // Locate the file.
+    logk(LOG_DEBUG, "Root open");
     vfs_file_handle_t *parent = root_open(ec);
     if (!badge_err_is_ok(ec)) {
         return FILE_NONE;
     }
     dirent_t ent;
-    bool     found = walk(ec, parent, canon_path, &ent);
+    logk(LOG_DEBUG, "Walk");
+    bool found = walk(ec, parent, canon_path, &ent);
     if (!badge_err_is_ok(ec)) {
         return FILE_NONE;
     }
