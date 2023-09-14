@@ -33,7 +33,7 @@ To build BadgerOS:
 
 To flash to an ESP:
 
-- ESP-IDF ([Espressif toolchain](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/get-started/#installation))
+- `esptool.py` from [ESP-IDF](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/get-started/#installation)
 
 Optional recommends:
 
