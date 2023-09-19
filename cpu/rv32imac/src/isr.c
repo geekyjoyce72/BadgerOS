@@ -46,7 +46,8 @@ void __trap_handler() {
     }
     double_trap = true;
 
-    uint32_t mcause, mtval, mepc;
+    uint32_t mcause, mstatus, mtval, mepc;
+    asm volatile("csrr %0, mstatus" : "=r"(mstatus));
     asm volatile("csrr %0, mcause" : "=r"(mcause));
 
     // Print trap name.
@@ -55,6 +56,15 @@ void __trap_handler() {
     } else {
         rawprint("Trap 0x");
         rawprinthex(mcause, 8);
+    }
+
+    // Print previous privilege.
+    if (mstatus & (3 << RV32_MSTATUS_MPP_BASE_BIT) == 3) {
+        rawprint(" from M-mode");
+    } else if (mstatus & (3 << RV32_MSTATUS_MPP_BASE_BIT) == 1) {
+        rawprint(" from S-mode");
+    } else {
+        rawprint(" from U-mode");
     }
 
     // Print PC.
