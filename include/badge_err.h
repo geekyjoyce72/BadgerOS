@@ -47,6 +47,8 @@ typedef enum {
 } badge_eloc_t;
 
 typedef enum {
+    // Not an error.
+    ECAUSE_OK      = 0,
     // Unknown error or no appropriate badge_ecause_t value
     ECAUSE_UNKNOWN = 1,
     // Parameter missing or invalid; generic invalid parameter error code

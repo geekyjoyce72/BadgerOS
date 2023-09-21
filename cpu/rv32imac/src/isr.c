@@ -58,15 +58,6 @@ void __trap_handler() {
         rawprinthex(mcause, 8);
     }
 
-    // Print previous privilege.
-    if (mstatus & (3 << RV32_MSTATUS_MPP_BASE_BIT) == 3) {
-        rawprint(" from M-mode");
-    } else if (mstatus & (3 << RV32_MSTATUS_MPP_BASE_BIT) == 1) {
-        rawprint(" from S-mode");
-    } else {
-        rawprint(" from U-mode");
-    }
-
     // Print PC.
     asm volatile("csrr %0, mepc" : "=r"(mepc));
     rawprint(" at PC 0x");

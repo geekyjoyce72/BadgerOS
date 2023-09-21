@@ -336,7 +336,7 @@ void vfs_ramfs_unlink(badge_err_t *ec, vfs_t *vfs, vfs_file_shared_t *dir, char 
         // Directories that are not empty cannot be removed.
         if (!is_dir_empty(iptr)) {
             badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_NOTEMPTY);
-            badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_NOTFOUND);
+            mutex_release(NULL, &vfs->ramfs.mtx);
             return;
         }
     }
@@ -469,10 +469,13 @@ void vfs_ramfs_file_open(
     // Look up the file in question.
     vfs_ramfs_inode_t  *dirptr = dir->ramfs_file;
     vfs_ramfs_dirent_t *ent    = find_dirent(ec, vfs, dirptr, name);
-    if (!badge_err_is_ok(ec))
+    if (!badge_err_is_ok(ec)) {
+        mutex_release(NULL, &vfs->ramfs.mtx);
         return;
+    }
     if (!ent) {
         badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_NOTFOUND);
+        mutex_release(NULL, &vfs->ramfs.mtx);
         return;
     }
 
@@ -507,20 +510,21 @@ void vfs_ramfs_file_read(
         badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_RANGE);
         return;
     }
-    mutex_acquire(NULL, &vfs->ramfs.mtx, TIMESTAMP_US_MAX);
+    mutex_acquire_shared(NULL, &vfs->ramfs.mtx, TIMESTAMP_US_MAX);
 
     vfs_ramfs_inode_t *iptr = file->ramfs_file;
 
     // Bounds check file and read offsets.
     if (offset + readlen > (ptrdiff_t)iptr->len || offset + readlen < offset) {
-        mutex_release_shared(ec, &vfs->ramfs.mtx);
+        mutex_release_shared(NULL, &vfs->ramfs.mtx);
         badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_RANGE);
         return;
     }
 
     // Checks passed, return data.
     mem_copy(readbuf, iptr->buf + offset, readlen);
-    mutex_release_shared(ec, &vfs->ramfs.mtx);
+    mutex_release_shared(NULL, &vfs->ramfs.mtx);
+    badge_err_set_ok(ec);
 }
 
 // Write bytes from a file.

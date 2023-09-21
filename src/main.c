@@ -20,8 +20,15 @@
 static kernel_ctx_t kctx;
 
 void debug_func(void *);
-#define stack_size 1024
+#define stack_size 8192
 static uint8_t stack0[stack_size] ALIGNED_TO(STACK_ALIGNMENT);
+
+static inline void check_ec(badge_err_t *ec) {
+    if (ec && !badge_err_is_ok(ec)) {
+        logkf(LOG_ERROR, "ELOC=%{d}, ECAUSE=%{d}", ec->location, ec->cause);
+        sched_destroy_thread(NULL, sched_get_current_thread());
+    }
+}
 
 // This is the entrypoint after the stack has been set up and the init functions
 // have been run. Main is not allowed to return, so declare it noreturn.
@@ -67,7 +74,7 @@ void debug_func(void *arg) {
     // Create RAMFS.
     logk(LOG_DEBUG, "Creating RAMFS at /");
     fs_mount(&ec, FS_TYPE_RAMFS, NULL, "/", 0);
-    assert_always(badge_err_is_ok(&ec));
+    check_ec(&ec);
 
     // Get the VFS handle.
     vfs_t *vfs = &vfs_table[vfs_root_index];
@@ -76,7 +83,7 @@ void debug_func(void *arg) {
     logk(LOG_DEBUG, "Raw opening root directory");
     vfs_file_shared_t shared;
     vfs_ramfs_root_open(&ec, vfs, &shared);
-    assert_always(badge_err_is_ok(&ec));
+    check_ec(&ec);
     shared.refcount = 1;
     vfs_file_handle_t handle;
     handle.offset         = 0;
@@ -91,7 +98,7 @@ void debug_func(void *arg) {
     // Create a file.
     logk(LOG_DEBUG, "Raw creating file b.txt");
     vfs_ramfs_create_file(&ec, vfs, &shared, "b.txt");
-    assert_always(badge_err_is_ok(&ec));
+    check_ec(&ec);
 
     // Dump raw RAMFS dirents.
     vfs_ramfs_inode_t *inode = &vfs->ramfs.inode_list[vfs->inode_root];
@@ -100,27 +107,27 @@ void debug_func(void *arg) {
     // List root directory.
     logk(LOG_DEBUG, "Raw reading directory");
     vfs_ramfs_dir_read(&ec, vfs, &handle);
-    assert_always(badge_err_is_ok(&ec));
+    check_ec(&ec);
     logk_hexdump(LOG_DEBUG, "dirent cache:", handle.dir_cache, handle.dir_cache_size);
 
     // Open the file.
     logk(LOG_DEBUG, "Raw opening file b.txt");
     vfs_file_shared_t fshared;
     vfs_ramfs_file_open(&ec, vfs, &shared, &fshared, "b.txt");
-    assert_always(badge_err_is_ok(&ec));
+    check_ec(&ec);
 
     // Write to the file.
     char const payload[] = "Hello, World!";
     logk(LOG_DEBUG, "Resize");
     vfs_ramfs_file_resize(&ec, vfs, &fshared, sizeof(payload));
-    assert_always(badge_err_is_ok(&ec));
+    check_ec(&ec);
     logk(LOG_DEBUG, "Write");
     vfs_ramfs_file_write(&ec, vfs, &fshared, 0, payload, sizeof(payload));
-    assert_always(badge_err_is_ok(&ec));
+    check_ec(&ec);
     logk(LOG_DEBUG, "Read");
     char buffer[sizeof(payload)];
     vfs_ramfs_file_read(&ec, vfs, &fshared, 0, buffer, sizeof(buffer));
-    assert_always(badge_err_is_ok(&ec));
+    check_ec(&ec);
     logk_hexdump(LOG_DEBUG, "Read data:", buffer, sizeof(buffer));
 
 
@@ -128,23 +135,23 @@ void debug_func(void *arg) {
     // Create a file.
     logk(LOG_DEBUG, "Opening a file at /a.txt");
     file_t fd = fs_open(&ec, "/a.txt", OFLAGS_CREATE | OFLAGS_READWRITE);
-    assert_always(badge_err_is_ok(&ec));
+    check_ec(&ec);
 
     // Write some data to it.
     logk(LOG_DEBUG, "Writing data to file");
     fs_write(&ec, fd, "Hi.", 3);
-    assert_always(badge_err_is_ok(&ec));
+    check_ec(&ec);
 
     // Seek to start.
     logk(LOG_DEBUG, "Seeking to 0");
     fs_seek(&ec, fd, 0, SEEK_ABS);
-    assert_always(badge_err_is_ok(&ec));
+    check_ec(&ec);
 
     // Read some data from it.
     logk(LOG_DEBUG, "Reading data from file");
     char      readbuf[4];
     fileoff_t len = fs_read(&ec, fd, readbuf, 3);
-    assert_always(badge_err_is_ok(&ec));
+    check_ec(&ec);
     logk_hexdump_vaddr(LOG_DEBUG, "Read data:", readbuf, 3, 0);
 
 
