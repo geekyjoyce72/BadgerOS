@@ -216,7 +216,7 @@ void vfs_ramfs_mount(badge_err_t *ec, vfs_t *vfs) {
     iptr->buf   = NULL;
     iptr->len   = 0;
     iptr->cap   = 0;
-    iptr->inode = INODE_NONE;
+    iptr->inode = VFS_RAMFS_INODE_ROOT;
     iptr->mode  = (FILETYPE_DIR << VFS_RAMFS_MODE_BIT) | 0777; /* TODO. */
     iptr->links = 1;
     iptr->uid   = 0; /* TODO. */
@@ -455,6 +455,7 @@ void vfs_ramfs_root_open(badge_err_t *ec, vfs_t *vfs, vfs_file_shared_t *file) {
     file->ramfs_file        = iptr;
     file->inode             = VFS_RAMFS_INODE_ROOT;
     file->vfs               = vfs;
+    file->refcount          = 1;
 
     mutex_release_shared(NULL, &vfs->ramfs.mtx);
     badge_err_set_ok(ec);
@@ -487,6 +488,7 @@ void vfs_ramfs_file_open(
     file->ramfs_file = iptr;
     file->inode      = iptr->inode;
     file->vfs        = vfs;
+    file->refcount   = 1;
 
     mutex_release(NULL, &vfs->ramfs.mtx);
     badge_err_set_ok(ec);

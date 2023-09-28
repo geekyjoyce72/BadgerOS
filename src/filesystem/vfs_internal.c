@@ -253,10 +253,7 @@ void vfs_file_destroy_handle(ptrdiff_t handle) {
 
 // Open the root directory of the root filesystem.
 void vfs_root_open(badge_err_t *ec, vfs_file_shared_t *dir) {
-    logkf(LOG_DEBUG, "root_index=%{ptrdiff;d}", vfs_root_index);
     vfs_t *vfs = &vfs_table[vfs_root_index];
-    logkf(LOG_DEBUG, "file=%{size;x}, vfs=%{size;x}", dir, vfs);
-    logkf(LOG_DEBUG, "type=%{d}, mount=%{size;x} %{cs}", vfs->type, vfs->mountpoint, vfs->mountpoint);
     vfs_impl_call_void(vfs->type, root_open, ec, vfs, dir);
 }
 
