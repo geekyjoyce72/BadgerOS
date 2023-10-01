@@ -3,6 +3,7 @@
 
 #include "mutex.h"
 
+#include "assertions.h"
 #include "scheduler.h"
 #include "time.h"
 
@@ -127,6 +128,7 @@ bool mutex_release(badge_err_t *ec, mutex_t *mutex) {
         badge_err_set(ec, ELOC_UNKNOWN, ECAUSE_ILLEGAL);
         return false;
     }
+    assert_dev_drop(atomic_load(&mutex->shares) >= EXCLUSIVE_MAGIC);
     if (await_swap_atomic_int(&mutex->shares, TIMESTAMP_US_MAX, EXCLUSIVE_MAGIC, 0, memory_order_release)) {
         // Successful release.
         badge_err_set_ok(ec);
@@ -175,6 +177,7 @@ bool mutex_release_shared(badge_err_t *ec, mutex_t *mutex) {
         badge_err_set(ec, ELOC_UNKNOWN, ECAUSE_ILLEGAL);
         return false;
     }
+    assert_dev_drop(atomic_load(&mutex->shares) < EXCLUSIVE_MAGIC);
     if (!unequal_sub_atomic_int(&mutex->shares, 0, EXCLUSIVE_MAGIC, memory_order_release)) {
         // Prevent the counter from underflowing.
         badge_err_set(ec, ELOC_UNKNOWN, ECAUSE_ILLEGAL);

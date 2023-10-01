@@ -15,7 +15,7 @@ static void root_reopen(badge_err_t *ec, vfs_file_handle_t *dir) {
     badge_err_t ec0;
     if (!ec)
         ec = &ec0;
-    mutex_acquire(NULL, &vfs_handle_mtx, TIMESTAMP_US_MAX);
+    assert_always(mutex_acquire(NULL, &vfs_handle_mtx, VFS_MUTEX_TIMEOUT));
 
     // Create or obtain a new shared handle.
     ptrdiff_t          shared = vfs_shared_by_inode(&vfs_table[vfs_root_index], vfs_table[vfs_root_index].inode_root);
@@ -68,7 +68,7 @@ static void dir_reopen(badge_err_t *ec, vfs_file_handle_t *dir, dirent_t const *
     badge_err_t ec0;
     if (!ec)
         ec = &ec0;
-    mutex_acquire(NULL, &vfs_handle_mtx, TIMESTAMP_US_MAX);
+    assert_always(mutex_acquire(NULL, &vfs_handle_mtx, VFS_MUTEX_TIMEOUT));
 
     // TODO: This is the location in which mounted filesystems are handled.
     // Create or obtain a new shared handle.
@@ -180,7 +180,7 @@ static ptrdiff_t walk(badge_err_t *ec, vfs_file_handle_t *dir, char path[FILESYS
         // Find the next delimiter.
         end = cstr_index_from(path, '/', begin);
         if (end < 0)
-            end = begin + 1;
+            end = begin + len;
 
         // Read current directory.
         char tmp  = path[end];
@@ -226,7 +226,7 @@ static vfs_file_handle_t *root_open(badge_err_t *ec) {
     badge_err_t ec0;
     if (!ec)
         ec = &ec0;
-    mutex_acquire(NULL, &vfs_handle_mtx, TIMESTAMP_US_MAX);
+    assert_always(mutex_acquire(NULL, &vfs_handle_mtx, VFS_MUTEX_TIMEOUT));
 
     ptrdiff_t          existing = vfs_shared_by_inode(&vfs_table[vfs_root_index], vfs_table[vfs_root_index].inode_root);
     ptrdiff_t          handle   = vfs_file_create_handle(existing);
@@ -334,7 +334,7 @@ void fs_mount(badge_err_t *ec, fs_type_t type, blkdev_t *media, char const *moun
         ec = &ec0;
 
     // Take the filesystem mounting mutex.
-    mutex_acquire(NULL, &vfs_mount_mtx, TIMESTAMP_US_MAX);
+    assert_always(mutex_acquire(NULL, &vfs_mount_mtx, VFS_MUTEX_TIMEOUT));
 
     if (type == FS_TYPE_UNKNOWN && !media) {
         // Block device is required to auto-detect.
@@ -497,7 +497,7 @@ bool fs_is_canonical_path(char const *path) {
 
 // Test that the handle exists and is a directory handle.
 static bool is_dir_handle(badge_err_t *ec, file_t dir) {
-    mutex_acquire_shared(ec, &vfs_handle_mtx, TIMESTAMP_US_MAX);
+    assert_always(mutex_acquire_shared(ec, &vfs_handle_mtx, VFS_MUTEX_TIMEOUT));
 
     // Check the handle exists.
     ptrdiff_t index = vfs_file_by_handle(dir);
@@ -606,18 +606,18 @@ file_t fs_open(badge_err_t *ec, char const *path, oflags_t oflags) {
         return FILE_NONE;
     }
     dirent_t ent;
-    logk(LOG_DEBUG, "Walk");
-    bool found = walk(ec, parent, canon_path, &ent);
+    logk(LOG_DEBUG, "Walking");
+    ptrdiff_t slash = walk(ec, parent, canon_path, &ent);
+    bool      found = slash >= 0;
     if (!badge_err_is_ok(ec)) {
         return FILE_NONE;
     }
     // Get the filename from canonical path.
-    char     *filename;
-    ptrdiff_t slash = cstr_last_index(canon_path, '/');
+    char *filename;
     if (slash == -1) {
         filename = canon_path;
     } else {
-        filename = canon_path + slash + 1;
+        filename = canon_path + slash;
     }
 
     ptrdiff_t existing = -1;
@@ -633,11 +633,12 @@ file_t fs_open(badge_err_t *ec, char const *path, oflags_t oflags) {
         }
 
         // Check for existing shared handles.
-        mutex_acquire_shared(ec, &vfs_handle_mtx, TIMESTAMP_US_MAX);
+        assert_always(mutex_acquire(ec, &vfs_handle_mtx, VFS_MUTEX_TIMEOUT));
         existing = vfs_shared_by_inode(parent->shared->vfs, ent.inode);
 
     } else {
         // File does not exist.
+        logk(LOG_DEBUG, "Not found");
         is_dir   = (oflags & OFLAGS_DIRECTORY);
         existing = -1;
     }
@@ -660,7 +661,7 @@ file_t fs_open(badge_err_t *ec, char const *path, oflags_t oflags) {
         // Create new shared file handle.
         vfs_file_shared_t *shared = ptr->shared;
         vfs_file_open(ec, parent->shared, shared, filename, oflags);
-        if (badge_err_is_ok(ec)) {
+        if (!badge_err_is_ok(ec)) {
             vfs_file_destroy_handle(handle);
             mutex_release(NULL, &vfs_handle_mtx);
             goto error;
@@ -675,7 +676,7 @@ file_t fs_open(badge_err_t *ec, char const *path, oflags_t oflags) {
 
 error:
     // Destroy directory handle.
-    mutex_acquire_shared(ec, &vfs_handle_mtx, TIMESTAMP_US_MAX);
+    assert_always(mutex_acquire(ec, &vfs_handle_mtx, VFS_MUTEX_TIMEOUT));
     ptrdiff_t index = vfs_file_by_handle(parent->fileno);
     vfs_file_destroy_handle(index);
     mutex_release(NULL, &vfs_handle_mtx);
@@ -685,7 +686,7 @@ error:
 // Close a file opened by `fs_open`.
 // Only raises an error if `file` is an invalid file descriptor.
 void fs_close(badge_err_t *ec, file_t file) {
-    mutex_acquire(ec, &vfs_handle_mtx, TIMESTAMP_US_MAX);
+    assert_always(mutex_acquire(ec, &vfs_handle_mtx, VFS_MUTEX_TIMEOUT));
 
     ptrdiff_t index = vfs_file_by_handle(file);
     if (index == -1) {
@@ -706,7 +707,7 @@ fileoff_t fs_read(badge_err_t *ec, file_t file, void *readbuf, fileoff_t readlen
         mutex_release_shared(NULL, &vfs_handle_mtx);
         return 0;
     }
-    mutex_acquire_shared(NULL, &vfs_handle_mtx, TIMESTAMP_US_MAX);
+    assert_always(mutex_acquire_shared(NULL, &vfs_handle_mtx, VFS_MUTEX_TIMEOUT));
 
     // Look up the handle.
     ptrdiff_t index = vfs_file_by_handle(file);
@@ -725,7 +726,7 @@ fileoff_t fs_read(badge_err_t *ec, file_t file, void *readbuf, fileoff_t readlen
     }
 
     // Read data from the handle.
-    mutex_acquire(NULL, &ptr->mutex, TIMESTAMP_US_MAX);
+    assert_always(mutex_acquire(NULL, &ptr->mutex, VFS_MUTEX_TIMEOUT));
     if (ptr->is_dir) {
         // Directory reads go through cache.
         if (ptr->offset == 0) {
@@ -760,7 +761,7 @@ fileoff_t fs_write(badge_err_t *ec, file_t file, void const *writebuf, fileoff_t
         mutex_release_shared(NULL, &vfs_handle_mtx);
         return 0;
     }
-    mutex_acquire_shared(NULL, &vfs_handle_mtx, TIMESTAMP_US_MAX);
+    assert_always(mutex_acquire_shared(NULL, &vfs_handle_mtx, VFS_MUTEX_TIMEOUT));
 
     // Look up the handle.
     ptrdiff_t index = vfs_file_by_handle(file);
@@ -779,7 +780,7 @@ fileoff_t fs_write(badge_err_t *ec, file_t file, void const *writebuf, fileoff_t
     }
 
     // Read data from the handle.
-    mutex_acquire(NULL, &ptr->mutex, TIMESTAMP_US_MAX);
+    assert_always(mutex_acquire(NULL, &ptr->mutex, VFS_MUTEX_TIMEOUT));
     // File writes go through VFS.
     if (writelen + ptr->offset < 0) {
         // Integer overflow: Assume no space.
@@ -787,6 +788,9 @@ fileoff_t fs_write(badge_err_t *ec, file_t file, void const *writebuf, fileoff_t
         mutex_release(NULL, &ptr->mutex);
         mutex_release_shared(NULL, &vfs_handle_mtx);
         return 0;
+    }
+    if (ptr->offset + writelen > ptr->shared->size) {
+        vfs_file_resize(ec, ptr->shared, ptr->offset + writelen);
     }
     vfs_file_write(ec, ptr->shared, ptr->offset, writebuf, writelen);
     mutex_release(NULL, &ptr->mutex);
@@ -797,7 +801,7 @@ fileoff_t fs_write(badge_err_t *ec, file_t file, void const *writebuf, fileoff_t
 
 // Get the current offset in the file.
 fileoff_t fs_tell(badge_err_t *ec, file_t file) {
-    mutex_acquire_shared(NULL, &vfs_handle_mtx, TIMESTAMP_US_MAX);
+    assert_always(mutex_acquire_shared(NULL, &vfs_handle_mtx, VFS_MUTEX_TIMEOUT));
 
     // Look up the handle.
     ptrdiff_t index = vfs_file_by_handle(file);
@@ -809,7 +813,7 @@ fileoff_t fs_tell(badge_err_t *ec, file_t file) {
     vfs_file_handle_t *ptr = &vfs_file_handle_list[index];
 
     // Get the position atomically.
-    mutex_acquire(NULL, &ptr->mutex, TIMESTAMP_US_MAX);
+    assert_always(mutex_acquire(NULL, &ptr->mutex, VFS_MUTEX_TIMEOUT));
     fileoff_t ret = ptr->offset;
     mutex_release(NULL, &ptr->mutex);
 
@@ -820,7 +824,7 @@ fileoff_t fs_tell(badge_err_t *ec, file_t file) {
 // Set the current offset in the file.
 // Returns the new offset in the file.
 fileoff_t fs_seek(badge_err_t *ec, file_t file, fileoff_t off, fs_seek_t seekmode) {
-    mutex_acquire_shared(NULL, &vfs_handle_mtx, TIMESTAMP_US_MAX);
+    assert_always(mutex_acquire_shared(NULL, &vfs_handle_mtx, VFS_MUTEX_TIMEOUT));
 
     // Look up the handle.
     ptrdiff_t index = vfs_file_by_handle(file);
@@ -832,7 +836,7 @@ fileoff_t fs_seek(badge_err_t *ec, file_t file, fileoff_t off, fs_seek_t seekmod
     vfs_file_handle_t *ptr = &vfs_file_handle_list[index];
 
     // Update the position atomically.
-    mutex_acquire(NULL, &ptr->mutex, TIMESTAMP_US_MAX);
+    assert_always(mutex_acquire(NULL, &ptr->mutex, VFS_MUTEX_TIMEOUT));
     badge_err_set_ok(ec);
     switch (seekmode) {
         case SEEK_ABS: ptr->offset = off; break;

@@ -7,6 +7,8 @@
 #include "filesystem/vfs_types.h"
 #include "mutex.h"
 
+#define VFS_MUTEX_TIMEOUT 1500000
+
 // Index in the VFS table of the filesystem mounted at /.
 // Set to -1 if no filesystem is mounted at /.
 // If no filesystem is mounted at /, the FS API will not work.

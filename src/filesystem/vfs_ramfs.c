@@ -12,6 +12,8 @@
 
 // Try to resize an inode.
 static bool resize_inode(badge_err_t *ec, vfs_t *vfs, vfs_ramfs_inode_t *inode, size_t size) {
+    (void)vfs;
+
     if (inode->cap >= 2 * size) {
         // If capacity is too large, try to save some memory.
         size_t cap = inode->cap / 2;
@@ -116,7 +118,7 @@ static vfs_ramfs_inode_t *
     if (name_len > VFS_RAMFS_NAME_MAX) {
         badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_TOOLONG);
     }
-    mutex_acquire(NULL, &vfs->ramfs.mtx, TIMESTAMP_US_MAX);
+    assert_always(mutex_acquire(NULL, &vfs->ramfs.mtx, VFS_MUTEX_TIMEOUT));
 
     // Test whether the file already exists.
     vfs_ramfs_inode_t  *dirptr   = dir->ramfs_file;
@@ -318,7 +320,7 @@ void vfs_ramfs_unlink(badge_err_t *ec, vfs_t *vfs, vfs_file_shared_t *dir, char 
         return;
     }
 
-    mutex_acquire(ec, &vfs->ramfs.mtx, TIMESTAMP_US_MAX);
+    assert_always(mutex_acquire(ec, &vfs->ramfs.mtx, VFS_MUTEX_TIMEOUT));
 
     // Find the directory entry with the given name.
     vfs_ramfs_inode_t  *dirptr = dir->ramfs_file;
@@ -357,7 +359,7 @@ bool vfs_ramfs_exists(badge_err_t *ec, vfs_t *vfs, vfs_file_shared_t *dir, char 
         badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_TOOLONG);
     }
 
-    mutex_acquire_shared(ec, &vfs->ramfs.mtx, TIMESTAMP_US_MAX);
+    assert_always(mutex_acquire_shared(ec, &vfs->ramfs.mtx, VFS_MUTEX_TIMEOUT));
     vfs_ramfs_inode_t  *dirptr = dir->ramfs_file;
     vfs_ramfs_dirent_t *ent    = find_dirent(ec, vfs, dirptr, name);
     mutex_release_shared(NULL, &vfs->ramfs.mtx);
@@ -394,7 +396,7 @@ static inline size_t convert_dirent(vfs_t *vfs, dirent_t *out, vfs_ramfs_dirent_
 // Atomically read all directory entries and cache them into the directory handle.
 // Refer to `dirent_t` for the structure of the cache.
 void vfs_ramfs_dir_read(badge_err_t *ec, vfs_t *vfs, vfs_file_handle_t *dir) {
-    mutex_acquire_shared(NULL, &vfs->ramfs.mtx, TIMESTAMP_US_MAX);
+    assert_always(mutex_acquire_shared(NULL, &vfs->ramfs.mtx, VFS_MUTEX_TIMEOUT));
     size_t             off  = 0;
     vfs_ramfs_inode_t *iptr = dir->shared->ramfs_file;
 
@@ -448,7 +450,7 @@ bool vfs_ramfs_dir_find_ent(badge_err_t *ec, vfs_t *vfs, vfs_file_shared_t *dir,
 
 // Open a file handle for the root directory.
 void vfs_ramfs_root_open(badge_err_t *ec, vfs_t *vfs, vfs_file_shared_t *file) {
-    mutex_acquire_shared(NULL, &vfs->ramfs.mtx, TIMESTAMP_US_MAX);
+    assert_always(mutex_acquire_shared(NULL, &vfs->ramfs.mtx, VFS_MUTEX_TIMEOUT));
 
     // Install in shared file handle.
     vfs_ramfs_inode_t *iptr = &vfs->ramfs.inode_list[VFS_RAMFS_INODE_ROOT];
@@ -465,7 +467,7 @@ void vfs_ramfs_root_open(badge_err_t *ec, vfs_t *vfs, vfs_file_shared_t *file) {
 void vfs_ramfs_file_open(
     badge_err_t *ec, vfs_t *vfs, vfs_file_shared_t *dir, vfs_file_shared_t *file, char const *name
 ) {
-    mutex_acquire(NULL, &vfs->ramfs.mtx, TIMESTAMP_US_MAX);
+    assert_always(mutex_acquire(NULL, &vfs->ramfs.mtx, VFS_MUTEX_TIMEOUT));
 
     // Look up the file in question.
     vfs_ramfs_inode_t  *dirptr = dir->ramfs_file;
@@ -497,7 +499,7 @@ void vfs_ramfs_file_open(
 // Close a file opened by `vfs_ramfs_file_open`.
 // Only raises an error if `file` is an invalid file descriptor.
 void vfs_ramfs_file_close(badge_err_t *ec, vfs_t *vfs, vfs_file_shared_t *file) {
-    mutex_acquire(NULL, &vfs->ramfs.mtx, TIMESTAMP_US_MAX);
+    assert_always(mutex_acquire(NULL, &vfs->ramfs.mtx, VFS_MUTEX_TIMEOUT));
     pop_inode_refcount(vfs, file->ramfs_file);
     mutex_release(NULL, &vfs->ramfs.mtx);
     file->ramfs_file = NULL;
@@ -512,7 +514,7 @@ void vfs_ramfs_file_read(
         badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_RANGE);
         return;
     }
-    mutex_acquire_shared(NULL, &vfs->ramfs.mtx, TIMESTAMP_US_MAX);
+    assert_always(mutex_acquire_shared(NULL, &vfs->ramfs.mtx, VFS_MUTEX_TIMEOUT));
 
     vfs_ramfs_inode_t *iptr = file->ramfs_file;
 
@@ -537,7 +539,7 @@ void vfs_ramfs_file_write(
         badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_RANGE);
         return;
     }
-    mutex_acquire(NULL, &vfs->ramfs.mtx, TIMESTAMP_US_MAX);
+    assert_always(mutex_acquire(NULL, &vfs->ramfs.mtx, VFS_MUTEX_TIMEOUT));
 
     vfs_ramfs_inode_t *iptr = file->ramfs_file;
 
@@ -559,15 +561,17 @@ void vfs_ramfs_file_resize(badge_err_t *ec, vfs_t *vfs, vfs_file_shared_t *file,
         badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_RANGE);
         return;
     }
-    mutex_acquire(NULL, &vfs->ramfs.mtx, TIMESTAMP_US_MAX);
+    assert_always(mutex_acquire(NULL, &vfs->ramfs.mtx, VFS_MUTEX_TIMEOUT));
 
     // Attempt to resize the buffer.
     vfs_ramfs_inode_t *iptr     = file->ramfs_file;
     fileoff_t          old_size = (fileoff_t)iptr->len;
-    resize_inode(ec, vfs, iptr, new_size);
-    if (new_size > old_size) {
-        // Zero out new bits.
-        mem_set(iptr->buf + old_size, 0, new_size - old_size);
+    if (resize_inode(ec, vfs, iptr, new_size)) {
+        file->size = new_size;
+        if (new_size > old_size) {
+            // Zero out new bits.
+            mem_set(iptr->buf + old_size, 0, new_size - old_size);
+        }
     }
 
     mutex_release(NULL, &vfs->ramfs.mtx);
