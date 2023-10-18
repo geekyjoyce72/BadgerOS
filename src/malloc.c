@@ -101,7 +101,6 @@ void *find_fit(size_t size) {
             fp                 = free_lists[i].next;
             free_lists[i].next = fp->next;
             fp->next->prior    = &free_lists[i];
-            logkf(LOG_DEBUG, "0x%{size;x} %{size;d}", fp, fp->size);
             try_split(fp, size);
             return fp;
         }

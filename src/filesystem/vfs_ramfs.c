@@ -5,7 +5,6 @@
 
 #include "assertions.h"
 #include "badge_strings.h"
-#include "log.h"
 #include "malloc.h"
 
 
@@ -280,7 +279,7 @@ void vfs_ramfs_create_dir(badge_err_t *ec, vfs_t *vfs, vfs_file_shared_t *dir, c
     // Write . and .. entries.
     vfs_ramfs_dirent_t ent = {
         .size     = sizeof(ent) - VFS_RAMFS_NAME_MAX - 1 + sizeof(size_t),
-        .inode    = 2,
+        .inode    = iptr->inode,
         .name_len = 1,
         .name     = {'.', 0},
     };
@@ -296,6 +295,7 @@ void vfs_ramfs_create_dir(badge_err_t *ec, vfs_t *vfs, vfs_file_shared_t *dir, c
     ent.name_len = 2;
     ent.name[1]  = '.';
     ent.name[2]  = 0;
+    ent.inode    = dir->inode;
     insert_dirent(ec, vfs, iptr, &ent);
     if (!badge_err_is_ok(ec)) {
         pop_inode_refcount(vfs, iptr);

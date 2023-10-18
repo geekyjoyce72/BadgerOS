@@ -46,9 +46,10 @@ ptrdiff_t cstr_index_from(char const *string, char value, size_t first_index) {
     char const *ptr = string + first_index;
 
     // Make sure string is long enough.
-    while (string++ < ptr)
-        if (!*string)
+    for (size_t i = 0; i < first_index; i++) {
+        if (!string[i])
             return -1;
+    }
 
     // Find first index.
     while (*ptr) {

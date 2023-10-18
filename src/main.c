@@ -69,6 +69,7 @@ void main() {
 }
 
 void debug_func(void *arg) {
+    (void)arg;
     badge_err_t ec;
 
     // Create RAMFS.
@@ -76,65 +77,20 @@ void debug_func(void *arg) {
     fs_mount(&ec, FS_TYPE_RAMFS, NULL, "/", 0);
     check_ec(&ec);
 
-    // Get the VFS handle.
-    vfs_t *vfs = &vfs_table[vfs_root_index];
-
-    // Open root directory.
-    logk(LOG_DEBUG, "Raw opening root directory");
-    vfs_file_shared_t shared;
-    vfs_ramfs_root_open(&ec, vfs, &shared);
+    // Create a directory.
+    logk(LOG_DEBUG, "Creating a directory at /foo");
+    file_t dirfd = fs_dir_open(&ec, "/foo", OFLAGS_CREATE);
     check_ec(&ec);
-    shared.refcount = 1;
-    vfs_file_handle_t handle;
-    handle.offset         = 0;
-    handle.write          = false;
-    handle.read           = true;
-    handle.mutex          = MUTEX_T_INIT_SHARED;
-    handle.dir_cache_size = 0;
-    handle.dir_cache      = NULL;
-    handle.shared         = &shared;
-    handle.fileno         = 1;
+
+    // Create a subdirectory.
+    logk(LOG_DEBUG, "Creating a directory at /foo/bar");
+    fs_dir_create(&ec, "/foo/bar");
+    check_ec(&ec);
 
     // Create a file.
-    logk(LOG_DEBUG, "Raw creating file b.txt");
-    vfs_ramfs_create_file(&ec, vfs, &shared, "b.txt");
-    check_ec(&ec);
-
-    // Dump raw RAMFS dirents.
-    vfs_ramfs_inode_t *inode = &vfs->ramfs.inode_list[vfs->inode_root];
-    logk_hexdump(LOG_DEBUG, "raw dirents:", inode->buf, inode->len);
-
-    // List root directory.
-    logk(LOG_DEBUG, "Raw reading directory");
-    vfs_ramfs_dir_read(&ec, vfs, &handle);
-    check_ec(&ec);
-    logk_hexdump(LOG_DEBUG, "dirent cache:", handle.dir_cache, handle.dir_cache_size);
-
-    // Open the file.
-    logk(LOG_DEBUG, "Raw opening file b.txt");
-    vfs_file_shared_t fshared;
-    vfs_ramfs_file_open(&ec, vfs, &shared, &fshared, "b.txt");
-    check_ec(&ec);
-
-    // Write to the file.
-    char const payload[] = "Hello, World!";
-    logk(LOG_DEBUG, "Resize");
-    vfs_ramfs_file_resize(&ec, vfs, &fshared, sizeof(payload));
-    check_ec(&ec);
-    logk(LOG_DEBUG, "Write");
-    vfs_ramfs_file_write(&ec, vfs, &fshared, 0, payload, sizeof(payload));
-    check_ec(&ec);
-    logk(LOG_DEBUG, "Read");
-    char buffer[sizeof(payload)];
-    vfs_ramfs_file_read(&ec, vfs, &fshared, 0, buffer, sizeof(buffer));
-    check_ec(&ec);
-    logk_hexdump(LOG_DEBUG, "Read data:", buffer, sizeof(buffer));
-
-
-
-    // Create a file.
-    logk(LOG_DEBUG, "Opening a file at /a.txt");
-    file_t fd = fs_open(&ec, "/a.txt", OFLAGS_CREATE | OFLAGS_READWRITE);
+    logk(LOG_DEBUG, "Opening a file at /foo/a.txt");
+    /* Walk didn't do it's job and opened '/' instead of '/foo' to create 'a.txt' in. */
+    file_t fd = fs_open(&ec, "/foo/a.txt", OFLAGS_CREATE | OFLAGS_READWRITE);
     check_ec(&ec);
 
     // Write some data to it.
@@ -153,6 +109,12 @@ void debug_func(void *arg) {
     fileoff_t len = fs_read(&ec, fd, readbuf, 3);
     check_ec(&ec);
     logk_hexdump_vaddr(LOG_DEBUG, "Read data:", readbuf, 3, 0);
+
+    // List the directory.
+    dirent_t ent;
+    while (fs_dir_read(&ec, &ent, dirfd)) {
+        logkf(LOG_DEBUG, "Inode: %{d}, Is dir: %{d}, Name: %{cs}", ent.inode, ent.is_dir, ent.name);
+    }
 
 
 

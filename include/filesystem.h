@@ -46,7 +46,7 @@ typedef uint32_t mountflags_t;
 #define VALID_OFLAGS_FILE                                                                                              \
     (OFLAGS_READWRITE | OFLAGS_APPEND | OFLAGS_TRUNCATE | OFLAGS_CREATE | OFLAGS_EXCLUSIVE | OFLAGS_CLOEXEC)
 // Bitmask of all opening flags valid in conjunction with `OFLAGS_DIRECTORY`.
-#define VALID_OFLAGS_DIRECTORY (OFLAGS_DIRECTORY | OFLAGS_READONLY | OFLAGS_CLOEXEC)
+#define VALID_OFLAGS_DIRECTORY (OFLAGS_DIRECTORY | OFLAGS_CREATE | OFLAGS_EXCLUSIVE | OFLAGS_READONLY | OFLAGS_CLOEXEC)
 
 // File opening mode flags.
 typedef uint32_t oflags_t;
@@ -162,14 +162,17 @@ bool fs_lstat(badge_err_t *ec, stat_t *stat_out, char const *path);
 // Get file status given file handle.
 bool fs_fstat(badge_err_t *ec, file_t file);
 
+// Create a new directory.
+// Returns whether the target exists and is a directory.
+bool   fs_dir_create(badge_err_t *ec, char const *path);
 // Open a directory for reading.
-file_t fs_dir_open(badge_err_t *ec, char const *path);
+file_t fs_dir_open(badge_err_t *ec, char const *path, oflags_t oflags);
 // Close a directory opened by `fs_dir_open`.
 // Only raises an error if `dir` is an invalid directory descriptor.
 void   fs_dir_close(badge_err_t *ec, file_t dir);
 // Read the current directory entry.
-// See also: `fs_dir_read_name`.
-void   fs_dir_read(badge_err_t *ec, dirent_t *dirent_out, file_t dir);
+// Returns whether a directory entry was successfully read.
+bool   fs_dir_read(badge_err_t *ec, dirent_t *dirent_out, file_t dir);
 
 // Open a file for reading and/or writing.
 file_t    fs_open(badge_err_t *ec, char const *path, oflags_t oflags);
