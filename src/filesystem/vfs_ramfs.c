@@ -459,6 +459,8 @@ void vfs_ramfs_root_open(badge_err_t *ec, vfs_t *vfs, vfs_file_shared_t *file) {
     file->vfs               = vfs;
     file->refcount          = 1;
 
+    iptr->links++;
+
     mutex_release_shared(NULL, &vfs->ramfs.mtx);
     badge_err_set_ok(ec);
 }
