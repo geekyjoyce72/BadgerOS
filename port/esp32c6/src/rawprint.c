@@ -57,8 +57,6 @@ void rawprint(char const *msg) {
 
 // Simple printer.
 void rawputc(char msg) {
-    while (!(READ_REG(USB_JTAG_BASE + 4) & 2))
-        ;
     WRITE_REG(USB_JTAG_BASE, msg);
     WRITE_REG(UART0_BASE, msg);
 }
