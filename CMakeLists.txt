@@ -80,6 +80,9 @@ add_executable(${target}
     # ${CMAKE_CURRENT_LIST_DIR}/src/filesystem/vfs_fat.c
     ${CMAKE_CURRENT_LIST_DIR}/src/filesystem/vfs_ramfs.c
     ${CMAKE_CURRENT_LIST_DIR}/src/filesystem/vfs_internal.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/loading/kbelfx.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/loading/rom.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/userland/memory.c
     ${CMAKE_CURRENT_LIST_DIR}/src/assertions.c
     ${CMAKE_CURRENT_LIST_DIR}/src/badge_format_str.c
     ${CMAKE_CURRENT_LIST_DIR}/src/badge_strings.c
@@ -97,6 +100,12 @@ target_include_directories(${target} PUBLIC ${CMAKE_CURRENT_LIST_DIR}/include)
 # Include port-specific.
 include(cpu/rv32imac/CMakeLists.txt)
 include(port/esp32c6/CMakeLists.txt)
+
+# Add libraries.
+add_compile_options(-I${CMAKE_CURRENT_LIST_DIR}/include -include ${CMAKE_CURRENT_LIST_DIR}/include/loading/kbelf_pre.h)
+add_subdirectory(lib/kbelf)
+target_link_libraries(${target} PUBLIC kbelf)
+
 
 # Convert the raw binary file into a ESP32 image file
 add_custom_command(
