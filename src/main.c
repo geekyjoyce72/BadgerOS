@@ -111,7 +111,29 @@ void debug_func(void *arg) {
     logk_hexdump_vaddr(LOG_DEBUG, "Read data:", readbuf, 3, 0);
 
     // List the directory.
+    fs_dir_close(&ec, dirfd);
+    check_ec(&ec);
+    dirfd = fs_dir_open(&ec, "/", 0);
+    check_ec(&ec);
     dirent_t ent;
+    while (fs_dir_read(&ec, &ent, dirfd)) {
+        logkf(LOG_DEBUG, "Inode: %{d}, Is dir: %{d}, Name: %{cs}", ent.inode, ent.is_dir, ent.name);
+    }
+
+    // List the directory.
+    fs_dir_close(&ec, dirfd);
+    check_ec(&ec);
+    dirfd = fs_dir_open(&ec, "/foo", 0);
+    check_ec(&ec);
+    while (fs_dir_read(&ec, &ent, dirfd)) {
+        logkf(LOG_DEBUG, "Inode: %{d}, Is dir: %{d}, Name: %{cs}", ent.inode, ent.is_dir, ent.name);
+    }
+
+    // List the directory.
+    fs_dir_close(&ec, dirfd);
+    check_ec(&ec);
+    dirfd = fs_dir_open(&ec, "/foo/bar", 0);
+    check_ec(&ec);
     while (fs_dir_read(&ec, &ent, dirfd)) {
         logkf(LOG_DEBUG, "Inode: %{d}, Is dir: %{d}, Name: %{cs}", ent.inode, ent.is_dir, ent.name);
     }
