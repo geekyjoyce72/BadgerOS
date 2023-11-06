@@ -1,4 +1,6 @@
 
+// SPDX-License-Identifier: MIT
+
 #include <badge_strings.h>
 
 

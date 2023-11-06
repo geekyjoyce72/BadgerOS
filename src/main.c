@@ -16,6 +16,11 @@
 
 #include <stdint.h>
 
+#include <kbelf.h>
+
+extern uint8_t const elf_rom[];
+extern size_t const  elf_rom_len;
+
 // Temporary kernel context until threading is implemented.
 static kernel_ctx_t kctx;
 
@@ -77,66 +82,27 @@ void debug_func(void *arg) {
     fs_mount(&ec, FS_TYPE_RAMFS, NULL, "/", 0);
     check_ec(&ec);
 
-    // Create a directory.
-    logk(LOG_DEBUG, "Creating a directory at /foo");
-    file_t dirfd = fs_dir_open(&ec, "/foo", OFLAGS_CREATE);
+    // Put the ROM in the RAMFS.
+    file_t fd = fs_open(&ec, "/a.out", OFLAGS_CREATE | OFLAGS_WRITEONLY);
     check_ec(&ec);
-
-    // Create a subdirectory.
-    logk(LOG_DEBUG, "Creating a directory at /foo/bar");
-    fs_dir_create(&ec, "/foo/bar");
+    fs_write(&ec, fd, elf_rom, elf_rom_len);
     check_ec(&ec);
-
-    // Create a file.
-    logk(LOG_DEBUG, "Opening a file at /foo/a.txt");
-    /* Walk didn't do it's job and opened '/' instead of '/foo' to create 'a.txt' in. */
-    file_t fd = fs_open(&ec, "/foo/a.txt", OFLAGS_CREATE | OFLAGS_READWRITE);
+    fs_close(&ec, fd);
     check_ec(&ec);
-
-    // Write some data to it.
-    logk(LOG_DEBUG, "Writing data to file");
-    fs_write(&ec, fd, "Hi.", 3);
-    check_ec(&ec);
-
-    // Seek to start.
-    logk(LOG_DEBUG, "Seeking to 0");
-    fs_seek(&ec, fd, 0, SEEK_ABS);
-    check_ec(&ec);
-
-    // Read some data from it.
-    logk(LOG_DEBUG, "Reading data from file");
-    char      readbuf[4];
-    fileoff_t len = fs_read(&ec, fd, readbuf, 3);
-    check_ec(&ec);
-    logk_hexdump_vaddr(LOG_DEBUG, "Read data:", readbuf, 3, 0);
 
     // List the directory.
-    fs_dir_close(&ec, dirfd);
-    check_ec(&ec);
-    dirfd = fs_dir_open(&ec, "/", 0);
+    file_t dirfd = fs_dir_open(&ec, "/", 0);
     check_ec(&ec);
     dirent_t ent;
     while (fs_dir_read(&ec, &ent, dirfd)) {
         logkf(LOG_DEBUG, "Inode: %{d}, Is dir: %{d}, Name: %{cs}", ent.inode, ent.is_dir, ent.name);
     }
+    check_ec(&ec);
 
-    // List the directory.
-    fs_dir_close(&ec, dirfd);
-    check_ec(&ec);
-    dirfd = fs_dir_open(&ec, "/foo", 0);
-    check_ec(&ec);
-    while (fs_dir_read(&ec, &ent, dirfd)) {
-        logkf(LOG_DEBUG, "Inode: %{d}, Is dir: %{d}, Name: %{cs}", ent.inode, ent.is_dir, ent.name);
-    }
-
-    // List the directory.
-    fs_dir_close(&ec, dirfd);
-    check_ec(&ec);
-    dirfd = fs_dir_open(&ec, "/foo/bar", 0);
-    check_ec(&ec);
-    while (fs_dir_read(&ec, &ent, dirfd)) {
-        logkf(LOG_DEBUG, "Inode: %{d}, Is dir: %{d}, Name: %{cs}", ent.inode, ent.is_dir, ent.name);
-    }
+    // Try to load the file.
+    kbelf_dyn dyn = kbelf_dyn_create(1);
+    kbelf_dyn_set_exec(dyn, "a.out", NULL);
+    kbelf_dyn_load(dyn);
 
 
 
