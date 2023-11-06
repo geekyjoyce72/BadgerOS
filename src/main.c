@@ -106,15 +106,6 @@ void debug_func(void *arg) {
     check_ec(&ec);
     lister("/");
 
-    // List the directory.
-    file_t dirfd = fs_dir_open(&ec, "/", 0);
-    check_ec(&ec);
-    dirent_t ent;
-    while (fs_dir_read(&ec, &ent, dirfd)) {
-        logkf(LOG_DEBUG, "Inode: %{d}, Is dir: %{d}, Name: %{cs}", ent.inode, ent.is_dir, ent.name);
-    }
-    check_ec(&ec);
-
     // Try to load the file.
     kbelf_dyn dyn = kbelf_dyn_create(1);
     kbelf_dyn_set_exec(dyn, "/a.out", NULL);

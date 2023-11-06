@@ -55,11 +55,13 @@ bool kbelfq_memeq(void const *a, void const *b, size_t nmemb) {
 void *kbelfx_malloc(size_t len) {
     return malloc(len);
 }
+
 // Memory allocator function to use for allocating metadata.
 // User-defined.
 void *kbelfx_realloc(void *mem, size_t len) {
     return realloc(mem, len);
 }
+
 // Memory allocator function to use for allocating metadata.
 // User-defined.
 void kbelfx_free(void *mem) {
@@ -80,24 +82,30 @@ bool kbelfx_seg_alloc(kbelf_inst inst, size_t segs_len, kbelf_segment *segs) {
     size_t min_align = 16;
 
     for (size_t i = 0; i < segs_len; i++) {
-        if (segs[i].vaddr_req < min_addr)
-            min_addr = segs[i].vaddr_req;
+        size_t start = segs[i].vaddr_req;
+        if (start < min_addr)
+            min_addr = start;
         size_t end = segs[i].vaddr_req + segs[i].size;
         if (end > max_addr)
             max_addr = end;
+        logkf(LOG_DEBUG, "Segment %{size;d}: %{size;x} - %{size;x}", i, start, end);
     }
 
-    size_t vaddr_real = user_map(proc, min_addr, max_addr - min_addr, min_align);
+    size_t vaddr_real      = user_map(proc, min_addr, max_addr - min_addr, min_align);
+    proc->memmap.segs_base = vaddr_real;
     if (!vaddr_real)
         return false;
 
     for (size_t i = 0; i < segs_len; i++) {
         segs[i].vaddr_real = segs[i].vaddr_req - min_addr + vaddr_real;
         segs[i].paddr      = segs[i].vaddr_real;
+        segs[i].laddr      = segs[i].vaddr_real;
+        logkf(LOG_DEBUG, "Segment %{size;x} mapped to %{size;x}", i, segs[i].vaddr_real);
     }
 
     return true;
 }
+
 // Memory allocator function to use for loading program segments.
 // Takes a previously allocated segment and unloads it.
 // User-defined.
@@ -114,7 +122,7 @@ void kbelfx_seg_free(kbelf_inst inst, size_t segs_len, kbelf_segment *segs) {
 // Open a binary file for reading.
 // User-defined.
 void *kbelfx_open(char const *path) {
-    file_t fd = fs_open(NULL, path, 0);
+    file_t fd = fs_open(NULL, path, OFLAGS_READONLY);
     if (fd == -1)
         return NULL;
     else
@@ -159,3 +167,22 @@ kbelf_file kbelfx_find_lib(char const *needed) {
     (void)needed;
     return NULL;
 }
+
+
+
+// A built-in library function test.
+static void exit_impl(int code) {
+    (void)code;
+    __builtin_trap();
+}
+
+kbelf_builtin_sym const my_syms[] = {{"exit", (size_t)&exit_impl, (size_t)&exit_impl, 0}};
+
+kbelf_builtin_lib const my_libs[] = {{"userlandlib.so", 1, my_syms, 0}};
+
+// Number of built-in libraries.
+// Optional user-defined.
+size_t                   kbelfx_builtin_libs_len = 1;
+// Array of built-in libraries.
+// Optional user-defined.
+kbelf_builtin_lib const *kbelfx_builtin_libs     = my_libs;
