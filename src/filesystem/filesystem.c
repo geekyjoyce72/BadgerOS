@@ -777,6 +777,7 @@ fileoff_t fs_read(badge_err_t *ec, file_t file, void *readbuf, fileoff_t readlen
             readlen = ptr->shared->size - ptr->offset;
         }
         vfs_file_read(ec, ptr->shared, ptr->offset, readbuf, readlen);
+        ptr->offset += readlen;
     }
     mutex_release(NULL, &ptr->mutex);
 

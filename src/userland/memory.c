@@ -24,7 +24,7 @@ size_t user_map(process_t *proc, size_t vaddr_req, size_t min_size, size_t min_a
     if (!base)
         return false;
 
-    logkf(LOG_INFO, "Mapped %{size;d} bytes to process %{d}", min_size, proc->pid);
+    logkf(LOG_INFO, "Mapped %{size;d} bytes at %{size;x} to process %{d}", min_size, base, proc->pid);
 
     map->region_bases[map->regions_len] = (size_t)base;
     map->region_sizes[map->regions_len] = min_size;
