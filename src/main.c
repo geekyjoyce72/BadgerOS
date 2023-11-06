@@ -73,6 +73,19 @@ void main() {
     __builtin_unreachable();
 }
 
+static void lister(char *dir) {
+    logkf(LOG_DEBUG, "Listing of %{cs}:", dir);
+    badge_err_t ec;
+    file_t      fd = fs_dir_open(&ec, dir, 0);
+    check_ec(&ec);
+    dirent_t ent;
+    while (fs_dir_read(&ec, &ent, fd)) {
+        logk(LOG_DEBUG, ent.name);
+    }
+    fs_dir_close(&ec, fd);
+    check_ec(&ec);
+}
+
 void debug_func(void *arg) {
     (void)arg;
     badge_err_t ec;
@@ -81,14 +94,17 @@ void debug_func(void *arg) {
     logk(LOG_DEBUG, "Creating RAMFS at /");
     fs_mount(&ec, FS_TYPE_RAMFS, NULL, "/", 0);
     check_ec(&ec);
+    lister("/");
 
     // Put the ROM in the RAMFS.
     file_t fd = fs_open(&ec, "/a.out", OFLAGS_CREATE | OFLAGS_WRITEONLY);
     check_ec(&ec);
+    lister("/");
     fs_write(&ec, fd, elf_rom, elf_rom_len);
     check_ec(&ec);
     fs_close(&ec, fd);
     check_ec(&ec);
+    lister("/");
 
     // List the directory.
     file_t dirfd = fs_dir_open(&ec, "/", 0);
@@ -101,7 +117,7 @@ void debug_func(void *arg) {
 
     // Try to load the file.
     kbelf_dyn dyn = kbelf_dyn_create(1);
-    kbelf_dyn_set_exec(dyn, "a.out", NULL);
+    kbelf_dyn_set_exec(dyn, "/a.out", NULL);
     kbelf_dyn_load(dyn);
 
 
