@@ -11,7 +11,7 @@
 #include "memprotect.h"
 #include "port/interrupt.h"
 #include "rawprint.h"
-#include "scheduler.h"
+#include "scheduler/scheduler.h"
 #include "time.h"
 
 #include <stdint.h>
@@ -86,6 +86,14 @@ static void lister(char *dir) {
     check_ec(&ec);
 }
 
+static void userfunc() {
+    while (1) {
+        asm("li a7, 0\necall" ::: "a7");
+    }
+}
+
+uint32_t kstack[1024] ALIGNED_TO(STACK_ALIGNMENT);
+
 void debug_func(void *arg) {
     (void)arg;
     badge_err_t ec;
@@ -110,6 +118,11 @@ void debug_func(void *arg) {
     kbelf_dyn dyn = kbelf_dyn_create(1);
     kbelf_dyn_set_exec(dyn, "/a.out", NULL);
     kbelf_dyn_load(dyn);
+
+    // Create a USERLAND thread.
+    sched_thread_t *thread =
+        sched_create_userland_thread(&ec, NULL, (sched_entry_point_t)userfunc, NULL, kstack, sizeof(kstack), 1);
+    sched_resume_thread(&ec, thread);
 
 
 
