@@ -14,6 +14,7 @@
 #include "port/interrupt.h"
 #include "syscall.h"
 #include "time.h"
+#include "userland/types.h"
 
 #include <stdint.h>
 
@@ -71,10 +72,13 @@ typedef enum thread_insert_position_t {
 
 
 struct sched_thread_t {
-    // fixed info:
+    // Process to which this thread belongs.
     process_t              *process;
-    uintptr_t               stack_bottom;
-    uintptr_t               stack_top;
+    // Lowest address of the kernel stack.
+    uintptr_t               kernel_stack_bottom;
+    // Highest address of the kernel stack.
+    uintptr_t               kernel_stack_top;
+    // Priority of this thread.
     sched_thread_priority_t priority;
 
     // dynamic info:
@@ -108,8 +112,8 @@ static_assert(
 // The scheduler must schedule something, and the idle task is what
 // the scheduler will schedule when nothing can be scheduled.
 static sched_thread_t idle_task = {
-    .stack_bottom = (uintptr_t)&idle_task_stack,
-    .stack_top    = (uintptr_t)&idle_task_stack + IDLE_TASK_STACK_LEN,
+    .kernel_stack_bottom = (uintptr_t)&idle_task_stack,
+    .kernel_stack_top    = (uintptr_t)&idle_task_stack + IDLE_TASK_STACK_LEN,
 
 #ifndef NDEBUG
     .name = "idle",
@@ -252,7 +256,7 @@ sched_thread_t *sched_get_current_thread(void) {
 
 void sched_init(badge_err_t *const ec) {
     // Set up the idle task:
-    sched_prepare_kernel_entry(&idle_task.kernel_ctx, idle_task.stack_top, idle_thread_function, NULL);
+    sched_prepare_kernel_entry(&idle_task.kernel_ctx, idle_task.kernel_stack_top, idle_thread_function, NULL);
 
     // Initialize thread allocator:
     for (size_t i = 0; i < SCHEDULER_MAX_THREADS; i++) {
@@ -409,14 +413,14 @@ sched_thread_t *sched_create_userland_thread(
     }
 
     *thread = (sched_thread_t){
-        .process       = process,
-        .stack_bottom  = 0x00000000UL,
-        .stack_top     = 0x00000000UL,
-        .priority      = priority,
-        .flags         = 0,
-        .schedule_node = DLIST_NODE_EMPTY,
-        .exit_code     = 0,
-        .kernel_ctx    = {},
+        .process             = process,
+        .kernel_stack_bottom = 0x00000000UL,
+        .kernel_stack_top    = 0x00000000UL,
+        .priority            = priority,
+        .flags               = 0,
+        .schedule_node       = DLIST_NODE_EMPTY,
+        .exit_code           = 0,
+        .kernel_ctx          = {},
     };
 
     sched_prepare_user_entry(&thread->kernel_ctx, entry_point, arg);
@@ -428,14 +432,14 @@ sched_thread_t *sched_create_kernel_thread(
     badge_err_t *const            ec,
     sched_entry_point_t const     entry_point,
     void *const                   arg,
-    void *const                   stack_bottom,
+    void *const                   kernel_stack_bottom,
     size_t const                  stack_size,
     sched_thread_priority_t const priority
 ) {
-    uintptr_t const stack_bottom_addr = (uintptr_t)stack_bottom;
+    uintptr_t const kernel_stack_bottom_addr = (uintptr_t)kernel_stack_bottom;
 
     assert_dev_drop(entry_point != NULL);
-    assert_dev_drop(is_aligned(stack_bottom_addr, STACK_ALIGNMENT));
+    assert_dev_drop(is_aligned(kernel_stack_bottom_addr, STACK_ALIGNMENT));
     assert_dev_drop(is_aligned(stack_size, STACK_ALIGNMENT));
 
     sched_thread_t *const thread = thread_alloc();
@@ -445,17 +449,17 @@ sched_thread_t *sched_create_kernel_thread(
     }
 
     *thread = (sched_thread_t){
-        .process       = NULL,
-        .stack_bottom  = stack_bottom_addr,
-        .stack_top     = stack_bottom_addr + stack_size,
-        .priority      = priority,
-        .flags         = THREAD_KERNEL,
-        .schedule_node = DLIST_NODE_EMPTY,
-        .exit_code     = 0,
-        .kernel_ctx    = {},
+        .process             = NULL,
+        .kernel_stack_bottom = kernel_stack_bottom_addr,
+        .kernel_stack_top    = kernel_stack_bottom_addr + stack_size,
+        .priority            = priority,
+        .flags               = THREAD_KERNEL,
+        .schedule_node       = DLIST_NODE_EMPTY,
+        .exit_code           = 0,
+        .kernel_ctx          = {},
     };
 
-    sched_prepare_kernel_entry(&thread->kernel_ctx, thread->stack_top, entry_point, arg);
+    sched_prepare_kernel_entry(&thread->kernel_ctx, thread->kernel_stack_top, entry_point, arg);
 
     return thread;
 }
