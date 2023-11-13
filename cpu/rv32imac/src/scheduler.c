@@ -15,17 +15,17 @@ static void thread_trampoline(sched_entry_point_t ep, void *arg) {
     assert_always(this_thread != NULL);
 
 #ifndef NDEBUG
-    logkf(LOG_INFO, "thread '%{cs}' starting...", sched_get_name(this_thread));
+    logkf(LOG_INFO, "Thread '%{cs}' started", sched_get_name(this_thread));
 #endif
 
-    // Invoke the actual thread function
+    // Invoke the actual thread function.
     ep(arg);
 
 #ifndef NDEBUG
-    logkf(LOG_INFO, "thread '%{cs}' has regular exit", sched_get_name(this_thread));
+    logkf(LOG_INFO, "Thread '%{cs}' returned", sched_get_name(this_thread));
 #endif
 
-    // make sure the thread is always exited properly
+    // Stop this thread.
     sched_exit(0);
 }
 
@@ -50,7 +50,9 @@ void sched_prepare_kernel_entry(
     asm volatile("mv %[gp], gp" : [gp] "=r"(ctx->regs.gp));
     asm volatile("mv %[tp], tp" : [tp] "=r"(ctx->regs.tp));
 
-    logkf(LOG_DEBUG, "thread init: gp=%{size;x}, tp=%{size;x})", ctx->regs.gp, ctx->regs.tp);
+#ifndef NDEBUG
+    logkf(LOG_DEBUG, "Kernel thread created", ctx->regs.gp, ctx->regs.tp);
+#endif
 }
 
 
@@ -70,4 +72,8 @@ void sched_prepare_user_entry(kernel_ctx_t *const ctx, sched_entry_point_t const
     ctx->regs.sp = 0xDEADC0DEUL;
     ctx->regs.gp = 0xDEADC0DEUL;
     ctx->regs.tp = 0xDEADC0DEUL;
+
+#ifndef NDEBUG
+    logkf(LOG_DEBUG, "Userland thread created", ctx->regs.gp, ctx->regs.tp);
+#endif
 }
