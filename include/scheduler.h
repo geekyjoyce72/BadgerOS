@@ -153,22 +153,31 @@ char const *sched_get_name(sched_thread_t *thread);
 
 // ISR interface:
 
-// Requests the scheduler to prepare a switch from inside an interrupt
-// routine.
+// Requests the scheduler to prepare a switch from userland to kernel for a user thread.
+// If `syscall` is true, copies registers `a0` through `a7` to the kernel thread.
+// Sets the program counter for the thread to `pc`.
+void sched_raise_from_isr(bool syscall, void *pc);
+
+// Requests the scheduler to prepare a switch from kernel to userland for a user thread.
+// If `syscall` is true, copies registers `a0` and `a1` to the user thread.
+// Resumes the userland thread where it left off.
+void sched_lower_from_ise(bool syscall);
+
+// Requests the scheduler to prepare a switch from inside an interrupt routine.
 void sched_request_switch_from_isr(void);
 
-// forward-declared from "kernel_ctx.h"
-typedef struct kernel_ctx_t kernel_ctx_t;
+// forward-declared from "isr_ctx.h"
+typedef struct isr_ctx_t isr_ctx_t;
 
 
 // Prepares a kernel `ctx` to be invoked as a kernel thread.
 //
 // NOTE: This function must be implemented in the `cpu` package!
 void sched_prepare_kernel_entry(
-    kernel_ctx_t *ctx, uintptr_t initial_stack_pointer, sched_entry_point_t entry_point, void *arg
+    isr_ctx_t *ctx, uintptr_t initial_stack_pointer, sched_entry_point_t entry_point, void *arg
 );
 
 // Prepares a kernel `ctx` to be invoked as a user thread.
 //
 // NOTE: This function must be implemented in the `cpu` package!
-void sched_prepare_user_entry(kernel_ctx_t *ctx, sched_entry_point_t entry_point, void *arg);
+void sched_prepare_user_entry(isr_ctx_t *ctx, sched_entry_point_t entry_point, void *arg);

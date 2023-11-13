@@ -12,7 +12,7 @@
 
 // Called on invalid system call.
 static long long invalid_syscall(long sysno) {
-    kernel_ctx_t *ctx = kernel_ctx_get();
+    isr_ctx_t *ctx = isr_ctx_get();
 
     // Report error.
     rawprint("Invalid syscall ");
@@ -20,7 +20,7 @@ static long long invalid_syscall(long sysno) {
     rawprint(" at PC 0x");
     rawprinthex(ctx->regs.pc, sizeof(ctx->regs.pc) * 2);
     rawprint("\n");
-    kernel_ctx_dump(ctx);
+    isr_ctx_dump(ctx);
 
     // TODO: Terminate thread.
     panic_poweroff();

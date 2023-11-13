@@ -7,7 +7,7 @@
 #include "attributes.h"
 #include "badge_strings.h"
 #include "cpu/isr.h"
-#include "kernel_ctx.h"
+#include "isr_ctx.h"
 #include "list.h"
 #include "meta.h"
 #include "port/hardware_allocation.h"
@@ -87,7 +87,7 @@ struct sched_thread_t {
     uint32_t     exit_code;
 
     // runtime state:
-    kernel_ctx_t kernel_ctx;
+    isr_ctx_t isr_ctx;
 
 #ifndef NDEBUG
     // debug info:
@@ -114,6 +114,7 @@ static_assert(
 static sched_thread_t idle_task = {
     .kernel_stack_bottom = (uintptr_t)&idle_task_stack,
     .kernel_stack_top    = (uintptr_t)&idle_task_stack + IDLE_TASK_STACK_LEN,
+    .isr_ctx             = {.thread = &idle_task},
 
 #ifndef NDEBUG
     .name = "idle",
@@ -228,8 +229,7 @@ static sched_thread_t *sched_get_current_thread_unsafe(void) {
         return NULL;
     }
 
-    kernel_ctx_t *const kernel_ctx = kernel_ctx_get();
-    return field_parent_ptr(sched_thread_t, kernel_ctx, kernel_ctx);
+    return isr_ctx_get()->thread;
 }
 
 // Destroys a thread and releases its resources.
@@ -256,7 +256,7 @@ sched_thread_t *sched_get_current_thread(void) {
 
 void sched_init(badge_err_t *const ec) {
     // Set up the idle task:
-    sched_prepare_kernel_entry(&idle_task.kernel_ctx, idle_task.kernel_stack_top, idle_thread_function, NULL);
+    sched_prepare_kernel_entry(&idle_task.isr_ctx, idle_task.kernel_stack_top, idle_thread_function, NULL);
 
     // Initialize thread allocator:
     for (size_t i = 0; i < SCHEDULER_MAX_THREADS; i++) {
@@ -378,7 +378,7 @@ void sched_request_switch_from_isr(void) {
         sched_thread_t *const next_thread = field_parent_ptr(sched_thread_t, schedule_node, next_thread_node);
 
         // Set the switch target
-        kernel_ctx_switch_set(&next_thread->kernel_ctx);
+        isr_ctx_switch_set(&next_thread->isr_ctx);
 
         task_time_quota = SCHEDULER_MIN_TASK_TIME_US + (uint32_t)next_thread->priority * SCHEDULER_TIME_QUOTA_INCR_US;
         // logkf(LOG_DEBUG, "switch to task '%{cs}'", next_thread->name);
@@ -386,7 +386,7 @@ void sched_request_switch_from_isr(void) {
     } else {
         // nothing to do, switch to idle task:
 
-        kernel_ctx_switch_set(&idle_task.kernel_ctx);
+        isr_ctx_switch_set(&idle_task.isr_ctx);
         task_time_quota = SCHEDULER_IDLE_TASK_QUOTA_US;
         // logk(LOG_DEBUG, "switch to idle");
     }
@@ -420,10 +420,10 @@ sched_thread_t *sched_create_userland_thread(
         .flags               = 0,
         .schedule_node       = DLIST_NODE_EMPTY,
         .exit_code           = 0,
-        .kernel_ctx          = {},
+        .isr_ctx             = {.thread = thread},
     };
 
-    sched_prepare_user_entry(&thread->kernel_ctx, entry_point, arg);
+    sched_prepare_user_entry(&thread->isr_ctx, entry_point, arg);
 
     return thread;
 }
@@ -456,10 +456,10 @@ sched_thread_t *sched_create_kernel_thread(
         .flags               = THREAD_KERNEL,
         .schedule_node       = DLIST_NODE_EMPTY,
         .exit_code           = 0,
-        .kernel_ctx          = {},
+        .isr_ctx             = {.thread = thread},
     };
 
-    sched_prepare_kernel_entry(&thread->kernel_ctx, thread->kernel_stack_top, entry_point, arg);
+    sched_prepare_kernel_entry(&thread->isr_ctx, thread->kernel_stack_top, entry_point, arg);
 
     return thread;
 }

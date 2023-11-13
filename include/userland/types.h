@@ -13,7 +13,7 @@
 #define PROC_MEMMAP_MAX_REGIONS 8
 
 // Process memory map information.
-typedef struct {
+typedef struct proc_memmap_t {
     // Base address of code segments.
     size_t segs_base;
     // Number of mapped regions.
@@ -30,7 +30,7 @@ typedef struct {
 typedef int pid_t;
 
 // Userland process.
-typedef struct {
+typedef struct process_t {
     // Process ID.
     pid_t         pid;
     // Memory map information.

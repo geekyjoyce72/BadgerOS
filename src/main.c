@@ -22,7 +22,7 @@ extern uint8_t const elf_rom[];
 extern size_t const  elf_rom_len;
 
 // Temporary kernel context until threading is implemented.
-static kernel_ctx_t kctx;
+static isr_ctx_t kctx;
 
 void debug_func(void *);
 #define stack_size 8192

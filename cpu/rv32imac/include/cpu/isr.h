@@ -5,7 +5,7 @@
 
 #include "cpu/regs.h"
 #include "cpu/riscv.h"
-#include "kernel_ctx.h"
+#include "isr_ctx.h"
 
 #ifndef __ASSEMBLER__
 #include <stdbool.h>

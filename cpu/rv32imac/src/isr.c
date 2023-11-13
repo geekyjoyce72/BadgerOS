@@ -4,7 +4,7 @@
 
 #include "cpu/isr.h"
 
-#include "cpu/kernel_ctx.h"
+#include "cpu/isr_ctx.h"
 #include "cpu/panic.h"
 #include "log.h"
 #include "rawprint.h"
@@ -73,9 +73,9 @@ void __trap_handler() {
     rawputc('\r');
     rawputc('\n');
 
-    kernel_ctx_t *kctx;
+    isr_ctx_t *kctx;
     asm volatile("csrr %0, mscratch" : "=r"(kctx));
-    kernel_ctx_dump(kctx);
+    isr_ctx_dump(kctx);
 
     // When the kernel traps it's a bad time.
     panic_poweroff();

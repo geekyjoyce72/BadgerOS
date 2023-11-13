@@ -2,7 +2,7 @@
 
 #include "assertions.h"
 #include "badge_strings.h"
-#include "kernel_ctx.h"
+#include "isr_ctx.h"
 #include "log.h"
 
 // The trampoline is used to jump into the thread code and return from it,
@@ -30,10 +30,7 @@ static void thread_trampoline(sched_entry_point_t ep, void *arg) {
 }
 
 void sched_prepare_kernel_entry(
-    kernel_ctx_t *const       ctx,
-    uintptr_t const           initial_stack_pointer,
-    sched_entry_point_t const entry_point,
-    void *const               arg
+    isr_ctx_t *const ctx, uintptr_t const initial_stack_pointer, sched_entry_point_t const entry_point, void *const arg
 ) {
     mem_set(&ctx->regs, 0, sizeof(cpu_regs_t));
 
@@ -56,7 +53,7 @@ void sched_prepare_kernel_entry(
 }
 
 
-void sched_prepare_user_entry(kernel_ctx_t *const ctx, sched_entry_point_t const entry_point, void *const arg) {
+void sched_prepare_user_entry(isr_ctx_t *const ctx, sched_entry_point_t const entry_point, void *const arg) {
 
     // Mark the thread as a user thread.
     ctx->is_kernel_thread = false;
