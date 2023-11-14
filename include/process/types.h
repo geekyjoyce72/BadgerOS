@@ -3,28 +3,29 @@
 
 #pragma once
 
+#include "cpu/process/types.h"
+#include "port/hardware_allocation.h"
+#include "port/process/types.h"
+
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
 
 
-// Maximum number of mapped regions per process.
-#define PROC_MEMMAP_MAX_REGIONS 8
-
 // Process memory map information.
 typedef struct proc_memmap_t {
+    // Memory management cache.
+    proc_mpu_t mpu;
     // Base address of code segments.
-    size_t segs_base;
+    size_t     segs_base;
     // Number of mapped regions.
-    size_t regions_len;
+    size_t     regions_len;
     // Base addresses of memory mapped regions.
-    size_t region_bases[PROC_MEMMAP_MAX_REGIONS];
+    size_t     region_bases[PROC_MEMMAP_MAX_REGIONS];
     // Sizes of memory mapped regions.
-    size_t region_sizes[PROC_MEMMAP_MAX_REGIONS];
+    size_t     region_sizes[PROC_MEMMAP_MAX_REGIONS];
 } proc_memmap_t;
-
-
 
 // Process ID.
 typedef int pid_t;

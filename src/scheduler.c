@@ -12,12 +12,12 @@
 #include "meta.h"
 #include "port/hardware_allocation.h"
 #include "port/interrupt.h"
+#include "process/process.h"
 #include "scheduler/cpu.h"
 #include "scheduler/isr.h"
 #include "scheduler/types.h"
 #include "syscall.h"
 #include "time.h"
-#include "userland/types.h"
 
 #include <stdint.h>
 

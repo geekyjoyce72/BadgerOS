@@ -5,8 +5,7 @@
 #include "badge_strings.h"
 #include "filesystem.h"
 #include "malloc.h"
-#include "userland/memory.h"
-#include "userland/process.h"
+#include "process/process.h"
 
 #include <kbelf.h>
 
@@ -73,7 +72,7 @@ void kbelfx_free(void *mem) {
 // Takes a segment with requested address and permissions and returns a segment with physical and virtual address
 // information. Returns success status. User-defined.
 bool kbelfx_seg_alloc(kbelf_inst inst, size_t segs_len, kbelf_segment *segs) {
-    process_t *proc = get_process(kbelf_inst_getpid(inst));
+    process_t *proc = proc_get(kbelf_inst_getpid(inst));
     assert_dev_keep(proc != NULL);
     assert_dev_keep(proc->memmap.segs_base == 0);
 
@@ -91,7 +90,7 @@ bool kbelfx_seg_alloc(kbelf_inst inst, size_t segs_len, kbelf_segment *segs) {
         logkf(LOG_DEBUG, "Segment %{size;d}: %{size;x} - %{size;x}", i, start, end);
     }
 
-    size_t vaddr_real      = user_map(proc, min_addr, max_addr - min_addr, min_align);
+    size_t vaddr_real      = proc_map(proc, min_addr, max_addr - min_addr, min_align);
     proc->memmap.segs_base = vaddr_real;
     if (!vaddr_real)
         return false;
@@ -112,10 +111,10 @@ bool kbelfx_seg_alloc(kbelf_inst inst, size_t segs_len, kbelf_segment *segs) {
 void kbelfx_seg_free(kbelf_inst inst, size_t segs_len, kbelf_segment *segs) {
     (void)segs_len;
     (void)segs;
-    process_t *proc = get_process(kbelf_inst_getpid(inst));
+    process_t *proc = proc_get(kbelf_inst_getpid(inst));
     assert_dev_keep(proc != NULL);
     assert_dev_keep(proc->memmap.segs_base != 0);
-    user_unmap(proc, proc->memmap.segs_base);
+    proc_unmap(proc, proc->memmap.segs_base);
 }
 
 

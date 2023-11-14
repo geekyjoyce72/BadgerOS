@@ -1,7 +1,7 @@
 
 // SPDX-License-Identifier: MIT
 
-#include "userland/memory.h"
+#include "process/process.h"
 
 #include "badge_strings.h"
 #include "log.h"
@@ -11,8 +11,14 @@ process_t dummy_proc;
 
 
 
+// Sort the memory map by ascending address.
+static void proc_memmap_sort(proc_memmap_t *memmap) {
+    // TODO.
+    (void)memmap;
+}
+
 // Allocate more memory to a process.
-size_t user_map(process_t *proc, size_t vaddr_req, size_t min_size, size_t min_align) {
+size_t proc_map(process_t *proc, size_t vaddr_req, size_t min_size, size_t min_align) {
     (void)min_align;
     (void)vaddr_req;
 
@@ -34,7 +40,7 @@ size_t user_map(process_t *proc, size_t vaddr_req, size_t min_size, size_t min_a
 }
 
 // Release memory allocated to a process.
-void user_unmap(process_t *proc, size_t base) {
+void proc_unmap(process_t *proc, size_t base) {
     proc_memmap_t *map = &proc->memmap;
     for (size_t i = 0; i < map->regions_len; i++) {
         if (map->region_bases[i] == base) {

@@ -82,7 +82,7 @@ add_executable(${target}
     ${CMAKE_CURRENT_LIST_DIR}/src/filesystem/vfs_internal.c
     ${CMAKE_CURRENT_LIST_DIR}/src/loading/kbelfx.c
     ${CMAKE_CURRENT_LIST_DIR}/src/loading/rom.c
-    ${CMAKE_CURRENT_LIST_DIR}/src/userland/memory.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/process/process.c
     ${CMAKE_CURRENT_LIST_DIR}/src/assertions.c
     ${CMAKE_CURRENT_LIST_DIR}/src/badge_format_str.c
     ${CMAKE_CURRENT_LIST_DIR}/src/badge_strings.c
