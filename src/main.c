@@ -1,6 +1,7 @@
 
 // SPDX-License-Identifier: MIT
 
+#include "arrays.h"
 #include "assertions.h"
 #include "filesystem.h"
 #include "filesystem/vfs_internal.h"
@@ -68,9 +69,26 @@ void main() {
     __builtin_unreachable();
 }
 
+int int_comp(void const *a, void const *b) {
+    return *(int const *)a - *(int const *)b;
+}
+
 void debug_func(void *arg) {
     (void)arg;
     badge_err_t ec;
+
+    // List for to sort now integer.
+    int          list[]   = {1, 2, 4, 3, -90, 80, 5, 19, 50, 101, -33};
+    size_t const list_len = sizeof(list) / sizeof(*list);
+    for (size_t i = 0; i < list_len; i++) {
+        logkf(LOG_DEBUG, "[%{size;d}] = %{d}", i, list[i]);
+    }
+
+    // Sort the list.
+    array_sort(list, sizeof(*list), list_len, int_comp);
+    for (size_t i = 0; i < list_len; i++) {
+        logkf(LOG_DEBUG, "[%{size;d}] = %{d}", i, list[i]);
+    }
 
     // Create RAMFS.
     logk(LOG_DEBUG, "Creating RAMFS at /");

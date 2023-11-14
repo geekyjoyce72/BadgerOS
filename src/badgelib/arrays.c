@@ -48,19 +48,19 @@ void array_sort_impl(void *array, void *tmp, size_t ent_size, size_t ent_count, 
         void *b_ptr = array_index(array, ent_size, avl_a + b);
         if (comparator(a_ptr, b_ptr) > 0) {
             mem_copy(array_index(tmp, ent_size, i), b_ptr, ent_size);
-            a++;
+            b++;
         } else {
             mem_copy(array_index(tmp, ent_size, i), a_ptr, ent_size);
-            b++;
+            a++;
         }
     }
 
     // Add any remainder.
-    for (; a < avl_a; a++) {
+    for (; a < avl_a; a++, i++) {
         void *a_ptr = array_index(array, ent_size, a);
         mem_copy(array_index(tmp, ent_size, i), a_ptr, ent_size);
     }
-    for (; b < avl_b; b++) {
+    for (; b < avl_b; b++, i++) {
         void *b_ptr = array_index(array, ent_size, avl_a + b);
         mem_copy(array_index(tmp, ent_size, i), b_ptr, ent_size);
     }
