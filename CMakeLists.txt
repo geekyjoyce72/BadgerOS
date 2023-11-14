@@ -74,6 +74,7 @@ project(badgeros C ASM)
 # Define executable file.
 set(target badger-os.elf)
 add_executable(${target}
+    ${CMAKE_CURRENT_LIST_DIR}/src/badgelib/arrays.c
     ${CMAKE_CURRENT_LIST_DIR}/src/badgelib/assertions.c
     ${CMAKE_CURRENT_LIST_DIR}/src/badgelib/badge_format_str.c
     ${CMAKE_CURRENT_LIST_DIR}/src/badgelib/badge_strings.c

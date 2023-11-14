@@ -264,6 +264,39 @@ void mem_copy(void *dest, void const *src, size_t size) {
     }
 }
 
+
+
+// Implementation of the mem_swap loop with variable access size.
+#define MEM_SWAP_IMPL(type, alignment, a, b, size)                                                                     \
+    {                                                                                                                  \
+        type  *a_ptr = (a); /* NOLINT*/                                                                                \
+        type  *b_ptr = (b); /* NOLINT*/                                                                                \
+        size_t _size = (size) / (alignment);                                                                           \
+        type   tmp;                                                                                                    \
+        for (size_t i = 0; i < _size; i++) {                                                                           \
+            tmp      = a_ptr[i];                                                                                       \
+            a_ptr[i] = b_ptr[i];                                                                                       \
+            b_ptr[i] = tmp;                                                                                            \
+        }                                                                                                              \
+    }
+
+// Swap the contents of memory areas `a` and `b`.
+// For correct copying, `a` and `b` must not overlap.
+void mem_swap(void *a, void *b, size_t size) {
+    size_t align_detector = (size_t)a | (size_t)b | (size_t)size;
+
+    // Optimise for alignment.
+    if (align_detector & 1) {
+        MEM_SWAP_IMPL(uint8_t, 1, a, b, size)
+    } else if (align_detector & 2) {
+        MEM_SWAP_IMPL(uint16_t, 2, a, b, size)
+    } else if (align_detector & 4) {
+        MEM_SWAP_IMPL(uint32_t, 4, a, b, size)
+    } else {
+        MEM_SWAP_IMPL(uint64_t, 8, a, b, size)
+    }
+}
+
 // Implementation of the mem_set loop with variable access size.
 #define MEM_SET_IMPL(type, alignment, dest, value, size)                                                               \
     {                                                                                                                  \
