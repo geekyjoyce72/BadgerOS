@@ -3,6 +3,7 @@
 
 #include "arrays.h"
 
+#include "assertions.h"
 #include "badge_strings.h"
 #include "malloc.h"
 
