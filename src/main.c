@@ -1,6 +1,7 @@
 
 // SPDX-License-Identifier: MIT
 
+#include "arrays.h"
 #include "assertions.h"
 #include "filesystem.h"
 #include "filesystem/vfs_internal.h"

@@ -74,6 +74,13 @@ project(badgeros C ASM)
 # Define executable file.
 set(target badger-os.elf)
 add_executable(${target}
+    ${CMAKE_CURRENT_LIST_DIR}/src/badgelib/arrays.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/badgelib/assertions.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/badgelib/badge_format_str.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/badgelib/badge_strings.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/badgelib/log.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/badgelib/mutex.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/badgelib/num_to_str.c
     ${CMAKE_CURRENT_LIST_DIR}/src/blockdevice/blkdev_ram.c
     ${CMAKE_CURRENT_LIST_DIR}/src/blockdevice/blockdevice.c
     ${CMAKE_CURRENT_LIST_DIR}/src/filesystem/filesystem.c
@@ -83,26 +90,20 @@ add_executable(${target}
     ${CMAKE_CURRENT_LIST_DIR}/src/loading/kbelfx.c
     ${CMAKE_CURRENT_LIST_DIR}/src/loading/rom.c
     ${CMAKE_CURRENT_LIST_DIR}/src/process/process.c
-    ${CMAKE_CURRENT_LIST_DIR}/src/assertions.c
-    ${CMAKE_CURRENT_LIST_DIR}/src/badge_format_str.c
-    ${CMAKE_CURRENT_LIST_DIR}/src/badge_strings.c
     ${CMAKE_CURRENT_LIST_DIR}/src/list.c
-    ${CMAKE_CURRENT_LIST_DIR}/src/log.c
     ${CMAKE_CURRENT_LIST_DIR}/src/main.c
     ${CMAKE_CURRENT_LIST_DIR}/src/malloc/malloc.c
-    ${CMAKE_CURRENT_LIST_DIR}/src/mutex.c
-    ${CMAKE_CURRENT_LIST_DIR}/src/num_to_str.c
     ${CMAKE_CURRENT_LIST_DIR}/src/scheduler.c
     ${CMAKE_CURRENT_LIST_DIR}/src/syscall.c
 )
-target_include_directories(${target} PUBLIC ${CMAKE_CURRENT_LIST_DIR}/include)
+target_include_directories(${target} PUBLIC ${CMAKE_CURRENT_LIST_DIR}/include ${CMAKE_CURRENT_LIST_DIR}/include/badgelib)
 
 # Include port-specific.
 include(cpu/rv32imac/CMakeLists.txt)
 include(port/esp32c6/CMakeLists.txt)
 
 # Add libraries.
-add_compile_options(-I${CMAKE_CURRENT_LIST_DIR}/include -include ${CMAKE_CURRENT_LIST_DIR}/include/loading/kbelf_pre.h)
+add_compile_options(-I${CMAKE_CURRENT_LIST_DIR}/include -I${CMAKE_CURRENT_LIST_DIR}/include/badgelib -include ${CMAKE_CURRENT_LIST_DIR}/include/loading/kbelf_pre.h)
 add_subdirectory(lib/kbelf)
 target_link_libraries(${target} PUBLIC kbelf)
 
