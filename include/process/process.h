@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "port/process/process.h"
 #include "process/types.h"
 
 extern process_t dummy_proc;

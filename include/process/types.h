@@ -13,18 +13,28 @@
 
 
 
+// A memory map entry.
+typedef struct {
+    // Base address of the region.
+    size_t base;
+    // Size of the region.
+    size_t size;
+    // Write permission.
+    bool   write;
+    // Execution permission.
+    bool   exec;
+} proc_memmap_ent_t;
+
 // Process memory map information.
 typedef struct proc_memmap_t {
     // Memory management cache.
-    proc_mpu_t mpu;
+    proc_mpu_t        mpu;
     // Base address of code segments.
-    size_t     segs_base;
+    size_t            segs_base;
     // Number of mapped regions.
-    size_t     regions_len;
-    // Base addresses of memory mapped regions.
-    size_t     region_bases[PROC_MEMMAP_MAX_REGIONS];
-    // Sizes of memory mapped regions.
-    size_t     region_sizes[PROC_MEMMAP_MAX_REGIONS];
+    size_t            regions_len;
+    // Mapped regions.
+    proc_memmap_ent_t regions[PROC_MEMMAP_MAX_REGIONS];
 } proc_memmap_t;
 
 // Process ID.
