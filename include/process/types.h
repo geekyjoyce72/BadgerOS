@@ -4,6 +4,8 @@
 #pragma once
 
 #include "cpu/process/types.h"
+#include "filesystem.h"
+#include "kbelf.h"
 #include "port/hardware_allocation.h"
 #include "port/process/types.h"
 
@@ -37,10 +39,10 @@ typedef struct proc_memmap_t {
     proc_memmap_ent_t regions[PROC_MEMMAP_MAX_REGIONS];
 } proc_memmap_t;
 
-// Process ID.
+// Globally unique process ID.
 typedef int pid_t;
 
-// Userland process.
+// A process and all of its resources.
 typedef struct process_t {
     // Process ID.
     pid_t         pid;

@@ -6,6 +6,7 @@
 #include "filesystem.h"
 #include "malloc.h"
 #include "process/process.h"
+#include "process/types.h"
 
 #include <kbelf.h>
 

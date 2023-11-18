@@ -12,6 +12,9 @@
 
 typedef struct process_t process_t;
 
+// Globally unique thread ID.
+typedef int tid_t;
+
 typedef struct sched_thread_t sched_thread_t;
 
 typedef void (*sched_entry_point_t)(void *arg);
@@ -23,7 +26,7 @@ typedef enum {
     SCHED_PRIO_NORMAL = 10,
     // will be scheduled with bigger time slices than normal
     SCHED_PRIO_HIGH   = 20,
-} sched_thread_priority_t;
+} sched_prio_t;
 
 // Initializes the scheduler and setups up the system to be ready to
 // create threads and execute them.
@@ -50,13 +53,13 @@ void sched_exec(void) NORETURN;
 // Potential errors:
 // - `ECAUSE_NOMEM` is issued when the thread could not be allocated.
 sched_thread_t *sched_create_userland_thread(
-    badge_err_t            *ec,
-    process_t              *process,
-    sched_entry_point_t     entry_point,
-    void                   *arg,
-    void                   *stack_bottom,
-    size_t                  stack_size,
-    sched_thread_priority_t priority
+    badge_err_t        *ec,
+    process_t          *process,
+    sched_entry_point_t entry_point,
+    void               *arg,
+    void               *stack_bottom,
+    size_t              stack_size,
+    sched_prio_t        priority
 );
 
 // Creates a new suspended kernel thread.
@@ -78,12 +81,12 @@ sched_thread_t *sched_create_userland_thread(
 // Potential errors:
 // - `ECAUSE_NOMEM` is issued when the thread could not be allocated.
 sched_thread_t *sched_create_kernel_thread(
-    badge_err_t            *ec,
-    sched_entry_point_t     entry_point,
-    void                   *arg,
-    void                   *stack_bottom,
-    size_t                  stack_size,
-    sched_thread_priority_t priority
+    badge_err_t        *ec,
+    sched_entry_point_t entry_point,
+    void               *arg,
+    void               *stack_bottom,
+    size_t              stack_size,
+    sched_prio_t        priority
 );
 
 // Kills the given thread and releases all scheduler resources allocated by the

@@ -7,10 +7,38 @@
 #include "badge_strings.h"
 #include "log.h"
 #include "malloc.h"
+#include "port/process/process.h"
+#include "process/types.h"
 
 process_t dummy_proc;
 
+// Create a new, empty process.
+process_t *proc_create() {
+    return &dummy_proc;
+}
 
+// Delete a process and release any resources it had.
+void proc_delete(pid_t pid) {
+    (void)pid;
+}
+
+// Get a process handle by ID.
+process_t *proc_get(pid_t pid) {
+    (void)pid;
+    return &dummy_proc;
+}
+
+
+
+// Create a new thread in a process.
+// Returns created thread handle.
+sched_thread_t *proc_create_thread(badge_err_t *ec, sched_entry_point_t entry_point, void *arg, sched_prio_t priority) {
+    (void)ec;
+    (void)entry_point;
+    (void)arg;
+    (void)priority;
+    return NULL;
+}
 
 // Memory map address comparator.
 static int prog_memmap_cmp(void const *a, void const *b) {
@@ -24,7 +52,7 @@ static int prog_memmap_cmp(void const *a, void const *b) {
 }
 
 // Sort the memory map by ascending address.
-static void proc_memmap_sort(proc_memmap_t *memmap) {
+static inline void proc_memmap_sort(proc_memmap_t *memmap) {
     array_sort(&memmap->regions[0], sizeof(memmap->regions[0]), memmap->regions_len, prog_memmap_cmp);
 }
 
@@ -41,8 +69,6 @@ size_t proc_map(process_t *proc, size_t vaddr_req, size_t min_size, size_t min_a
     if (!base)
         return 0;
 
-    logkf(LOG_INFO, "Mapped %{size;d} bytes at %{size;x} to process %{d}", min_size, base, proc->pid);
-
     map->regions[map->regions_len] = (proc_memmap_ent_t){
         .base  = (size_t)base,
         .size  = (size_t)min_size,
@@ -56,6 +82,8 @@ size_t proc_map(process_t *proc, size_t vaddr_req, size_t min_size, size_t min_a
         return 0;
     }
 
+    logkf(LOG_INFO, "Mapped %{size;d} bytes at %{size;x} to process %{d}", min_size, base, proc->pid);
+
     return (size_t)base;
 }
 
@@ -65,7 +93,7 @@ void proc_unmap(process_t *proc, size_t base) {
     for (size_t i = 0; i < map->regions_len; i++) {
         if (map->regions[i].base == base) {
             free((void *)base);
-            mem_copy(map->regions + i, map->regions + i + 1, sizeof(map->regions[0]) * (map->regions_len - i - 1));
+            array_remove(&map->regions[0], sizeof(map->regions[0]), map->regions_len, NULL, i);
             map->regions_len--;
             return;
         }

@@ -345,13 +345,13 @@ void sched_request_switch_from_isr(void) {
 }
 
 sched_thread_t *sched_create_userland_thread(
-    badge_err_t            *ec,
-    process_t              *process,
-    sched_entry_point_t     entry_point,
-    void                   *arg,
-    void                   *kernel_stack_bottom,
-    size_t                  stack_size,
-    sched_thread_priority_t priority
+    badge_err_t        *ec,
+    process_t          *process,
+    sched_entry_point_t entry_point,
+    void               *arg,
+    void               *kernel_stack_bottom,
+    size_t              stack_size,
+    sched_prio_t        priority
 ) {
     size_t const kernel_stack_bottom_addr = (size_t)kernel_stack_bottom;
 
@@ -384,12 +384,12 @@ sched_thread_t *sched_create_userland_thread(
 }
 
 sched_thread_t *sched_create_kernel_thread(
-    badge_err_t *const            ec,
-    sched_entry_point_t const     entry_point,
-    void *const                   arg,
-    void *const                   kernel_stack_bottom,
-    size_t const                  stack_size,
-    sched_thread_priority_t const priority
+    badge_err_t *const        ec,
+    sched_entry_point_t const entry_point,
+    void *const               arg,
+    void *const               kernel_stack_bottom,
+    size_t const              stack_size,
+    sched_prio_t const        priority
 ) {
     size_t const kernel_stack_bottom_addr = (size_t)kernel_stack_bottom;
 

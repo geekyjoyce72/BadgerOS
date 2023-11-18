@@ -46,13 +46,13 @@ enum {
 
 struct sched_thread_t {
     // Process to which this thread belongs.
-    process_t              *process;
+    process_t   *process;
     // Lowest address of the kernel stack.
-    size_t                  kernel_stack_bottom;
+    size_t       kernel_stack_bottom;
     // Highest address of the kernel stack.
-    size_t                  kernel_stack_top;
+    size_t       kernel_stack_top;
     // Priority of this thread.
-    sched_thread_priority_t priority;
+    sched_prio_t priority;
 
     // dynamic info:
     uint32_t     flags;
