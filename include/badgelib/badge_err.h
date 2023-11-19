@@ -46,6 +46,8 @@ typedef enum {
     ELOC_FILESYSTEM,
     // Block device driver
     ELOC_BLKDEV,
+    // Process API
+    ELOC_PROCESS,
 } badge_eloc_t;
 
 typedef enum {

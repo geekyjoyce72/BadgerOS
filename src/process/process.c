@@ -5,39 +5,177 @@
 
 #include "arrays.h"
 #include "badge_strings.h"
+#include "isr_ctx.h"
+#include "kbelf.h"
 #include "log.h"
 #include "malloc.h"
 #include "port/process/process.h"
 #include "process/types.h"
 
+#include <stdatomic.h>
+
+// Globally unique PID number counter.
+atomic_int pid_counter = 1;
+
 process_t dummy_proc;
 
+
+
 // Create a new, empty process.
-process_t *proc_create() {
-    return &dummy_proc;
+process_t *proc_create(badge_err_t *ec) {
+    (void)ec;
+    // TODO: Allocate these instead of just handing a dummy out.
+    process_t *handle = &dummy_proc;
+
+    // Get a new PID.
+    pid_t pid = atomic_fetch_add_explicit(&pid_counter, 1, memory_order_acquire);
+    assert_always(pid >= 1);
+
+    // Install default values.
+    *handle = (process_t){
+        .argc        = 0,
+        .argv        = NULL,
+        .threads_len = 0,
+        .threads     = NULL,
+        .memmap =
+            {
+                .regions_len = 0,
+            },
+        .pid = pid,
+    };
+
+    // Initialise the empty memory map.
+    assert_dev_drop(proc_mpu_gen(&handle->memmap));
+
+    return handle;
 }
 
 // Delete a process and release any resources it had.
-void proc_delete(pid_t pid) {
-    (void)pid;
+void proc_delete(badge_err_t *ec, pid_t pid) {
+    // TODO: Convert to atomic lookup and remove.
+    process_t *handle = proc_get(ec, pid);
+    if (!handle)
+        return;
+
+    // TODO: Destroy all the threads.
+    // Unmap all memory from this process.
+    while (handle->memmap.regions_len) {
+        proc_unmap(ec, handle, handle->memmap.regions[0].base);
+        assert_dev_drop(badge_err_is_ok(ec));
+    }
+    // Release kernel memory allocated to process.
+    free(handle->argv);
+    badge_err_set_ok(ec);
 }
 
 // Get a process handle by ID.
-process_t *proc_get(pid_t pid) {
+process_t *proc_get(badge_err_t *ec, pid_t pid) {
+    // TODO: Allocate these instead of just handing a dummy out.
+    (void)ec;
     (void)pid;
     return &dummy_proc;
 }
 
 
+// Set arguments for a process.
+// If omitted, argc will be 0 and argv will be NULL.
+void proc_setargs(badge_err_t *ec, process_t *process, int argc, char const *const *argv) {
+    // Measure required memory for argv.
+    int required = sizeof(size_t) * argc;
+    for (int i = 0; i < argc; i++) {
+        required += cstr_length(argv[i]) + 1;
+    }
+
+    // Allocate memory for the argv.
+    char *mem = realloc(process->argv, required);
+    if (!mem) {
+        badge_err_set(ec, ELOC_PROCESS, ECAUSE_NOMEM);
+        return;
+    }
+
+    // Copy datas into the argv.
+    int off = sizeof(size_t) * argc;
+    for (int i = 0; i < argc; i++) {
+        // Argument pointer.
+        *(char **)(mem + sizeof(size_t) * i) = (mem + off);
+
+        // Copy in the string.
+        size_t len = cstr_length(argv[i]);
+        mem_copy(mem + off, argv[i], len + 1);
+        off += len;
+    }
+    badge_err_set_ok(ec);
+}
+
+// Load an executable and start a prepared process.
+void proc_start(badge_err_t *ec, process_t *process, char const *executable) {
+    // Load the executable.
+    logk(LOG_DEBUG, "Creating dynamic loader");
+    kbelf_dyn dyn = kbelf_dyn_create(process->pid);
+    logk(LOG_DEBUG, "Adding executable");
+    if (!kbelf_dyn_set_exec(dyn, executable, NULL)) {
+        kbelf_dyn_destroy(dyn);
+        badge_err_set(ec, ELOC_PROCESS, ECAUSE_UNKNOWN);
+        return;
+    }
+    logk(LOG_DEBUG, "Loading program");
+    if (!kbelf_dyn_load(dyn)) {
+        kbelf_dyn_destroy(dyn);
+        badge_err_set(ec, ELOC_PROCESS, ECAUSE_UNKNOWN);
+        return;
+    }
+
+    // Create the process' main thread.
+    logk(LOG_DEBUG, "Creating main thread");
+    sched_thread_t *thread =
+        proc_create_thread(ec, process, (sched_entry_point_t)kbelf_dyn_entrypoint(dyn), NULL, SCHED_PRIO_NORMAL);
+    if (!thread) {
+        kbelf_dyn_unload(dyn);
+        kbelf_dyn_destroy(dyn);
+        return;
+    }
+    logk(LOG_DEBUG, "Starting main thread");
+    sched_resume_thread(ec, thread);
+}
+
+
+#define kstack_size 8192
+char kstack[kstack_size] ALIGNED_TO(STACK_ALIGNMENT);
 
 // Create a new thread in a process.
 // Returns created thread handle.
-sched_thread_t *proc_create_thread(badge_err_t *ec, sched_entry_point_t entry_point, void *arg, sched_prio_t priority) {
-    (void)ec;
-    (void)entry_point;
-    (void)arg;
-    (void)priority;
-    return NULL;
+sched_thread_t *proc_create_thread(
+    badge_err_t *ec, process_t *process, sched_entry_point_t entry_point, void *arg, sched_prio_t priority
+) {
+    // TODO: Locking for process threads.
+    // Create an entry for a new thread.
+    void *mem = realloc(process->threads, sizeof(*process->threads) * (process->threads_len + 1));
+    if (!mem) {
+        badge_err_set(ec, ELOC_PROCESS, ECAUSE_NOMEM);
+        return NULL;
+    }
+    process->threads = mem;
+
+    // TODO: Use a proper allocator for the kernel stack.
+    // size_t const kstack_size = 8192;
+    // void        *kstack      = malloc(kstack_size);
+    // if (!kstack) {
+    //     badge_err_set(ec, ELOC_PROCESS, ECAUSE_NOMEM);
+    //     return NULL;
+    // }
+
+    // Create a thread.
+    sched_thread_t *thread = sched_create_userland_thread(ec, process, entry_point, arg, kstack, kstack_size, priority);
+    if (!thread) {
+        // free(kstack);
+        return NULL;
+    }
+
+    // Add the thread to the list.
+    array_insert(process->threads, sizeof(*process->threads), process->threads_len, &thread, process->threads_len);
+    process->threads_len++;
+
+    return thread;
 }
 
 // Memory map address comparator.
@@ -57,17 +195,21 @@ static inline void proc_memmap_sort(proc_memmap_t *memmap) {
 }
 
 // Allocate more memory to a process.
-size_t proc_map(process_t *proc, size_t vaddr_req, size_t min_size, size_t min_align) {
+size_t proc_map(badge_err_t *ec, process_t *proc, size_t vaddr_req, size_t min_size, size_t min_align) {
     (void)min_align;
     (void)vaddr_req;
 
     proc_memmap_t *map = &proc->memmap;
-    if (map->regions_len >= PROC_MEMMAP_MAX_REGIONS)
+    if (map->regions_len >= PROC_MEMMAP_MAX_REGIONS) {
+        badge_err_set(ec, ELOC_PROCESS, ECAUSE_NOMEM);
         return 0;
+    }
 
     void *base = malloc(min_size);
-    if (!base)
+    if (!base) {
+        badge_err_set(ec, ELOC_PROCESS, ECAUSE_NOMEM);
         return 0;
+    }
 
     map->regions[map->regions_len] = (proc_memmap_ent_t){
         .base  = (size_t)base,
@@ -78,24 +220,27 @@ size_t proc_map(process_t *proc, size_t vaddr_req, size_t min_size, size_t min_a
     map->regions_len++;
     proc_memmap_sort(map);
     if (!proc_mpu_gen(map)) {
-        proc_unmap(proc, (size_t)base);
+        badge_err_set(ec, ELOC_PROCESS, ECAUSE_NOMEM);
+        proc_unmap(NULL, proc, (size_t)base);
         return 0;
     }
 
     logkf(LOG_INFO, "Mapped %{size;d} bytes at %{size;x} to process %{d}", min_size, base, proc->pid);
-
+    badge_err_set_ok(ec);
     return (size_t)base;
 }
 
 // Release memory allocated to a process.
-void proc_unmap(process_t *proc, size_t base) {
+void proc_unmap(badge_err_t *ec, process_t *proc, size_t base) {
     proc_memmap_t *map = &proc->memmap;
     for (size_t i = 0; i < map->regions_len; i++) {
         if (map->regions[i].base == base) {
             free((void *)base);
             array_remove(&map->regions[0], sizeof(map->regions[0]), map->regions_len, NULL, i);
             map->regions_len--;
+            badge_err_set_ok(ec);
             return;
         }
     }
+    badge_err_set(ec, ELOC_PROCESS, ECAUSE_NOTFOUND);
 }

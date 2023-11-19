@@ -73,9 +73,8 @@ void kbelfx_free(void *mem) {
 // Takes a segment with requested address and permissions and returns a segment with physical and virtual address
 // information. Returns success status. User-defined.
 bool kbelfx_seg_alloc(kbelf_inst inst, size_t segs_len, kbelf_segment *segs) {
-    process_t *proc = proc_get(kbelf_inst_getpid(inst));
+    process_t *proc = proc_get(NULL, kbelf_inst_getpid(inst));
     assert_dev_keep(proc != NULL);
-    assert_dev_keep(proc->memmap.segs_base == 0);
 
     size_t min_addr  = SIZE_MAX;
     size_t max_addr  = 0;
@@ -91,17 +90,18 @@ bool kbelfx_seg_alloc(kbelf_inst inst, size_t segs_len, kbelf_segment *segs) {
         logkf(LOG_DEBUG, "Segment %{size;d}: %{size;x} - %{size;x}", i, start, end);
     }
 
-    size_t vaddr_real      = proc_map(proc, min_addr, max_addr - min_addr, min_align);
-    proc->memmap.segs_base = vaddr_real;
+    size_t vaddr_real = proc_map(NULL, proc, min_addr, max_addr - min_addr, min_align);
     if (!vaddr_real)
         return false;
 
     for (size_t i = 0; i < segs_len; i++) {
-        segs[i].vaddr_real = segs[i].vaddr_req - min_addr + vaddr_real;
-        segs[i].paddr      = segs[i].vaddr_real;
-        segs[i].laddr      = segs[i].vaddr_real;
+        segs[i].vaddr_real   = segs[i].vaddr_req - min_addr + vaddr_real;
+        segs[i].paddr        = segs[i].vaddr_real;
+        segs[i].laddr        = segs[i].vaddr_real;
+        segs[i].alloc_cookie = NULL;
         logkf(LOG_DEBUG, "Segment %{size;x} mapped to %{size;x}", i, segs[i].vaddr_real);
     }
+    segs[0].alloc_cookie = (void *)vaddr_real;
 
     return true;
 }
@@ -112,10 +112,9 @@ bool kbelfx_seg_alloc(kbelf_inst inst, size_t segs_len, kbelf_segment *segs) {
 void kbelfx_seg_free(kbelf_inst inst, size_t segs_len, kbelf_segment *segs) {
     (void)segs_len;
     (void)segs;
-    process_t *proc = proc_get(kbelf_inst_getpid(inst));
+    process_t *proc = proc_get(NULL, kbelf_inst_getpid(inst));
     assert_dev_keep(proc != NULL);
-    assert_dev_keep(proc->memmap.segs_base != 0);
-    proc_unmap(proc, proc->memmap.segs_base);
+    proc_unmap(NULL, proc, (size_t)segs[0].alloc_cookie);
 }
 
 

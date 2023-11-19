@@ -31,8 +31,6 @@ typedef struct {
 typedef struct proc_memmap_t {
     // Memory management cache.
     proc_mpu_t        mpu;
-    // Base address of code segments.
-    size_t            segs_base;
     // Number of mapped regions.
     size_t            regions_len;
     // Mapped regions.
@@ -44,8 +42,16 @@ typedef int pid_t;
 
 // A process and all of its resources.
 typedef struct process_t {
+    // Number of arguments.
+    int              argc;
+    // Value of arguments.
+    char           **argv;
+    // Number of threads.
+    size_t           threads_len;
+    // Thread handles.
+    sched_thread_t **threads;
     // Process ID.
-    pid_t         pid;
+    pid_t            pid;
     // Memory map information.
-    proc_memmap_t memmap;
+    proc_memmap_t    memmap;
 } process_t;

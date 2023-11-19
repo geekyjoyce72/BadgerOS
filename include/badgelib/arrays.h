@@ -23,7 +23,7 @@ void array_sort(void *array, size_t ent_size, size_t ent_count, array_sort_comp_
 static inline void array_copy(
     void *array_dst, void const *array_src, size_t ent_size, size_t dst_index, size_t src_index, size_t ent_count
 ) {
-    mem_copy(
+    __builtin_memmove(
         (void *)((size_t)array_dst + ent_size * dst_index),
         (void *)((size_t)array_src + ent_size * src_index),
         ent_size * ent_count

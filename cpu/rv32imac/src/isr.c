@@ -91,9 +91,10 @@ void __trap_handler() {
 // Return a value from the syscall handler.
 void __syscall_return(long long value) {
     isr_global_disable();
-    isr_ctx_t *usr = &isr_ctx_get()->thread->user_isr_ctx;
-    usr->regs.a0   = value;
-    usr->regs.a1   = value >> 32;
+    isr_ctx_t *usr  = &isr_ctx_get()->thread->user_isr_ctx;
+    usr->regs.a0    = value;
+    usr->regs.a1    = value >> 32;
+    usr->regs.pc   += 4;
     sched_lower_from_isr();
     isr_context_switch();
     __builtin_unreachable();

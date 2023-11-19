@@ -11,6 +11,7 @@
 #include "malloc.h"
 #include "memprotect.h"
 #include "port/interrupt.h"
+#include "process/process.h"
 #include "rawprint.h"
 #include "scheduler/scheduler.h"
 #include "time.h"
@@ -74,27 +75,6 @@ void main() {
     __builtin_unreachable();
 }
 
-static void lister(char *dir) {
-    logkf(LOG_DEBUG, "Listing of %{cs}:", dir);
-    badge_err_t ec;
-    file_t      fd = fs_dir_open(&ec, dir, 0);
-    check_ec(&ec);
-    dirent_t ent;
-    while (fs_dir_read(&ec, &ent, fd)) {
-        logk(LOG_DEBUG, ent.name);
-    }
-    fs_dir_close(&ec, fd);
-    check_ec(&ec);
-}
-
-static void userfunc() {
-    while (1) {
-        asm("li a7, 0\necall" ::: "a7");
-    }
-}
-
-uint32_t kstack[1024] ALIGNED_TO(STACK_ALIGNMENT);
-
 void debug_func(void *arg) {
     (void)arg;
     badge_err_t ec;
@@ -103,39 +83,18 @@ void debug_func(void *arg) {
     logk(LOG_DEBUG, "Creating RAMFS at /");
     fs_mount(&ec, FS_TYPE_RAMFS, NULL, "/", 0);
     check_ec(&ec);
-    lister("/");
 
     // Put the ROM in the RAMFS.
     file_t fd = fs_open(&ec, "/a.out", OFLAGS_CREATE | OFLAGS_WRITEONLY);
     check_ec(&ec);
-    lister("/");
     fs_write(&ec, fd, elf_rom, elf_rom_len);
     check_ec(&ec);
     fs_close(&ec, fd);
     check_ec(&ec);
-    lister("/");
 
-    // Try to load the file.
-    kbelf_dyn dyn = kbelf_dyn_create(1);
-    kbelf_dyn_set_exec(dyn, "/a.out", NULL);
-    kbelf_dyn_load(dyn);
-
-    // Create a USERLAND thread.
-    sched_thread_t *thread =
-        sched_create_userland_thread(&ec, NULL, (sched_entry_point_t)userfunc, NULL, kstack, sizeof(kstack), 1);
-    sched_resume_thread(&ec, thread);
-
-
-
-    // (void)arg;
-    // io_mode(NULL, 19, IO_MODE_OUTPUT);
-    // timestamp_us_t t;
-    // while (1) {
-    //     io_write(NULL, 19, true);
-    //     t = time_us() + 500000;
-    //     while (time_us() < t) sched_yield();
-    //     io_write(NULL, 19, false);
-    //     t = time_us() + 500000;
-    //     while (time_us() < t) sched_yield();
-    // }
+    // Start a process.
+    process_t *proc = proc_create(&ec);
+    check_ec(&ec);
+    proc_start(&ec, proc, "/a.out");
+    check_ec(&ec);
 }
