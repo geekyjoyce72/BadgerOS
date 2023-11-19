@@ -156,6 +156,8 @@ void sched_yield(void);
 void sched_exit(uint32_t exit_code) NORETURN;
 
 
+// Debug: Set thread name shown in logs.
 void sched_set_name(badge_err_t *ec, sched_thread_t *thread, char const *name);
 
+// Debug: Get thread name shown in logs.
 char const *sched_get_name(sched_thread_t *thread);

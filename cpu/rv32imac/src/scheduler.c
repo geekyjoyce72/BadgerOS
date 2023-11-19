@@ -14,6 +14,7 @@
 void sched_raise_from_isr(bool syscall, void *entry_point) {
     sched_thread_t *thread = sched_get_current_thread_unsafe();
     assert_dev_drop(!(thread->flags & THREAD_KERNEL) && !(thread->flags & THREAD_PRIVILEGED));
+    thread->flags |= THREAD_PRIVILEGED;
 
     // Set kernel thread entrypoint.
     thread->kernel_isr_ctx.regs.pc = (uint32_t)entry_point;
@@ -40,6 +41,8 @@ void sched_raise_from_isr(bool syscall, void *entry_point) {
 void sched_lower_from_isr() {
     sched_thread_t *thread = sched_get_current_thread_unsafe();
     assert_dev_drop(!(thread->flags & THREAD_KERNEL) && (thread->flags & THREAD_PRIVILEGED));
+    thread->flags &= ~THREAD_PRIVILEGED;
+
     // Set context switch target to user thread.
     isr_ctx_switch_set(&thread->user_isr_ctx);
 }

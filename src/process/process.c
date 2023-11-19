@@ -174,6 +174,7 @@ sched_thread_t *proc_create_thread(
     // Add the thread to the list.
     array_insert(process->threads, sizeof(*process->threads), process->threads_len, &thread, process->threads_len);
     process->threads_len++;
+    logkf(LOG_DEBUG, "Creating user thread, PC: 0x%{size;x}", entry_point);
 
     return thread;
 }
