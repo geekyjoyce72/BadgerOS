@@ -90,6 +90,7 @@ add_executable(${target}
     ${CMAKE_CURRENT_LIST_DIR}/src/loading/kbelfx.c
     ${CMAKE_CURRENT_LIST_DIR}/src/loading/rom.c
     ${CMAKE_CURRENT_LIST_DIR}/src/process/process.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/process/syscall_impl.c
     ${CMAKE_CURRENT_LIST_DIR}/src/list.c
     ${CMAKE_CURRENT_LIST_DIR}/src/main.c
     ${CMAKE_CURRENT_LIST_DIR}/src/malloc/malloc.c

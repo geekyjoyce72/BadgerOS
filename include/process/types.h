@@ -16,6 +16,8 @@
 
 
 
+#define PROC_MTX_TIMEOUT 50000
+
 // A memory map entry.
 typedef struct {
     // Base address of the region.

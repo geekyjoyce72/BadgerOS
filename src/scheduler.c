@@ -315,8 +315,10 @@ void sched_request_switch_from_isr(void) {
     //     }
     // }
 
-    uint32_t            task_time_quota  = 0;
-    dlist_node_t *const next_thread_node = dlist_pop_front(&thread_wait_queue);
+    uint32_t      task_time_quota = 0;
+    dlist_node_t *next_thread_node;
+pop_thread:
+    next_thread_node = dlist_pop_front(&thread_wait_queue);
 
     if (next_thread_node != NULL) {
         sched_thread_t *const next_thread = field_parent_ptr(sched_thread_t, schedule_node, next_thread_node);
@@ -325,6 +327,11 @@ void sched_request_switch_from_isr(void) {
         if (next_thread->flags & THREAD_PRIVILEGED) {
             isr_ctx_switch_set(&next_thread->kernel_isr_ctx);
         } else {
+            if (proc_getflags(next_thread->process) & PROC_EXITING) {
+                // If a thread's process is exiting, suspend it and get the next one instead.
+                reset_flag(next_thread->flags, THREAD_RUNNING);
+                goto pop_thread;
+            }
             isr_ctx_switch_set(&next_thread->user_isr_ctx);
         }
 
@@ -533,6 +540,12 @@ void sched_resume_thread(badge_err_t *const ec, sched_thread_t *const thread) {
 
 void sched_resume_thread_next(badge_err_t *const ec, sched_thread_t *const thread) {
     sched_resume_thread_inner(ec, thread, INSERT_THREAD_FRONT);
+}
+
+bool sched_thread_is_running(badge_err_t *ec, sched_thread_t *thread) {
+    assert_dev_drop(thread != NULL);
+    badge_err_set_ok(ec);
+    return is_flag_set(thread->flags, THREAD_RUNNING);
 }
 
 process_t *sched_get_associated_process(sched_thread_t const *const thread) {

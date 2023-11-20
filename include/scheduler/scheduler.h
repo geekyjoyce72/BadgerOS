@@ -135,6 +135,9 @@ void sched_resume_thread(badge_err_t *ec, sched_thread_t *thread);
 // - `ECAUSE_ILLEGAL` is issued when the thread has finished.
 void sched_resume_thread_next(badge_err_t *ec, sched_thread_t *thread);
 
+// Returns whether a thread is running; it is neither suspended nor has it exited.
+bool sched_thread_is_running(badge_err_t *ec, sched_thread_t *thread);
+
 // Returns the currently active thread or NULL if the scheduler isn't running.
 sched_thread_t *sched_get_current_thread(void);
 

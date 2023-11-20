@@ -42,6 +42,7 @@ process_t *proc_create(badge_err_t *ec) {
             {
                 .regions_len = 0,
             },
+        .mtx = MUTEX_T_INIT_SHARED,
         .pid = pid,
     };
 
@@ -58,12 +59,9 @@ void proc_delete(badge_err_t *ec, pid_t pid) {
     if (!handle)
         return;
 
-    // TODO: Destroy all the threads.
-    // Unmap all memory from this process.
-    while (handle->memmap.regions_len) {
-        proc_unmap(ec, handle, handle->memmap.regions[0].base);
-        assert_dev_drop(badge_err_is_ok(ec));
-    }
+    // Stop the possibly running process and release all run-time resources.
+    proc_delete_runtime(handle);
+
     // Release kernel memory allocated to process.
     free(handle->argv);
     badge_err_set_ok(ec);
@@ -257,12 +255,74 @@ void proc_unmap(badge_err_t *ec, process_t *proc, size_t base) {
 
 // Suspend all threads for a process except the current.
 void proc_suspend(process_t *process, sched_thread_t *current) {
+    assert_always(mutex_acquire(NULL, &process->mtx, PROC_MTX_TIMEOUT));
+    for (size_t i = 0; i < process->threads_len; i++) {
+        if (process->threads[i] != current) {
+            sched_suspend_thread(NULL, process->threads[i]);
+        }
+    }
+    mutex_release(NULL, &process->mtx);
 }
+
 // Resume all threads for a process.
 void proc_resume(process_t *process) {
+    assert_always(mutex_acquire(NULL, &process->mtx, PROC_MTX_TIMEOUT));
+    for (size_t i = 0; i < process->threads_len; i++) {
+        sched_resume_thread(NULL, process->threads[i]);
+    }
+    mutex_release(NULL, &process->mtx);
 }
+
 
 // Release all process runtime resources (threads, memory, files, etc.).
 // Does not remove args, exit code, etc.
 void proc_delete_runtime(process_t *process) {
+    // This may not be run from one of the process' threads because it kills all of them.
+    for (size_t i = 0; i < process->threads_len; i++) {
+        assert_dev_drop(sched_get_current_thread() != process->threads[i]);
+    }
+
+    // Set the exiting flag so any return to user-mode kills the thread.
+    assert_always(mutex_acquire(NULL, &process->mtx, PROC_MTX_TIMEOUT));
+    if (process->flags & (PROC_EXITED | PROC_EXITING)) {
+        // Already exiting or exited, return now.
+        return;
+        mutex_release(NULL, &process->mtx);
+    } else {
+        // Flag the scheduler to start suspending threads.
+        process->flags |= PROC_EXITING;
+        atomic_thread_fence(memory_order_release);
+    }
+
+    // Wait for the scheduler to suspend all the threads.
+    proc_resume(process);
+    bool waiting = true;
+    while (waiting) {
+        waiting = false;
+        for (size_t i = 0; i < process->threads_len; i++) {
+            if (sched_thread_is_running(NULL, process->threads[i]))
+                waiting = true;
+        }
+        sched_yield();
+    }
+
+    // Destroy all threads.
+    // TODO: Release kernel stacks.
+    for (size_t i = 0; i < process->threads_len; i++) {
+        sched_destroy_thread(NULL, process->threads[i]);
+    }
+    process->threads_len = 0;
+    free(process->threads);
+
+    // Unmap all memory regions.
+    while (process->memmap.regions_len) {
+        proc_unmap(NULL, process, process->memmap.regions[0].base);
+    }
+
+    // TODO: Close pipes and files.
+
+    // Mark the process as exited.
+    process->flags |= PROC_EXITED;
+    process->flags &= ~PROC_EXITING & ~PROC_RUNNING;
+    mutex_release(NULL, &process->mtx);
 }

@@ -4,7 +4,10 @@
 #include "badge_strings.h"
 #include "isr_ctx.h"
 #include "log.h"
+#include "process/process.h"
+#include "process/types.h"
 #include "scheduler/cpu.h"
+#include "scheduler/isr.h"
 
 
 
@@ -39,12 +42,22 @@ void sched_raise_from_isr(bool syscall, void *entry_point) {
 // Requests the scheduler to prepare a switch from kernel to userland for a user thread.
 // Resumes the userland thread where it left off.
 void sched_lower_from_isr() {
-    sched_thread_t *thread = sched_get_current_thread_unsafe();
+    sched_thread_t *thread  = sched_get_current_thread_unsafe();
+    process_t      *process = thread->process;
     assert_dev_drop(!(thread->flags & THREAD_KERNEL) && (thread->flags & THREAD_PRIVILEGED));
     thread->flags &= ~THREAD_PRIVILEGED;
 
-    // Set context switch target to user thread.
-    isr_ctx_switch_set(&thread->user_isr_ctx);
+    assert_always(mutex_acquire_shared(NULL, &process->mtx, PROC_MTX_TIMEOUT));
+    if (process->flags & PROC_EXITING) {
+        // Request a context switch to a different thread.
+        reset_flag(thread->flags, THREAD_RUNNING);
+        sched_request_switch_from_isr();
+
+    } else {
+        // Set context switch target to user thread.
+        isr_ctx_switch_set(&thread->user_isr_ctx);
+    }
+    mutex_release_shared(NULL, &process->mtx);
 }
 
 // Return to exit the thread.
