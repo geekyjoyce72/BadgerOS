@@ -6,6 +6,7 @@
 #include "cpu/process/types.h"
 #include "filesystem.h"
 #include "kbelf.h"
+#include "mutex.h"
 #include "port/hardware_allocation.h"
 #include "port/process/types.h"
 
@@ -54,4 +55,10 @@ typedef struct process_t {
     pid_t            pid;
     // Memory map information.
     proc_memmap_t    memmap;
+    // Resource mutex used for multithreading processes.
+    mutex_t          mtx;
+    // Process status flags.
+    uint32_t         flags;
+    // Exit code if applicable.
+    int              exit_code;
 } process_t;

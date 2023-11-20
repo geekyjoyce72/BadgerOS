@@ -10,6 +10,7 @@
 #include "log.h"
 #include "malloc.h"
 #include "port/process/process.h"
+#include "process/internal.h"
 #include "process/types.h"
 
 #include <stdatomic.h>
@@ -76,6 +77,11 @@ process_t *proc_get(badge_err_t *ec, pid_t pid) {
     return &dummy_proc;
 }
 
+// Get the process' flags.
+uint32_t proc_getflags(process_t *process) {
+    return process->flags;
+}
+
 
 // Set arguments for a process.
 // If omitted, argc will be 0 and argv will be NULL.
@@ -135,6 +141,7 @@ void proc_start(badge_err_t *ec, process_t *process, char const *executable) {
         return;
     }
     logk(LOG_DEBUG, "Starting main thread");
+    process->flags = PROC_RUNNING;
     sched_resume_thread(ec, thread);
 }
 
@@ -244,4 +251,18 @@ void proc_unmap(badge_err_t *ec, process_t *proc, size_t base) {
         }
     }
     badge_err_set(ec, ELOC_PROCESS, ECAUSE_NOTFOUND);
+}
+
+
+
+// Suspend all threads for a process except the current.
+void proc_suspend(process_t *process, sched_thread_t *current) {
+}
+// Resume all threads for a process.
+void proc_resume(process_t *process) {
+}
+
+// Release all process runtime resources (threads, memory, files, etc.).
+// Does not remove args, exit code, etc.
+void proc_delete_runtime(process_t *process) {
 }
