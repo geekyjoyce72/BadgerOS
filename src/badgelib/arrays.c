@@ -14,10 +14,46 @@ static inline void *array_index(void *array, size_t ent_size, size_t index) {
     return (void *)((size_t)array + ent_size * index);
 }
 
+// Get the address of an entry.
+static inline void const *array_index_const(void const *array, size_t ent_size, size_t index) {
+    return (void *)((size_t)array + ent_size * index);
+}
+
 // Swap two elements.
 static inline void array_swap(void *array, size_t ent_size, size_t a, size_t b) {
     mem_swap(array_index(array, ent_size, a), array_index(array, ent_size, b), ent_size);
 }
+
+
+
+// Binary search for a value in a sorted (ascending order) array.
+array_binsearch_t array_binsearch(
+    void const *array, size_t ent_size, size_t ent_count, void const *value, array_sort_comp_t comparator
+) {
+    size_t ent_start = 0;
+    while (ent_count > 0) {
+        size_t midpoint = ent_count >> 1;
+        int    res      = comparator(array_index_const(array, ent_size, midpoint), value);
+        if (res > 0) {
+            // The value is to the left of the midpoint.
+            ent_count = midpoint;
+
+        } else if (res < 0) {
+            // The value is to the right of the midpoint.
+            ent_start += midpoint + 1;
+            ent_count -= midpoint + 1;
+            array      = array_index_const(array, ent_size, midpoint + 1);
+
+        } else /* res == 0 */ {
+            // The value was found.
+            return (array_binsearch_t){ent_start + midpoint, true};
+        }
+    }
+    // The value was not found.
+    return (array_binsearch_t){ent_start, false};
+}
+
+
 
 // A recursive array sorting implementation.
 void array_sort_impl(void *array, void *tmp, size_t ent_size, size_t ent_count, array_sort_comp_t comparator) {
