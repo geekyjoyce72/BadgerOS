@@ -5,6 +5,7 @@
 
 #include "attributes.h"
 #include "badge_err.h"
+#include "isr_ctx.h"
 #include "list.h"
 #include "scheduler.h"
 

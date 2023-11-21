@@ -50,7 +50,7 @@ void sched_lower_from_isr() {
     assert_always(mutex_acquire_shared(NULL, &process->mtx, PROC_MTX_TIMEOUT));
     if (process->flags & PROC_EXITING) {
         // Request a context switch to a different thread.
-        reset_flag(thread->flags, THREAD_RUNNING);
+        thread->flags &= ~THREAD_RUNNING;
         sched_request_switch_from_isr();
 
     } else {
