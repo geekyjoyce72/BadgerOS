@@ -99,8 +99,7 @@ target_link_libraries(${target} PUBLIC kbelf)
 add_custom_command(
     OUTPUT badger-os.bin
     COMMAND cp badger-os.elf badger-os.elf.patch
-    COMMAND "${BADGER_OPJCOPY}" --remove-section .eh_frame --remove-section .eh_frame_hdr badger-os.elf.patch
-    COMMAND "${BADGER_OBJCOPY}" -O binary badger-os.elf.patch badger-os.nochecksum.bin
+    COMMAND "${BADGER_OBJCOPY}" -O binary badger-os.elf badger-os.nochecksum.bin
     COMMAND python3 "${CMAKE_CURRENT_LIST_DIR}/tools/pack-image.py" badger-os.nochecksum.bin badger-os.bin
     DEPENDS badger-os.elf
 )
