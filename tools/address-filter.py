@@ -54,7 +54,7 @@ def addr2line(x):
                         ["riscv64-linux-gnu-addr2line", "-e", file_name, addr_string]
                     )
                 except:
-                    pass
+                    result = None
 
     if result != None:
         return f"{addr_string} ({result})"
