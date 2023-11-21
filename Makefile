@@ -44,6 +44,7 @@ gdb:
 	riscv32-unknown-elf-gdb -x port/esp32c6/gdbinit build/badger-os.elf
 
 clean:
+	@make -C testapp clean
 	rm -rf "$(BUILDDIR)"
 
 flash: build
