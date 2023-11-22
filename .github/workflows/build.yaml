@@ -26,8 +26,8 @@ jobs:
 
       - name: Fetch & install RISC-V GNU Compiler Toolchain
         run: |
-          curl -Lo riscv32-elf-ubuntu-22.04-nightly.tar.gz 'https://github.com/riscv-collab/riscv-gnu-toolchain/releases/download/2023.06.09/riscv32-elf-ubuntu-22.04-nightly-2023.06.09-nightly.tar.gz'
-          tar -xf riscv32-elf-ubuntu-22.04-nightly.tar.gz
+          curl -Lo riscv32-glibc-ubuntu-22.04-nightly.tar.gz 'https://github.com/riscv-collab/riscv-gnu-toolchain/releases/download/2023.06.09/riscv32-glibc-ubuntu-22.04-nightly-2023.06.09-nightly.tar.gz'
+          tar -xf riscv32-glibc-ubuntu-22.04-nightly.tar.gz
           echo "${PWD}/riscv/bin" >> $GITHUB_PATH
 
       - name: Configure CMake
@@ -38,7 +38,7 @@ jobs:
 
       - name: Build Statistics
         run: |
-          riscv32-unknown-elf-size -B build/badger-os.elf
+          riscv32-unknown-glibc-size -B build/badger-os.elf
 
       - name: Create firmware image
         run: cmake --install build --prefix output
