@@ -39,7 +39,6 @@ void kernel_assertion_failure(char const *assertion_msg) COLD NORETURN;
         if (__builtin_expect(condition, 0) == 0) {                                                                     \
             __builtin_unreachable();                                                                                   \
         }                                                                                                              \
-        \                                                                                                              \
     } while (false)
 
 // Assertion that will only assert in debug builds, will be removed in release
