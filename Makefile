@@ -25,13 +25,13 @@ test:
 	cc -g -I include -o "./$(BUILDDIR)/list-test" test/list.c src/list.c
 	./build/list-test
 
-clang-format-check:
+clang-format-check: build
 	echo "clang-format check the following files:"
 	jq -r '.[].file' build/compile_commands.json | grep '\.[ch]$$'
 	echo "analysis results:"
 	clang-format --dry-run $(shell jq -r '.[].file' build/compile_commands.json | grep '\.[ch]$$')
 
-clang-tidy-check:
+clang-tidy-check: build
 	echo "clang-tidy check the following files:"
 	jq -r '.[].file' build/compile_commands.json | grep '\.[ch]$$'
 	echo "analysis results:"
