@@ -38,7 +38,7 @@ jobs:
 
       - name: Build Statistics
         run: |
-          riscv32-unknown-glibc-size -B build/badger-os.elf
+          riscv32-unknown-linux-gnu-size -B build/badger-os.elf
 
       - name: Create firmware image
         run: cmake --install build --prefix output
