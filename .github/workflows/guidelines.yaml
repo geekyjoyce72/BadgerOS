@@ -16,9 +16,15 @@ jobs:
       - name: Fetch submodules
         run: git submodule update --init --recursive
 
-      - name: Install clang-tidy
+      - name: Install clang-format
         run: |
           sudo apt-get update -y
+
+          # see https://apt.llvm.org/
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 18
+          
           sudo apt-get install -y clang-format-18
 
       - name: Fetch & install RISC-V GNU Compiler Toolchain
