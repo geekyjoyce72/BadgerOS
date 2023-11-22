@@ -62,10 +62,11 @@ void *__real_reallocarray(void *ptr, size_t nmemb, size_t size);
 #define NUM_SIZE_CLASSES 6
 #define MBLK_SIZE        ALIGN(sizeof(free_blk_header_t))
 
-typedef struct free_blk_header {
-    size_t                  size;
-    struct free_blk_header *next;
-    struct free_blk_header *prior;
+typedef struct free_blk_header_t free_blk_header_t;
+typedef struct free_blk_header_t {
+    size_t             size;
+    free_blk_header_t *next;
+    free_blk_header_t *prior;
 } free_blk_header_t;
 
 static char              *mem_start;

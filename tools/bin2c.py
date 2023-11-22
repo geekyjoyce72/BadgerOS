@@ -13,6 +13,7 @@ name  = sys.argv[3]
 data = infd.read()
 
 outfd.write("// WARNING: This is a generated file, do not edit it!\n")
+outfd.write("// clang-format off\n")
 outfd.write("#include <stdint.h>\n")
 outfd.write("#include <stddef.h>\n")
 outfd.write("uint8_t const {}[] = {{\n".format(name))

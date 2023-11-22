@@ -1,6 +1,5 @@
 
 // SPDX-License-Identifier: MIT
-// Note: This file implements placeholder ISRs and will be removed eventually.
 
 #include "cpu/isr.h"
 

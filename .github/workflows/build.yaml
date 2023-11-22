@@ -33,15 +33,12 @@ jobs:
           tar -xf riscv32-glibc-ubuntu-22.04-nightly.tar.gz
           echo "${PWD}/riscv/bin" >> $GITHUB_PATH
 
-      - name: Configure CMake
-        run: cmake -B "${{github.workspace}}/build" -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
-
       - name: Build
-        run: cmake --build ${{github.workspace}}/build --config ${{ matrix.build_type }}
+        run: CMAKE_BUILD_TYPE=${{matrix.build_type}} make clean build
 
       - name: Build Statistics
         run: |
-          riscv32-unknown-glibc-size -B build/badger-os.elf
+          riscv32-unknown-linux-gnu-size -B build/badger-os.elf
 
       - name: Create firmware image
         run: cmake --install build --prefix output

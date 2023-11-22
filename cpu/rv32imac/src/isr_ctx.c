@@ -1,5 +1,8 @@
 
+// SPDX-License-Identifier: MIT
+
 #include "cpu/isr_ctx.h"
+
 #include "rawprint.h"
 
 // Number of columns in register dump.
