@@ -145,7 +145,7 @@ static ptrdiff_t walk(badge_err_t *ec, vfs_file_handle_t *dir, char path[FILESYS
     // One pas last character of the next filename.
     ptrdiff_t end   = 0;
     // Current length of the path string.
-    ptrdiff_t len   = cstr_length(path);
+    ptrdiff_t len   = (ptrdiff_t)cstr_length(path);
     // Whether the file was found.
     bool      found = false;
 
@@ -412,7 +412,7 @@ void fs_mount(badge_err_t *ec, fs_type_t type, blkdev_t *media, char const *moun
 
     if (cstr_equals(mountpoint, "/")) {
         // Set root mountpoint index.
-        vfs_root_index = vfs_index;
+        vfs_root_index = (ptrdiff_t)vfs_index;
     }
 
     // At this point, the filesystem is ready for use.
@@ -553,7 +553,7 @@ void fs_dir_close(badge_err_t *ec, file_t dir) {
 bool fs_dir_read(badge_err_t *ec, dirent_t *dirent_out, file_t dir) {
     if (!is_dir_handle(ec, dir))
         return false;
-    badge_err_t ec0;
+    badge_err_t ec0 = {.cause = ECAUSE_OK};
     if (!ec)
         ec = &ec0;
 
@@ -600,7 +600,7 @@ bool fs_dir_read(badge_err_t *ec, dirent_t *dirent_out, file_t dir) {
 
 // Open a file for reading and/or writing.
 file_t fs_open(badge_err_t *ec, char const *path, oflags_t oflags) {
-    badge_err_t ec0;
+    badge_err_t ec0 = {.cause = ECAUSE_OK};
     if (!ec)
         ec = &ec0;
 
@@ -631,7 +631,7 @@ file_t fs_open(badge_err_t *ec, char const *path, oflags_t oflags) {
     if (!badge_err_is_ok(ec)) {
         return FILE_NONE;
     }
-    dirent_t  ent;
+    dirent_t  ent   = {0};
     ptrdiff_t slash = walk(ec, parent, canon_path, &ent);
     bool      found = ent.inode;
     if (!badge_err_is_ok(ec)) {

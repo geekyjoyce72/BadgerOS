@@ -383,11 +383,11 @@ static inline size_t convert_dirent(vfs_t *vfs, dirent_t *out, vfs_ramfs_dirent_
     vfs_ramfs_inode_t *iptr = &vfs->ramfs.inode_list[in->inode];
 
     out->record_len  = offsetof(dirent_t, name) + in->name_len + 1;
-    out->record_len += (size_t)(~out->record_len + 1) % sizeof(size_t);
+    out->record_len += (fileoff_t)((size_t)(~out->record_len + 1) % sizeof(size_t));
     out->inode       = in->inode;
     out->is_dir      = (iptr->mode & VFS_RAMFS_MODE_MASK) == FILETYPE_DIR << VFS_RAMFS_MODE_BIT;
     out->is_symlink  = (iptr->mode & VFS_RAMFS_MODE_MASK) == FILETYPE_LINK << VFS_RAMFS_MODE_BIT;
-    out->name_len    = in->name_len;
+    out->name_len    = (fileoff_t)in->name_len;
     mem_copy(out->name, in->name, in->name_len + 1);
 
     return out->record_len;
@@ -409,14 +409,14 @@ void vfs_ramfs_dir_read(badge_err_t *ec, vfs_t *vfs, vfs_file_handle_t *dir) {
     }
 
     // Allocate memory.
-    void *mem = realloc(dir->dir_cache, cap);
+    void *mem = realloc(dir->dir_cache, cap); // NOLINT
     if (!mem) {
         mutex_release_shared(NULL, &vfs->ramfs.mtx);
         badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_NOMEM);
         return;
     }
     dir->dir_cache      = mem;
-    dir->dir_cache_size = cap;
+    dir->dir_cache_size = (fileoff_t)cap;
 
     // Generate entries.
     size_t out_off = 0;
@@ -493,7 +493,7 @@ void vfs_ramfs_file_open(
     file->inode      = iptr->inode;
     file->vfs        = vfs;
     file->refcount   = 1;
-    file->size       = iptr->len;
+    file->size       = (fileoff_t)iptr->len;
 
     mutex_release(NULL, &vfs->ramfs.mtx);
     badge_err_set_ok(ec);

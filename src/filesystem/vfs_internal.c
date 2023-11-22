@@ -87,7 +87,7 @@ static file_t next_fileno() {
 static ptrdiff_t vfs_file_by_ptr(vfs_file_shared_t *ptr) {
     for (size_t i = 0; i < vfs_file_shared_list_len; i++) {
         if (vfs_file_shared_list[i] == ptr) {
-            return i;
+            return (ptrdiff_t)i;
         }
     }
     return -1;
@@ -106,7 +106,7 @@ static void vfs_file_shared_splice(ptrdiff_t i) {
         size_t new_cap = vfs_file_shared_list_cap / 2;
         if (new_cap < 2)
             new_cap = 2;
-        void *mem = realloc(vfs_file_shared_list, sizeof(*vfs_file_shared_list) * new_cap);
+        void *mem = realloc(vfs_file_shared_list, sizeof(vfs_file_shared_t *) * new_cap);
         if (!mem)
             return;
         vfs_file_shared_list     = mem;
@@ -139,7 +139,7 @@ static void vfs_file_handle_splice(ptrdiff_t i) {
 ptrdiff_t vfs_shared_by_inode(vfs_t *vfs, inode_t inode) {
     for (size_t i = 0; i < vfs_file_shared_list_len; i++) {
         if (vfs_file_shared_list[i]->vfs == vfs && vfs_file_shared_list[i]->inode == inode) {
-            return i;
+            return (ptrdiff_t)i;
         }
     }
     return -1;
@@ -149,7 +149,7 @@ ptrdiff_t vfs_shared_by_inode(vfs_t *vfs, inode_t inode) {
 ptrdiff_t vfs_file_by_handle(file_t fileno) {
     for (size_t i = 0; i < vfs_file_handle_list_len; i++) {
         if (vfs_file_handle_list[i].fileno == fileno) {
-            return i;
+            return (ptrdiff_t)i;
         }
     }
     return -1;
@@ -162,7 +162,7 @@ ptrdiff_t vfs_file_create_shared() {
         size_t new_cap = vfs_file_shared_list_cap * 2;
         if (new_cap < 2)
             new_cap = 2;
-        void *mem = realloc(vfs_file_shared_list, sizeof(*vfs_file_shared_list) * new_cap);
+        void *mem = realloc(vfs_file_shared_list, sizeof(vfs_file_shared_t *) * new_cap);
         if (!mem)
             return -1;
         vfs_file_shared_list     = mem;
@@ -170,7 +170,7 @@ ptrdiff_t vfs_file_create_shared() {
     }
 
     // Allocate new shared handle.
-    ptrdiff_t          shared = vfs_file_shared_list_len;
+    ptrdiff_t          shared = (ptrdiff_t)vfs_file_shared_list_len;
     vfs_file_shared_t *shptr  = malloc(sizeof(vfs_file_shared_t));
     if (!shptr)
         return -1;
@@ -212,7 +212,7 @@ ptrdiff_t vfs_file_create_handle(ptrdiff_t shared) {
     }
 
     // Allocate new handle.
-    ptrdiff_t handle = vfs_file_handle_list_len;
+    ptrdiff_t handle = (ptrdiff_t)vfs_file_handle_list_len;
     vfs_file_handle_list_len++;
     vfs_file_handle_list[handle] = (vfs_file_handle_t){
         .offset = 0,
