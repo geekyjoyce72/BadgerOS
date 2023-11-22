@@ -87,7 +87,7 @@ void debug_func(void *arg) {
     // Put the ROM in the RAMFS.
     file_t fd = fs_open(&ec, "/a.out", OFLAGS_CREATE | OFLAGS_WRITEONLY);
     check_ec(&ec);
-    fs_write(&ec, fd, elf_rom, elf_rom_len);
+    fs_write(&ec, fd, elf_rom, (long)elf_rom_len);
     check_ec(&ec);
     fs_close(&ec, fd);
     check_ec(&ec);

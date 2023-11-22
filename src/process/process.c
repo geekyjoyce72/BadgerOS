@@ -84,9 +84,12 @@ uint32_t proc_getflags(process_t *process) {
 // Set arguments for a process.
 // If omitted, argc will be 0 and argv will be NULL.
 void proc_setargs(badge_err_t *ec, process_t *process, int argc, char const *const *argv) {
+    if (argc <= 0)
+        return;
+
     // Measure required memory for argv.
-    int required = sizeof(size_t) * argc;
-    for (int i = 0; i < argc; i++) {
+    size_t required = sizeof(size_t) * (size_t)argc;
+    for (size_t i = 0; i < (size_t)argc; i++) {
         required += cstr_length(argv[i]) + 1;
     }
 
@@ -98,8 +101,8 @@ void proc_setargs(badge_err_t *ec, process_t *process, int argc, char const *con
     }
 
     // Copy datas into the argv.
-    int off = sizeof(size_t) * argc;
-    for (int i = 0; i < argc; i++) {
+    size_t off = sizeof(size_t) * (size_t)argc;
+    for (size_t i = 0; i < (size_t)argc; i++) {
         // Argument pointer.
         *(char **)(mem + sizeof(size_t) * i) = (mem + off);
 
@@ -154,7 +157,7 @@ sched_thread_t *proc_create_thread(
 ) {
     // TODO: Locking for process threads.
     // Create an entry for a new thread.
-    void *mem = realloc(process->threads, sizeof(*process->threads) * (process->threads_len + 1));
+    void *mem = realloc(process->threads, sizeof(sched_thread_t *) * (process->threads_len + 1));
     if (!mem) {
         badge_err_set(ec, ELOC_PROCESS, ECAUSE_NOMEM);
         return NULL;

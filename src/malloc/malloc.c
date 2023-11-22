@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 #ifndef BADGEOS_KERNEL
+// NOLINTNEXTLINE
 #define _GNU_SOURCE
 #endif
 
@@ -12,6 +13,7 @@
 #include <stdint.h>
 
 #ifdef BADGEROS_KERNEL
+// NOLINTBEGIN
 extern char __start_free_sram[];
 extern char __stop_free_sram[];
 
@@ -22,6 +24,7 @@ extern char __stop_free_sram[];
 #define __wrap_reallocarray   reallocarray
 #define __wrap_aligned_alloc  aligned_alloc
 #define __wrap_posix_memalign posix_memalign
+// NOLINTEND
 
 #else
 #include <stdio.h>
@@ -29,14 +32,17 @@ extern char __stop_free_sram[];
 
 #include <unistd.h>
 
+// NOLINTBEGIN
 void *__real_malloc(size_t size);
 void  __real_free(void *ptr);
 void *__real_calloc(size_t nmemb, size_t size);
 void *__real_realloc(void *ptr, size_t size);
 void *__real_reallocarray(void *ptr, size_t nmemb, size_t size);
+// NOLINTEND
 #endif
 
 #ifdef PRELOAD
+// NOLINTBEGIN
 #define __wrap_malloc         malloc
 #define __wrap_free           free
 #define __wrap_calloc         calloc
@@ -44,13 +50,14 @@ void *__real_reallocarray(void *ptr, size_t nmemb, size_t size);
 #define __wrap_reallocarray   reallocarray
 #define __wrap_aligned_alloc  aligned_alloc
 #define __wrap_posix_memalign posix_memalign
+// NOLINTEND
 #endif
 
 #define ALIGNMENT   8
 #define ALIGN(size) (((size) + (ALIGNMENT - 1)) & ~(ALIGNMENT - 1))
 
-#define ALIGN_UP(x, y)   (void *)(((size_t)(x) + (y - 1)) & ~(y - 1))
-#define ALIGN_DOWN(x, y) (void *)((size_t)(x) & ~(y - 1))
+#define ALIGN_UP(x, y)   (void *)(((size_t)(x) + ((y)-1)) & ~((y)-1))
+#define ALIGN_DOWN(x, y) (void *)((size_t)(x) & ~((y)-1))
 
 #define NUM_SIZE_CLASSES 6
 #define MBLK_SIZE        ALIGN(sizeof(free_blk_header_t))
@@ -196,6 +203,7 @@ static void try_split(free_blk_header_t *fp, size_t needed) {
     }
 }
 
+// NOLINTNEXTLINE
 void *_malloc(size_t size) {
     if (!size)
         size = 1;
@@ -230,6 +238,7 @@ void *_malloc(size_t size) {
     return ptr;
 }
 
+// NOLINTNEXTLINE
 void *__wrap_malloc(size_t size) {
 #ifdef PRELOAD
     if (!free_lists)
@@ -242,6 +251,7 @@ void *__wrap_malloc(size_t size) {
     return ptr;
 }
 
+// NOLINTNEXTLINE
 void *__wrap_aligned_alloc(size_t alignment, size_t size) {
     (void)alignment;
 #ifdef PRELOAD
@@ -255,6 +265,7 @@ void *__wrap_aligned_alloc(size_t alignment, size_t size) {
     return ptr;
 }
 
+// NOLINTNEXTLINE
 int __wrap_posix_memalign(void **memptr, size_t alignment, size_t size) {
     (void)alignment;
 #ifdef PRELOAD
@@ -269,6 +280,7 @@ int __wrap_posix_memalign(void **memptr, size_t alignment, size_t size) {
     return 0;
 }
 
+// NOLINTNEXTLINE
 void *__wrap_calloc(size_t nmemb, size_t size) {
 #ifdef PRELOAD
     if (!free_lists)
@@ -278,11 +290,12 @@ void *__wrap_calloc(size_t nmemb, size_t size) {
     SPIN_LOCK_LOCK(lock);
     void *ptr = _malloc(nmemb * size);
     if (ptr)
-        __builtin_memset(ptr, 0, nmemb * size);
+        __builtin_memset(ptr, 0, nmemb * size); // NOLINT
     SPIN_LOCK_UNLOCK(lock);
     return ptr;
 }
 
+// NOLINTNEXTLINE
 static void _free(void *ptr) {
     if (!ptr) {
         return;
@@ -311,6 +324,7 @@ static void _free(void *ptr) {
     }
 }
 
+// NOLINTNEXTLINE
 void __wrap_free(void *ptr) {
 #ifdef PRELOAD
     if (!free_lists)
@@ -322,6 +336,7 @@ void __wrap_free(void *ptr) {
     SPIN_LOCK_UNLOCK(lock);
 }
 
+// NOLINTNEXTLINE
 void *__wrap_realloc(void *ptr, size_t size) {
 #ifdef PRELOAD
     if (!free_lists)
@@ -362,7 +377,7 @@ void *__wrap_realloc(void *ptr, size_t size) {
     );
 
     size_t copy_size = old_size < size ? old_size : size;
-    __builtin_memcpy(new_ptr, ptr, copy_size);
+    __builtin_memcpy(new_ptr, ptr, copy_size); // NOLINT
 
 #if BADGEROS_MALLOC_DEBUG_LEVEL >= BADGEROS_MALLOC_DEBUG_DEBUG
     for (size_t i = 0; i < copy_size; ++i) {
@@ -386,6 +401,7 @@ void *__wrap_realloc(void *ptr, size_t size) {
     return new_ptr;
 }
 
+// NOLINTNEXTLINE
 void *__wrap_reallocarray(void *ptr, size_t nmemb, size_t size) {
     return __wrap_realloc(ptr, nmemb * size);
 }

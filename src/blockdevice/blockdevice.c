@@ -54,7 +54,7 @@ static inline ptrdiff_t blkdev_alloc_cache(blkdev_t *dev, blksize_t block) {
     timestamp_us_t oldest_read_time  = time_us() - BLKDEV_READ_CACHE_TIMEOUT;
     ptrdiff_t      oldest_read_index = -1;
 
-    for (size_t i = 0; i < dev->cache->cache_depth; i++) {
+    for (ptrdiff_t i = 0; i < (ptrdiff_t)dev->cache->cache_depth; i++) {
         if (!flags[i].present || flags[i].index == block) {
             // Vacant cache entry found.
             return i;
@@ -82,7 +82,7 @@ static inline ptrdiff_t blkdev_find_cache(blkdev_t *dev, blksize_t block) {
 
     blkdev_flags_t *flags = dev->cache->block_flags;
 
-    for (size_t i = 0; i < dev->cache->cache_depth; i++) {
+    for (ptrdiff_t i = 0; i < (ptrdiff_t)dev->cache->cache_depth; i++) {
         if (flags[i].present && flags[i].index == block) {
             return i;
         }
@@ -592,7 +592,7 @@ void blkdev_delete_cache(badge_err_t *ec, blkdev_t *dev) {
         return;
     }
     if (dev->cache) {
-        badge_err_t ec0;
+        badge_err_t ec0 = {.cause = ECAUSE_OK};
         if (!ec)
             ec = &ec0;
         blkdev_flush(ec, dev);

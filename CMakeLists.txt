@@ -19,7 +19,7 @@ string(REGEX MATCH "^([A-Za-z0-9_]+\-)*" BADGER_COMPILER_PREFIX "${compiler_name
 find_program(BADGER_OBJCOPY NAMES "${BADGER_COMPILER_PREFIX}objcopy" REQUIRED)  
 find_program(BADGER_OBJDUMP NAMES "${BADGER_COMPILER_PREFIX}objdump" REQUIRED)
 
-set(target_arch rv32imac_zifencei_zicsr)
+set(target_arch rv32imac_zicsr_zifencei)
 if(DEFINED TARGET_ARCH)
 	set(target_arch "${TARGET_ARCH}")
 endif()
@@ -35,7 +35,6 @@ set(common_compiler_flags
     -march=${target_arch}              # Selects the target CPU.
     -mabi=${target_abi}                # Selects target ABI 
     -nodefaultlibs                     # Do not link any default libraries like libgcc or libc.
-    -fno-tree-loop-distribute-patterns
     -O1                                # Optimize the code.
     -ggdb                              # Generate debug information in default extended format.
     -fsanitize=undefined               # Adds sanitizer for undefined behaviour.
@@ -43,7 +42,6 @@ set(common_compiler_flags
     -Werror=return-type                # Error when a function doesn't return a value, but declares to do so.
     -Wall -Wextra                      # Ramp up warning level.
     -std=gnu11                         # We use the C11 standard
-    -fno-tree-loop-distribute-patterns # do not generate hidden calls to memset/memcpy
     -DBADGEROS_KERNEL                  # Tell the code we're building for the kernel
     -DBADGEROS_MALLOC_DEBUG_LEVEL=4    # Turn on all malloc() debug stuff for now. 
 )

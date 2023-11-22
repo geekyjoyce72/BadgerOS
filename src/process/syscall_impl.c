@@ -18,5 +18,8 @@ void syscall_self_exit(int code) {
     process->flags |= PROC_EXITING;
     mutex_release(NULL, &process->mtx);
 
+    // Set the exit code.
+    process->exit_code = code;
+
     // TODO: Add deleting runtime to the housekeeping list.
 }
