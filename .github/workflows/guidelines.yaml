@@ -19,7 +19,7 @@ jobs:
       - name: Run clang-format style check
         uses: jidicula/clang-format-action@v4.11.0
         with:
-          clang-format-version: '16'
+          clang-format-version: '17'
           check-path: '.'
 
   static-analysis:
@@ -41,9 +41,9 @@ jobs:
           # see https://apt.llvm.org/
           wget https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
-          sudo ./llvm.sh 16
+          sudo ./llvm.sh 17
 
-          sudo apt-get install -y clang-tidy-16
+          sudo apt-get install -y clang-tidy-17
 
       - name: Fetch & install RISC-V GNU Compiler Toolchain
         run: |
