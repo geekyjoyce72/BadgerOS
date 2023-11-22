@@ -14,7 +14,7 @@
 bool proc_riscv_pmp_gen(proc_memmap_t *memmap) {
     // TODO.
     (void)memmap;
-    logkf(LOG_DEBUG, "Memory map: %{size;d} regions:");
+    logkf(LOG_DEBUG, "Memory map: %{size;d} regions:", memmap->regions_len);
     for (size_t i = 0; i < memmap->regions_len; i++) {
         logkf(
             LOG_DEBUG,
