@@ -16,17 +16,30 @@ jobs:
       - name: Fetch submodules
         run: git submodule update --init --recursive
 
-      - name: Run clang-format style check
-        uses: jidicula/clang-format-action@v4.11.0
-        with:
-          clang-format-version: '18'
-          check-path: '.'
+      - name: Install clang-tidy
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y clang-format-18
+
+      - name: Fetch & install RISC-V GNU Compiler Toolchain
+        run: |
+          curl -Lo riscv32-glibc-ubuntu-22.04-nightly.tar.gz 'https://github.com/riscv-collab/riscv-gnu-toolchain/releases/download/2023.06.09/riscv32-glibc-ubuntu-22.04-nightly-2023.06.09-nightly.tar.gz'
+          tar -xf riscv32-glibc-ubuntu-22.04-nightly.tar.gz
+          echo "${PWD}/riscv/bin" >> $GITHUB_PATH
+
+      - name: Build
+        run: CMAKE_BUILD_TYPE=Debug make clean build
+
+      - name: Run clang-format
+        run: |
+          echo "scan the following files:"
+          jq -r '.[].file' build/compile_commands.json | grep '\.[ch]$'
+          echo "analysis results:"
+          clang-format-18 --dry-run $(jq -r '.[].file' build/compile_commands.json | grep '\.[ch]$')
+
 
   static-analysis:
     runs-on: ubuntu-22.04
-
-    # might be enabled in the future:
-    # https://github.com/marketplace/actions/clang-tidy-review
 
     steps:
       - uses: actions/checkout@v3
