@@ -59,4 +59,4 @@ jobs:
           echo "scan the following files:"
           jq -r '.[].file' build/compile_commands.json | grep '\.[ch]$'
           echo "analysis results:"
-          clang-tidy-16 -p build $(jq -r '.[].file' build/compile_commands.json | grep '\.[ch]$') --warnings-as-errors="*"
+          clang-tidy-17 -p build $(jq -r '.[].file' build/compile_commands.json | grep '\.[ch]$') --warnings-as-errors="*"
