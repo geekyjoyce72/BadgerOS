@@ -89,8 +89,9 @@ static inline void array_sorted_insert(
 
 
 // Resize a length-based dynamically allocated array.
-static inline bool array_len_resize(void **array_ptr, size_t ent_size, size_t *ent_count_ptr, size_t new_ent_count) {
-    void *mem = realloc(*array_ptr, ent_size * new_ent_count);
+static inline bool array_len_resize(void *_array_ptr, size_t ent_size, size_t *ent_count_ptr, size_t new_ent_count) {
+    void **array_ptr = _array_ptr;
+    void  *mem       = realloc(*array_ptr, ent_size * new_ent_count);
     if (!mem)
         return false;
     *array_ptr     = mem;
@@ -100,8 +101,9 @@ static inline bool array_len_resize(void **array_ptr, size_t ent_size, size_t *e
 
 // Insert a multiple elements into a dynamically allocated array.
 static inline bool array_len_insert_n(
-    void **array_ptr, size_t ent_size, size_t *ent_count_ptr, void const *insert, size_t index, size_t insert_count
+    void *_array_ptr, size_t ent_size, size_t *ent_count_ptr, void const *insert, size_t index, size_t insert_count
 ) {
+    void **array_ptr = _array_ptr;
     if (array_len_resize(array_ptr, ent_size, ent_count_ptr, *ent_count_ptr + insert_count)) {
         array_insert_n(*array_ptr, ent_size, *ent_count_ptr, insert, index, insert_count);
         return true;
@@ -111,15 +113,17 @@ static inline bool array_len_insert_n(
 
 // Remove an element from a dynamically allocated array.
 static inline void array_len_remove_n(
-    void **array_ptr, size_t ent_size, size_t *ent_count_ptr, void *removed, size_t index, size_t remove_count
+    void *_array_ptr, size_t ent_size, size_t *ent_count_ptr, void *removed, size_t index, size_t remove_count
 ) {
+    void **array_ptr = _array_ptr;
     array_remove_n(*array_ptr, ent_size, *ent_count_ptr, removed, index, remove_count);
     array_len_resize(array_ptr, ent_size, ent_count_ptr, *ent_count_ptr - remove_count);
 }
 
 // Insert an element into a dynamically allocated array.
 static inline bool
-    array_len_insert(void **array_ptr, size_t ent_size, size_t *ent_count_ptr, void const *insert, size_t index) {
+    array_len_insert(void *_array_ptr, size_t ent_size, size_t *ent_count_ptr, void const *insert, size_t index) {
+    void **array_ptr = _array_ptr;
     if (array_len_resize(array_ptr, ent_size, ent_count_ptr, *ent_count_ptr + 1)) {
         array_insert(*array_ptr, ent_size, *ent_count_ptr, insert, index);
         return true;
@@ -129,16 +133,18 @@ static inline bool
 
 // Remove an element from a dynamically allocated array.
 static inline void
-    array_len_remove(void **array_ptr, size_t ent_size, size_t *ent_count_ptr, void *removed, size_t index) {
+    array_len_remove(void *_array_ptr, size_t ent_size, size_t *ent_count_ptr, void *removed, size_t index) {
+    void **array_ptr = _array_ptr;
     array_remove(*array_ptr, ent_size, *ent_count_ptr, removed, index);
     array_len_resize(array_ptr, ent_size, ent_count_ptr, *ent_count_ptr - 1);
 }
 
 // Insert an element into a sorted array.
 static inline bool array_len_sorted_insert(
-    void **array_ptr, size_t ent_size, size_t *ent_count_ptr, void const *insert, array_sort_comp_t comparator
+    void *_array_ptr, size_t ent_size, size_t *ent_count_ptr, void const *insert, array_sort_comp_t comparator
 ) {
-    size_t index = array_binsearch(*array_ptr, ent_size, *ent_count_ptr, insert, comparator).index;
+    void **array_ptr = _array_ptr;
+    size_t index     = array_binsearch(*array_ptr, ent_size, *ent_count_ptr, insert, comparator).index;
     return array_len_insert(array_ptr, ent_size, ent_count_ptr, insert, index);
 }
 
@@ -146,8 +152,9 @@ static inline bool array_len_sorted_insert(
 
 // Resize a length-based dynamically allocated array.
 static inline bool array_lencap_resize(
-    void **array_ptr, size_t ent_size, size_t *ent_count_ptr, size_t *ent_cap_ptr, size_t new_ent_count
+    void *_array_ptr, size_t ent_size, size_t *ent_count_ptr, size_t *ent_cap_ptr, size_t new_ent_count
 ) {
+    void **array_ptr = _array_ptr;
     if (*ent_cap_ptr >= new_ent_count) {
         *ent_count_ptr = new_ent_count;
         return true;
@@ -165,7 +172,7 @@ static inline bool array_lencap_resize(
 
 // Insert a multiple elements into a dynamically allocated array.
 static inline bool array_lencap_insert_n(
-    void      **array_ptr,
+    void       *_array_ptr,
     size_t      ent_size,
     size_t     *ent_count_ptr,
     size_t     *ent_cap_ptr,
@@ -173,6 +180,7 @@ static inline bool array_lencap_insert_n(
     size_t      index,
     size_t      insert_count
 ) {
+    void **array_ptr = _array_ptr;
     if (array_lencap_resize(array_ptr, ent_size, ent_count_ptr, ent_cap_ptr, *ent_count_ptr + insert_count)) {
         array_insert_n(*array_ptr, ent_size, *ent_count_ptr, insert, index, insert_count);
         return true;
@@ -182,7 +190,7 @@ static inline bool array_lencap_insert_n(
 
 // Remove an element from a dynamically allocated array.
 static inline void array_lencap_remove_n(
-    void  **array_ptr,
+    void   *_array_ptr,
     size_t  ent_size,
     size_t *ent_count_ptr,
     size_t *ent_cap_ptr,
@@ -190,14 +198,16 @@ static inline void array_lencap_remove_n(
     size_t  index,
     size_t  remove_count
 ) {
+    void **array_ptr = _array_ptr;
     array_remove_n(*array_ptr, ent_size, *ent_count_ptr, removed, index, remove_count);
     array_lencap_resize(array_ptr, ent_size, ent_count_ptr, ent_cap_ptr, *ent_count_ptr - remove_count);
 }
 
 // Insert an element into a dynamically allocated array.
 static inline bool array_lencap_insert(
-    void **array_ptr, size_t ent_size, size_t *ent_count_ptr, size_t *ent_cap_ptr, void const *insert, size_t index
+    void *_array_ptr, size_t ent_size, size_t *ent_count_ptr, size_t *ent_cap_ptr, void const *insert, size_t index
 ) {
+    void **array_ptr = _array_ptr;
     if (array_lencap_resize(array_ptr, ent_size, ent_count_ptr, ent_cap_ptr, *ent_count_ptr + 1)) {
         array_insert(*array_ptr, ent_size, *ent_count_ptr, insert, index);
         return true;
@@ -207,21 +217,23 @@ static inline bool array_lencap_insert(
 
 // Remove an element from a dynamically allocated array.
 static inline void array_lencap_remove(
-    void **array_ptr, size_t ent_size, size_t *ent_count_ptr, size_t *ent_cap_ptr, void *removed, size_t index
+    void *_array_ptr, size_t ent_size, size_t *ent_count_ptr, size_t *ent_cap_ptr, void *removed, size_t index
 ) {
+    void **array_ptr = _array_ptr;
     array_remove(*array_ptr, ent_size, *ent_count_ptr, removed, index);
     array_lencap_resize(array_ptr, ent_size, ent_count_ptr, ent_cap_ptr, *ent_count_ptr - 1);
 }
 
 // Insert an element into a sorted array.
 static inline bool array_lencap_sorted_insert(
-    void            **array_ptr,
+    void             *_array_ptr,
     size_t            ent_size,
     size_t           *ent_count_ptr,
     size_t           *ent_cap_ptr,
     void const       *insert,
     array_sort_comp_t comparator
 ) {
-    size_t index = array_binsearch(*array_ptr, ent_size, *ent_count_ptr, insert, comparator).index;
+    void **array_ptr = _array_ptr;
+    size_t index     = array_binsearch(*array_ptr, ent_size, *ent_count_ptr, insert, comparator).index;
     return array_lencap_insert(array_ptr, ent_size, ent_count_ptr, ent_cap_ptr, insert, index);
 }

@@ -217,7 +217,7 @@ int64_t timer_value_get(int timerno) {
     uint32_t lo   = READ_REG(base + T0LO_REG);
     int      div  = 32;
     WRITE_REG(base + T0UPDATE_REG, -1);
-    while (READ_REG(base + T0LO_REG) == lo && --div);
+    while (READ_REG(base + T0LO_REG) == lo && --div) continue;
     return READ_REG(base + T0LO_REG) | ((uint64_t)READ_REG(base + T0HI_REG) << 32LLU);
 }
 

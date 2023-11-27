@@ -61,13 +61,14 @@ void hk_thread_func(void *ignored) {
 
     while (1) {
         mutex_acquire(NULL, &hk_mtx, TIMESTAMP_US_MAX);
-        timestamp_us_t now = time_us();
-        taskent_t      task;
+        timestamp_us_t now  = time_us();
+        taskent_t      task = {0};
 
         // Check all tasks.
         while (queue_len && queue[0].next_time <= now) {
             // Run the first task.
             array_remove(queue, sizeof(taskent_t), queue_len, &task, 0);
+            assert_dev_drop(task.callback != NULL);
             task.callback(task.taskno, task.arg);
 
             if (task.interval > 0 && task.next_time <= TIMESTAMP_US_MAX - task.interval) {
@@ -107,6 +108,9 @@ int hk_add_once(timestamp_us_t time, hk_task_t task, void *arg) {
 // This task will be run in the "housekeeping" task.
 // Returns the task number.
 int hk_add_repeated(timestamp_us_t time, timestamp_us_t interval, hk_task_t task, void *arg) {
+    if (!task) {
+        return -1;
+    }
     mutex_acquire(NULL, &hk_mtx, TIMESTAMP_US_MAX);
 
     int       taskno = taskno_ctr;
