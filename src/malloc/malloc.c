@@ -59,8 +59,10 @@ void *__real_reallocarray(void *ptr, size_t nmemb, size_t size);
 #define ALIGN_UP(x, y)   (void *)(((size_t)(x) + ((y)-1)) & ~((y)-1))
 #define ALIGN_DOWN(x, y) (void *)((size_t)(x) & ~((y)-1))
 
-#define NUM_SIZE_CLASSES 6
-#define MBLK_SIZE        ALIGN(sizeof(free_blk_header_t))
+#define NUM_SIZE_CLASSES 5
+#define MBLK_SIZE        64
+
+#define MAX(a,b) (((a)>(b))?(a):(b))
 
 typedef struct free_blk_header_t free_blk_header_t;
 typedef struct free_blk_header_t {
@@ -76,10 +78,9 @@ static free_blk_header_t *free_lists = NULL;
 static atomic_flag        lock       = ATOMIC_FLAG_INIT;
 
 void         kernel_heap_init();
-static void  try_split(free_blk_header_t *fp, size_t needed);
 static void *find_fit(size_t size);
 
-size_t min_class_size[] = {MBLK_SIZE, 64, 128, 256, 1024, 4096};
+size_t min_class_size[] = {MBLK_SIZE, 128, 256, 1024, 4096};
 
 #ifndef BADGEROS_KERNEL
 void print_heap() {
@@ -154,7 +155,6 @@ static void *find_fit(size_t size) {
             fp                 = free_lists[i].next;
             free_lists[i].next = fp->next;
             fp->next->prior    = &free_lists[i];
-            try_split(fp, size);
             return fp;
         }
     }
@@ -164,7 +164,6 @@ static void *find_fit(size_t size) {
         if (fp->size >= size) {
             fp->next->prior = fp->prior;
             fp->prior->next = fp->next;
-            try_split(fp, size);
             return fp;
         }
         fp = fp->next;
@@ -173,44 +172,13 @@ static void *find_fit(size_t size) {
     return NULL;
 }
 
-static void try_split(free_blk_header_t *fp, size_t needed) {
-    if (fp->size < needed)
-        return;
-    size_t             remaining = fp->size - needed;
-    free_blk_header_t *sp;
-
-    if (remaining < MBLK_SIZE)
-        return;
-
-    fp->size = needed;
-    sp       = (free_blk_header_t *)((char *)fp + needed);
-    sp->size = remaining;
-
-    for (int i = NUM_SIZE_CLASSES - 1; i > 0; i--) {
-        BADGEROS_MALLOC_ASSERT_DEBUG(
-            ((void *)free_lists[i].next >= (void *)free_lists && (void *)free_lists[i].next < (void *)mem_end_max),
-            "try_split: corrupted linked list free_lists[" FMT_I "].next = " FMT_P " valid range: " FMT_P "-" FMT_P,
-            i,
-            free_lists[i].next,
-            free_lists,
-            mem_end_max
-        );
-        if (min_class_size[i] <= remaining) {
-            sp->prior          = &free_lists[i];
-            sp->next           = free_lists[i].next;
-            free_lists[i].next = free_lists[i].next->prior = sp;
-            break;
-        }
-    }
-}
-
 // NOLINTNEXTLINE
 void *_malloc(size_t size) {
     if (!size)
         size = 1;
 
     size_t *header;
-    size_t  blk_size = ALIGN(size + sizeof(size_t));
+    size_t  blk_size = ALIGN(size + MAX(sizeof(size_t), ALIGNMENT));
 
     blk_size = (blk_size < MBLK_SIZE) ? MBLK_SIZE : blk_size;
     header   = find_fit(blk_size);
@@ -218,7 +186,7 @@ void *_malloc(size_t size) {
     if (header) {
         *header = *(size_t *)header | 1;
     } else {
-        header = ALIGN_UP((size_t *)mem_end, 8);
+        header = ALIGN_UP((size_t *)mem_end, ALIGNMENT);
 
         if ((void *)header > (void *)mem_end_max) {
             BADGEROS_MALLOC_MSG_DEBUG("malloc: out of memory, returning NULL");
@@ -228,7 +196,7 @@ void *_malloc(size_t size) {
         mem_end = (char *)header + blk_size;
         *header = blk_size | 1;
     }
-    void *ptr = (char *)header + sizeof(size_t);
+    void *ptr = ALIGN_UP((char *)header + sizeof(size_t), ALIGNMENT);
     BADGEROS_MALLOC_ASSERT_DEBUG(
         (ptr >= (void *)mem_start && ptr < (void *)mem_end_max),
         "malloc: invalid pointer " FMT_P " range " FMT_P "-" FMT_P,
@@ -310,7 +278,7 @@ static void _free(void *ptr) {
         mem_end_max
     );
 
-    free_blk_header_t *header = (free_blk_header_t *)((char *)ptr - sizeof(size_t));
+    free_blk_header_t *header = (free_blk_header_t *)((char *)ptr - MAX(sizeof(size_t), ALIGNMENT));
     size_t             size   = header->size;
     header->size              = *(size_t *)header & ~1L;
     BADGEROS_MALLOC_ASSERT_DEBUG(size & 1, "free: double free on pointer " FMT_P, ptr);
@@ -360,7 +328,7 @@ void *__wrap_realloc(void *ptr, size_t size) {
         mem_start,
         mem_end_max
     );
-    free_blk_header_t *header = (free_blk_header_t *)((char *)ptr - sizeof(size_t));
+    free_blk_header_t *header = (free_blk_header_t *)((char *)ptr - MAX(sizeof(size_t), ALIGNMENT));
     BADGEROS_MALLOC_ASSERT_DEBUG(header->size & 1, "realloc: attempting to resize freed pointer " FMT_P, ptr);
 
     SPIN_LOCK_LOCK(lock);
