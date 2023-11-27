@@ -17,5 +17,5 @@ void panic_abort() {
 // Immediately power off or reset the system.
 void panic_poweroff() {
     rawprint("**** KERNEL PANIC ****\nPowering off.\n");
-    while (1);
+    while (1) continue;
 }

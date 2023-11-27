@@ -62,7 +62,7 @@ void *__real_reallocarray(void *ptr, size_t nmemb, size_t size);
 #define NUM_SIZE_CLASSES 5
 #define MBLK_SIZE        64
 
-#define MAX(a,b) (((a)>(b))?(a):(b))
+#define MAX(a, b) (((a) > (b)) ? (a) : (b))
 
 typedef struct free_blk_header_t free_blk_header_t;
 typedef struct free_blk_header_t {
