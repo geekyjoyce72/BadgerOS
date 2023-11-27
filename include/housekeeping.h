@@ -19,4 +19,4 @@ int  hk_add_once(timestamp_us_t time, hk_task_t task, void *arg);
 // Returns the task number.
 int  hk_add_repeated(timestamp_us_t time, timestamp_us_t interval, hk_task_t task, void *arg);
 // Cancel a housekeeping task.
-void hk_cancel(int task);
+void hk_cancel(int taskno);

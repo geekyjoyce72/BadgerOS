@@ -7,6 +7,7 @@
 #include "filesystem/vfs_internal.h"
 #include "filesystem/vfs_ramfs.h"
 #include "gpio.h"
+#include "housekeeping.h"
 #include "log.h"
 #include "malloc.h"
 #include "memprotect.h"
@@ -59,16 +60,17 @@ void main() {
 
     // Set up multithreading.
     sched_init(&err);
-    assert_always(badge_err_is_ok(&err));
+    badge_err_assert_always(&err);
+    hk_init();
 
     // A debug thread.
     sched_thread_t *const debug_thread_0 =
         sched_create_kernel_thread(&err, debug_func, NULL, stack0, stack_size, SCHED_PRIO_NORMAL);
-    assert_always(badge_err_is_ok(&err));
+    badge_err_assert_always(&err);
     sched_set_name(&err, debug_thread_0, "debug0");
-    assert_always(badge_err_is_ok(&err));
+    badge_err_assert_always(&err);
     sched_resume_thread(&err, debug_thread_0);
-    assert_always(badge_err_is_ok(&err));
+    badge_err_assert_always(&err);
 
     // Enter the scheduler
     sched_exec();

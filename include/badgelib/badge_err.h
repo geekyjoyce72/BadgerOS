@@ -3,7 +3,9 @@
 
 #pragma once
 
+#include "assertions.h"
 #include "log.h"
+#include "meta.h"
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -48,6 +50,8 @@ typedef enum {
     ELOC_BLKDEV,
     // Process API
     ELOC_PROCESS,
+    // Number of badge_eloc_t values
+    _badge_eloc_num,
 } badge_eloc_t;
 
 typedef enum {
@@ -109,10 +113,79 @@ typedef enum {
     ECAUSE_EXISTS,
     // The resource is out of space
     ECAUSE_NOSPACE,
-    // The resource is not empty.
+    // The resource is not empty
     ECAUSE_NOTEMPTY,
+    // Number of badge_ecause_t values
+    _badge_ecause_num,
 } badge_ecause_t;
 
+
+
+// Names for badge_eloc_t.
+extern char const *badge_eloc_name[_badge_eloc_num];
+// Names for badge_ecause_t.
+extern char const *badge_ecause_name[_badge_ecause_num];
+
+// Get the name of a badge_eloc_t.
+char const *badge_eloc_get_name(badge_eloc_t eloc) PURE;
+// Get the name of a badge_ecause_t.
+char const *badge_ecause_get_name(badge_ecause_t eloc) PURE;
+
+
+
+// Show a warning message if the error condition fails.
+#define badge_err_log_warn(ec)                                                                                         \
+    do {                                                                                                               \
+        if (__builtin_expect((ec) != NULL && (ec)->cause != 0, 0)) {                                                   \
+            logkf(                                                                                                     \
+                LOG_WARN,                                                                                              \
+                "%{cs}:%{d}: %{cs} error: %{cs}",                                                                      \
+                __FILE__,                                                                                              \
+                __LINE__,                                                                                              \
+                badge_eloc_get_name((ec)->location),                                                                   \
+                badge_ecause_get_name((ec)->cause)                                                                     \
+            );                                                                                                         \
+        }                                                                                                              \
+    } while (0)
+
+// Show an error message if the error condition fails.
+#define badge_err_log_err(ec)                                                                                          \
+    do {                                                                                                               \
+        if (__builtin_expect((ec) != NULL && (ec)->cause != 0, 0)) {                                                   \
+            logkf(                                                                                                     \
+                LOG_ERROR,                                                                                             \
+                "%{cs}:%{d}: %{cs} error: %{cs}",                                                                      \
+                __FILE__,                                                                                              \
+                __LINE__,                                                                                              \
+                badge_eloc_get_name((ec)->location),                                                                   \
+                badge_ecause_get_name((ec)->cause)                                                                     \
+            );                                                                                                         \
+        }                                                                                                              \
+    } while (0)
+
+// Assert if the error condition fails.
+#define badge_err_assert_always(ec)                                                                                    \
+    do {                                                                                                               \
+        if (__builtin_expect((ec) != NULL && (ec)->cause != 0, 0)) {                                                   \
+            logkf(                                                                                                     \
+                LOG_FATAL,                                                                                             \
+                "%{cs}:%{d}: %{cs} error: %{cs}",                                                                      \
+                __FILE__,                                                                                              \
+                __LINE__,                                                                                              \
+                badge_eloc_get_name((ec)->location),                                                                   \
+                badge_ecause_get_name((ec)->cause)                                                                     \
+            );                                                                                                         \
+            __builtin_trap();                                                                                          \
+        }                                                                                                              \
+    } while (0)
+
+#ifndef NDEBUG
+// Assert if the error condition fails in debug mode.
+#define badge_err_assert_dev(ec) badge_err_assert_always(ec)
+#else
+// Assert if the error condition fails in debug mode.
+#define badge_err_assert_dev(ec) ((void)0)
+#endif
 
 // Sets `ec` to the given `location` and `cause` values if `ec` is not `NULL`.
 // `ec` must be a variable name.

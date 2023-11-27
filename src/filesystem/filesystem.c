@@ -53,7 +53,7 @@ static void root_reopen(badge_err_t *ec, vfs_file_handle_t *dir) {
     old->refcount--;
     if (old->refcount == 0) {
         vfs_file_close(ec, old);
-        assert_dev_drop(badge_err_is_ok(ec));
+        badge_err_assert_dev(ec);
         vfs_file_destroy_shared(old->index);
     } else {
         badge_err_set_ok(ec);
@@ -107,7 +107,7 @@ static void dir_reopen(badge_err_t *ec, vfs_file_handle_t *dir, dirent_t const *
     old->refcount--;
     if (old->refcount == 0) {
         vfs_file_close(ec, old);
-        assert_dev_drop(badge_err_is_ok(ec));
+        badge_err_assert_dev(ec);
         vfs_file_destroy_shared(old->index);
     } else {
         badge_err_set_ok(ec);

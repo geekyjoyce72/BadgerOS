@@ -387,6 +387,7 @@ sched_thread_t *sched_create_userland_thread(
 
     sched_prepare_user_entry(thread, entry_point, arg);
 
+    badge_err_set_ok(ec);
     return thread;
 }
 
@@ -423,6 +424,7 @@ sched_thread_t *sched_create_kernel_thread(
 
     sched_prepare_kernel_entry(thread, entry_point, arg);
 
+    badge_err_set_ok(ec);
     return thread;
 }
 

@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "attributes.h"
 #include "port/hardware.h"
 
 #include <stdbool.h>
@@ -17,8 +18,8 @@
 #define TIMER_VALUE_MAX  INT64_MAX
 
 typedef int32_t frequency_hz_t;
-typedef int64_t timestamp_us_t;
-typedef int64_t timer_value_t;
+typedef int64_t ALIGNED_TO(sizeof(size_t)) timestamp_us_t;
+typedef int64_t ALIGNED_TO(sizeof(size_t)) timer_value_t;
 
 // Initialise timer and watchdog subsystem.
 void           time_init();

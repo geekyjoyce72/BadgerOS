@@ -59,7 +59,7 @@ project(badgeros C ASM)
 set(target badger-os.elf)
 add_executable(${target}
     ${CMAKE_CURRENT_LIST_DIR}/src/badgelib/arrays.c
-    ${CMAKE_CURRENT_LIST_DIR}/src/badgelib/assertions.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/badgelib/badge_err.c
     ${CMAKE_CURRENT_LIST_DIR}/src/badgelib/badge_format_str.c
     ${CMAKE_CURRENT_LIST_DIR}/src/badgelib/badge_strings.c
     ${CMAKE_CURRENT_LIST_DIR}/src/badgelib/log.c
@@ -75,6 +75,7 @@ add_executable(${target}
     ${CMAKE_CURRENT_LIST_DIR}/src/loading/rom.c
     ${CMAKE_CURRENT_LIST_DIR}/src/process/process.c
     ${CMAKE_CURRENT_LIST_DIR}/src/process/syscall_impl.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/housekeeping.c
     ${CMAKE_CURRENT_LIST_DIR}/src/list.c
     ${CMAKE_CURRENT_LIST_DIR}/src/main.c
     ${CMAKE_CURRENT_LIST_DIR}/src/malloc/malloc.c
