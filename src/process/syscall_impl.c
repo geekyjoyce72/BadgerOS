@@ -3,10 +3,17 @@
 
 #include "process/syscall_impl.h"
 
+#include "housekeeping.h"
 #include "process/internal.h"
 #include "process/process.h"
 #include "process/types.h"
 #include "scheduler/types.h"
+
+// Clean up: the housekeeping task.
+static void clean_up_from_housekeeping(int taskno, void *arg) {
+    (void)taskno;
+    proc_cleanup((pid_t)arg);
+}
 
 // Sycall: Exit the process; exit code can be read by parent process.
 // When this system call returns, the thread will be suspended awaiting process termination.
@@ -21,5 +28,6 @@ void syscall_self_exit(int code) {
     // Set the exit code.
     process->exit_code = code;
 
-    // TODO: Add deleting runtime to the housekeeping list.
+    // Add deleting runtime to the housekeeping list.
+    hk_add_once(0, clean_up_from_housekeeping, (void *)process->pid);
 }

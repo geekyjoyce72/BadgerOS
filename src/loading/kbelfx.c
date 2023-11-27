@@ -73,7 +73,7 @@ void kbelfx_free(void *mem) {
 // Takes a segment with requested address and permissions and returns a segment with physical and virtual address
 // information. Returns success status. User-defined.
 bool kbelfx_seg_alloc(kbelf_inst inst, size_t segs_len, kbelf_segment *segs) {
-    process_t *proc = proc_get(NULL, kbelf_inst_getpid(inst));
+    process_t *proc = proc_get(kbelf_inst_getpid(inst));
     assert_dev_keep(proc != NULL);
 
     size_t min_addr  = SIZE_MAX;
@@ -112,7 +112,7 @@ bool kbelfx_seg_alloc(kbelf_inst inst, size_t segs_len, kbelf_segment *segs) {
 void kbelfx_seg_free(kbelf_inst inst, size_t segs_len, kbelf_segment *segs) {
     (void)segs_len;
     (void)segs;
-    process_t *proc = proc_get(NULL, kbelf_inst_getpid(inst));
+    process_t *proc = proc_get(kbelf_inst_getpid(inst));
     assert_dev_keep(proc != NULL);
     proc_unmap(NULL, proc, (size_t)segs[0].alloc_cookie);
 }

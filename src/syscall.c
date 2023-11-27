@@ -6,6 +6,7 @@
 #include "cpu/isr.h"
 #include "cpu/isr_ctx.h"
 #include "cpu/panic.h"
+#include "process/syscall_impl.h"
 #include "rawprint.h"
 #include "scheduler/cpu.h"
 #include "scheduler/scheduler.h"
@@ -36,6 +37,7 @@ __SYSCALL_HANDLER_SIGNATURE {
     switch (sysnum) {
         case SYSCALL_TEMP_WRITE: rawprint_substr((char const *)a0, (size_t)a1); break;
         case SYSCALL_THREAD_YIELD: sched_yield(); break;
+        case SYSCALL_SELF_EXIT: syscall_self_exit(a0); break;
         default: invalid_syscall(sysnum); break;
     }
     __syscall_return(retval);

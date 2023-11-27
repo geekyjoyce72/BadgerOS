@@ -24,9 +24,9 @@ typedef int              pid_t;
 // Create a new, empty process.
 process_t *proc_create(badge_err_t *ec);
 // Delete a process and release any resources it had.
-void       proc_delete(badge_err_t *ec, pid_t pid);
+void       proc_delete(pid_t pid);
 // Get a process handle by ID.
-process_t *proc_get(badge_err_t *ec, pid_t pid);
+process_t *proc_get(pid_t pid);
 // Get the process' flags.
 uint32_t   proc_getflags(process_t *process);
 

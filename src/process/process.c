@@ -53,9 +53,9 @@ process_t *proc_create(badge_err_t *ec) {
 }
 
 // Delete a process and release any resources it had.
-void proc_delete(badge_err_t *ec, pid_t pid) {
+void proc_delete(pid_t pid) {
     // TODO: Convert to atomic lookup and remove.
-    process_t *handle = proc_get(ec, pid);
+    process_t *handle = proc_get(pid);
     if (!handle)
         return;
 
@@ -64,13 +64,18 @@ void proc_delete(badge_err_t *ec, pid_t pid) {
 
     // Release kernel memory allocated to process.
     free(handle->argv);
-    badge_err_set_ok(ec);
 }
 
 // Get a process handle by ID.
-process_t *proc_get(badge_err_t *ec, pid_t pid) {
+process_t *proc_get(pid_t pid) {
     // TODO: Allocate these instead of just handing a dummy out.
-    (void)ec;
+    (void)pid;
+    return &dummy_proc;
+}
+
+// Look up a process without locking the global process mutex.
+process_t *proc_get_unsafe(pid_t pid) {
+    // TODO: Allocate these instead of just handing a dummy out.
     (void)pid;
     return &dummy_proc;
 }
@@ -276,7 +281,6 @@ void proc_resume(process_t *process) {
     mutex_release(NULL, &process->mtx);
 }
 
-
 // Release all process runtime resources (threads, memory, files, etc.).
 // Does not remove args, exit code, etc.
 void proc_delete_runtime(process_t *process) {
@@ -328,4 +332,8 @@ void proc_delete_runtime(process_t *process) {
     process->flags |= PROC_EXITED;
     process->flags &= ~PROC_EXITING & ~PROC_RUNNING;
     mutex_release(NULL, &process->mtx);
+}
+
+// Thread-safe process clean-up.
+void proc_cleanup(pid_t pid) {
 }
