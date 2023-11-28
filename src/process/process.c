@@ -1,36 +1,55 @@
 
 // SPDX-License-Identifier: MIT
 
-#include "process/process.h"
+#include "port/process/process.h"
 
 #include "arrays.h"
 #include "badge_strings.h"
+#include "cpu/panic.h"
 #include "isr_ctx.h"
 #include "kbelf.h"
 #include "log.h"
 #include "malloc.h"
-#include "port/process/process.h"
 #include "process/internal.h"
+#include "process/process.h"
 #include "process/types.h"
+#include "scheduler/types.h"
 
 #include <stdatomic.h>
 
+
+
 // Globally unique PID number counter.
-atomic_int pid_counter = 1;
+static pid_t       pid_counter       = 1;
+// Global process lifetime mutex.
+static mutex_t     proc_mtx          = MUTEX_T_INIT_SHARED;
+// Number of processes.
+static size_t      procs_len         = 0;
+// Capacity for processes.
+static size_t      procs_cap         = 0;
+// Process array.
+static process_t **procs             = NULL;
+// Allow process 1 to die without kernel panic.
+static bool        allow_proc1_death = false;
 
-process_t dummy_proc;
 
 
+// Compare processes by ID.
+int proc_sort_pid_cmp(void const *a, void const *b) {
+    return (*(process_t **)a)->pid - (*(process_t **)b)->pid;
+}
 
 // Create a new, empty process.
-process_t *proc_create(badge_err_t *ec) {
-    (void)ec;
-    // TODO: Allocate these instead of just handing a dummy out.
-    process_t *handle = &dummy_proc;
-
+process_t *proc_create_raw(badge_err_t *ec) {
     // Get a new PID.
-    pid_t pid = atomic_fetch_add_explicit(&pid_counter, 1, memory_order_acquire);
-    assert_always(pid >= 1);
+    mutex_acquire(NULL, &proc_mtx, TIMESTAMP_US_MAX);
+
+    // Allocate a process entry.
+    process_t *handle = malloc(sizeof(process_t));
+    if (!handle) {
+        mutex_release(NULL, &proc_mtx);
+        badge_err_set(ec, ELOC_PROCESS, ECAUSE_NOMEM);
+    }
 
     // Install default values.
     *handle = (process_t){
@@ -43,54 +62,56 @@ process_t *proc_create(badge_err_t *ec) {
                 .regions_len = 0,
             },
         .mtx = MUTEX_T_INIT_SHARED,
-        .pid = pid,
+        .pid = pid_counter,
     };
+
+    // Insert the entry into the list.
+    process_t         dummy = {.pid = pid_counter};
+    array_binsearch_t res   = array_binsearch(procs, sizeof(process_t *), procs_len, &dummy, proc_sort_pid_cmp);
+    if (!array_lencap_insert(&procs, sizeof(process_t *), &procs_len, &procs_cap, NULL, res.index)) {
+        free(handle);
+        mutex_release(NULL, &proc_mtx);
+        badge_err_set(ec, ELOC_PROCESS, ECAUSE_NOMEM);
+    }
+    procs[res.index] = handle;
+    pid_counter++;
 
     // Initialise the empty memory map.
     assert_dev_drop(proc_mpu_gen(&handle->memmap));
 
+    mutex_release(NULL, &proc_mtx);
+    badge_err_set_ok(ec);
     return handle;
-}
-
-// Delete a process and release any resources it had.
-void proc_delete(pid_t pid) {
-    // TODO: Convert to atomic lookup and remove.
-    process_t *handle = proc_get(pid);
-    if (!handle)
-        return;
-
-    // Stop the possibly running process and release all run-time resources.
-    proc_delete_runtime(handle);
-
-    // Release kernel memory allocated to process.
-    free(handle->argv);
 }
 
 // Get a process handle by ID.
 process_t *proc_get(pid_t pid) {
-    // TODO: Allocate these instead of just handing a dummy out.
-    (void)pid;
-    return &dummy_proc;
+    mutex_acquire_shared(NULL, &proc_mtx, TIMESTAMP_US_MAX);
+    process_t *res = proc_get_unsafe(pid);
+    mutex_release_shared(NULL, &proc_mtx);
+    return res;
 }
 
 // Look up a process without locking the global process mutex.
 process_t *proc_get_unsafe(pid_t pid) {
-    // TODO: Allocate these instead of just handing a dummy out.
-    (void)pid;
-    return &dummy_proc;
+    process_t         dummy     = {.pid = pid};
+    process_t        *dummy_ptr = &dummy;
+    array_binsearch_t res       = array_binsearch(procs, sizeof(process_t *), procs_len, &dummy_ptr, proc_sort_pid_cmp);
+    return res.found ? procs[res.index] : NULL;
 }
 
 // Get the process' flags.
-uint32_t proc_getflags(process_t *process) {
-    return process->flags;
+uint32_t proc_getflags_raw(process_t *process) {
+    return atomic_load(&process->flags);
 }
 
 
 // Set arguments for a process.
 // If omitted, argc will be 0 and argv will be NULL.
-void proc_setargs(badge_err_t *ec, process_t *process, int argc, char const *const *argv) {
+void proc_setargs_raw(badge_err_t *ec, process_t *process, int argc, char const *const *argv) {
     if (argc <= 0)
         return;
+    mutex_acquire(NULL, &process->mtx, TIMESTAMP_US_MAX);
 
     // Measure required memory for argv.
     size_t required = sizeof(size_t) * (size_t)argc;
@@ -101,6 +122,7 @@ void proc_setargs(badge_err_t *ec, process_t *process, int argc, char const *con
     // Allocate memory for the argv.
     char *mem = realloc(process->argv, required);
     if (!mem) {
+        mutex_release(NULL, &process->mtx);
         badge_err_set(ec, ELOC_PROCESS, ECAUSE_NOMEM);
         return;
     }
@@ -116,51 +138,60 @@ void proc_setargs(badge_err_t *ec, process_t *process, int argc, char const *con
         mem_copy(mem + off, argv[i], len + 1);
         off += len;
     }
+    mutex_release(NULL, &process->mtx);
     badge_err_set_ok(ec);
 }
 
 // Load an executable and start a prepared process.
-void proc_start(badge_err_t *ec, process_t *process, char const *executable) {
+void proc_start_raw(badge_err_t *ec, process_t *process, char const *executable) {
+    mutex_acquire(NULL, &process->mtx, TIMESTAMP_US_MAX);
+
     // Load the executable.
     logk(LOG_DEBUG, "Creating dynamic loader");
     kbelf_dyn dyn = kbelf_dyn_create(process->pid);
     logk(LOG_DEBUG, "Adding executable");
     if (!kbelf_dyn_set_exec(dyn, executable, NULL)) {
         kbelf_dyn_destroy(dyn);
+        mutex_release(NULL, &process->mtx);
         badge_err_set(ec, ELOC_PROCESS, ECAUSE_UNKNOWN);
         return;
     }
     logk(LOG_DEBUG, "Loading program");
     if (!kbelf_dyn_load(dyn)) {
         kbelf_dyn_destroy(dyn);
+        mutex_release(NULL, &process->mtx);
         badge_err_set(ec, ELOC_PROCESS, ECAUSE_UNKNOWN);
         return;
     }
 
     // Create the process' main thread.
     logk(LOG_DEBUG, "Creating main thread");
-    sched_thread_t *thread =
-        proc_create_thread(ec, process, (sched_entry_point_t)kbelf_dyn_entrypoint(dyn), NULL, SCHED_PRIO_NORMAL);
+    sched_thread_t *thread = proc_create_thread_raw_unsafe(
+        ec,
+        process,
+        (sched_entry_point_t)kbelf_dyn_entrypoint(dyn),
+        NULL,
+        SCHED_PRIO_NORMAL
+    );
     if (!thread) {
         kbelf_dyn_unload(dyn);
         kbelf_dyn_destroy(dyn);
+        mutex_release(NULL, &process->mtx);
         return;
     }
     logk(LOG_DEBUG, "Starting main thread");
-    process->flags = PROC_RUNNING;
+    atomic_store(&process->flags, PROC_RUNNING);
     sched_resume_thread(ec, thread);
+    mutex_release(NULL, &process->mtx);
+    logkf(LOG_INFO, "Process %{d} started", process->pid);
 }
 
 
-#define kstack_size 8192
-char kstack[kstack_size] ALIGNED_TO(STACK_ALIGNMENT);
-
 // Create a new thread in a process.
 // Returns created thread handle.
-sched_thread_t *proc_create_thread(
+sched_thread_t *proc_create_thread_raw_unsafe(
     badge_err_t *ec, process_t *process, sched_entry_point_t entry_point, void *arg, sched_prio_t priority
 ) {
-    // TODO: Locking for process threads.
     // Create an entry for a new thread.
     void *mem = realloc(process->threads, sizeof(sched_thread_t *) * (process->threads_len + 1));
     if (!mem) {
@@ -169,18 +200,18 @@ sched_thread_t *proc_create_thread(
     }
     process->threads = mem;
 
-    // TODO: Use a proper allocator for the kernel stack.
-    // size_t const kstack_size = 8192;
-    // void        *kstack      = malloc(kstack_size);
-    // if (!kstack) {
-    //     badge_err_set(ec, ELOC_PROCESS, ECAUSE_NOMEM);
-    //     return NULL;
-    // }
+    // TODO: Use a proper allocator for the kernel stack?
+    size_t const kstack_size = 8192;
+    void        *kstack      = malloc(kstack_size);
+    if (!kstack) {
+        badge_err_set(ec, ELOC_PROCESS, ECAUSE_NOMEM);
+        return NULL;
+    }
 
     // Create a thread.
     sched_thread_t *thread = sched_create_userland_thread(ec, process, entry_point, arg, kstack, kstack_size, priority);
     if (!thread) {
-        // free(kstack);
+        free(kstack);
         return NULL;
     }
 
@@ -190,6 +221,15 @@ sched_thread_t *proc_create_thread(
     logkf(LOG_DEBUG, "Creating user thread, PC: 0x%{size;x}", entry_point);
 
     return thread;
+}
+
+
+// Delete a thread in a process.
+void proc_delete_thread_raw_unsafe(badge_err_t *ec, process_t *process, sched_thread_t *thread) {
+    (void)ec;
+    (void)process;
+    (void)thread;
+    __builtin_trap();
 }
 
 // Memory map address comparator.
@@ -204,12 +244,12 @@ static int prog_memmap_cmp(void const *a, void const *b) {
 }
 
 // Sort the memory map by ascending address.
-static inline void proc_memmap_sort(proc_memmap_t *memmap) {
+static inline void proc_memmap_sort_raw(proc_memmap_t *memmap) {
     array_sort(&memmap->regions[0], sizeof(memmap->regions[0]), memmap->regions_len, prog_memmap_cmp);
 }
 
 // Allocate more memory to a process.
-size_t proc_map(badge_err_t *ec, process_t *proc, size_t vaddr_req, size_t min_size, size_t min_align) {
+size_t proc_map_raw(badge_err_t *ec, process_t *proc, size_t vaddr_req, size_t min_size, size_t min_align) {
     (void)min_align;
     (void)vaddr_req;
 
@@ -232,10 +272,10 @@ size_t proc_map(badge_err_t *ec, process_t *proc, size_t vaddr_req, size_t min_s
         .exec  = true,
     };
     map->regions_len++;
-    proc_memmap_sort(map);
+    proc_memmap_sort_raw(map);
     if (!proc_mpu_gen(map)) {
         badge_err_set(ec, ELOC_PROCESS, ECAUSE_NOMEM);
-        proc_unmap(NULL, proc, (size_t)base);
+        proc_unmap_raw(NULL, proc, (size_t)base);
         return 0;
     }
 
@@ -245,7 +285,7 @@ size_t proc_map(badge_err_t *ec, process_t *proc, size_t vaddr_req, size_t min_s
 }
 
 // Release memory allocated to a process.
-void proc_unmap(badge_err_t *ec, process_t *proc, size_t base) {
+void proc_unmap_raw(badge_err_t *ec, process_t *proc, size_t base) {
     proc_memmap_t *map = &proc->memmap;
     for (size_t i = 0; i < map->regions_len; i++) {
         if (map->regions[i].base == base) {
@@ -258,7 +298,6 @@ void proc_unmap(badge_err_t *ec, process_t *proc, size_t base) {
     }
     badge_err_set(ec, ELOC_PROCESS, ECAUSE_NOTFOUND);
 }
-
 
 
 // Suspend all threads for a process except the current.
@@ -289,33 +328,42 @@ void proc_delete_runtime(process_t *process) {
         assert_dev_drop(sched_get_current_thread() != process->threads[i]);
     }
 
+    if (process->pid == 1 && !allow_proc1_death) {
+        // Process 1 exited and now the kernel is dead.
+        logkf(LOG_FATAL, "Process 1 exited unexpectedly");
+        panic_abort();
+    }
+
     // Set the exiting flag so any return to user-mode kills the thread.
     assert_always(mutex_acquire(NULL, &process->mtx, PROC_MTX_TIMEOUT));
-    if (process->flags & (PROC_EXITED | PROC_EXITING)) {
-        // Already exiting or exited, return now.
+    if (atomic_load(&process->flags) & PROC_EXITED) {
+        // Already exited, return now.
         return;
         mutex_release(NULL, &process->mtx);
     } else {
         // Flag the scheduler to start suspending threads.
-        process->flags |= PROC_EXITING;
+        atomic_fetch_or(&process->flags, PROC_EXITING);
         atomic_thread_fence(memory_order_release);
     }
 
     // Wait for the scheduler to suspend all the threads.
-    proc_resume(process);
+    for (size_t i = 0; i < process->threads_len; i++) {
+        sched_resume_thread(NULL, process->threads[i]);
+    }
     bool waiting = true;
     while (waiting) {
         waiting = false;
         for (size_t i = 0; i < process->threads_len; i++) {
-            if (sched_thread_is_running(NULL, process->threads[i]))
+            if (sched_thread_is_running(NULL, process->threads[i])) {
                 waiting = true;
+            }
         }
         sched_yield();
     }
 
     // Destroy all threads.
-    // TODO: Release kernel stacks.
     for (size_t i = 0; i < process->threads_len; i++) {
+        free((void *)process->threads[i]->kernel_stack_bottom);
         sched_destroy_thread(NULL, process->threads[i]);
     }
     process->threads_len = 0;
@@ -323,7 +371,7 @@ void proc_delete_runtime(process_t *process) {
 
     // Unmap all memory regions.
     while (process->memmap.regions_len) {
-        proc_unmap(NULL, process, process->memmap.regions[0].base);
+        proc_unmap_raw(NULL, process, process->memmap.regions[0].base);
     }
 
     // TODO: Close pipes and files.
@@ -332,8 +380,104 @@ void proc_delete_runtime(process_t *process) {
     process->flags |= PROC_EXITED;
     process->flags &= ~PROC_EXITING & ~PROC_RUNNING;
     mutex_release(NULL, &process->mtx);
+    logkf(LOG_INFO, "Process %{d} stopped", process->pid);
 }
 
-// Thread-safe process clean-up.
-void proc_cleanup(pid_t pid) {
+
+
+// Create a new, empty process.
+pid_t proc_create(badge_err_t *ec) {
+    return proc_create_raw(ec)->pid;
+}
+
+// Delete a process and release any resources it had.
+void proc_delete(pid_t pid) {
+    mutex_acquire(NULL, &proc_mtx, TIMESTAMP_US_MAX);
+    process_t         dummy     = {.pid = pid};
+    process_t        *dummy_ptr = &dummy;
+    array_binsearch_t res       = array_binsearch(procs, sizeof(process_t *), procs_len, &dummy_ptr, proc_sort_pid_cmp);
+    if (!res.found) {
+        mutex_release(NULL, &proc_mtx);
+        return;
+    }
+    process_t *handle = procs[res.index];
+
+    // Stop the possibly running process and release all run-time resources.
+    proc_delete_runtime(handle);
+
+    // Release kernel memory allocated to process.
+    free(handle->argv);
+    free(handle);
+    array_lencap_remove(&procs, sizeof(process_t), &procs_len, &procs_cap, NULL, res.index);
+    mutex_release(NULL, &proc_mtx);
+}
+
+// Get the process' flags.
+uint32_t proc_getflags(badge_err_t *ec, pid_t pid) {
+    mutex_acquire_shared(NULL, &proc_mtx, TIMESTAMP_US_MAX);
+    process_t *proc = proc_get(pid);
+    uint32_t   flags;
+    if (proc) {
+        flags = atomic_load(&proc->flags);
+        badge_err_set_ok(ec);
+    } else {
+        flags = 0;
+        badge_err_set(ec, ELOC_PROCESS, ECAUSE_NOTFOUND);
+    }
+    mutex_release_shared(NULL, &proc_mtx);
+    return flags;
+}
+
+
+// Set arguments for a process.
+// If omitted, argc will be 0 and argv will be NULL.
+void proc_setargs(badge_err_t *ec, pid_t pid, int argc, char const *const *argv) {
+    mutex_acquire_shared(NULL, &proc_mtx, TIMESTAMP_US_MAX);
+    process_t *proc = proc_get(pid);
+    if (proc) {
+        proc_setargs_raw(ec, proc, argc, argv);
+    } else {
+        badge_err_set(ec, ELOC_PROCESS, ECAUSE_NOTFOUND);
+    }
+    mutex_release_shared(NULL, &proc_mtx);
+}
+
+// Load an executable and start a prepared process.
+void proc_start(badge_err_t *ec, pid_t pid, char const *executable) {
+    mutex_acquire_shared(NULL, &proc_mtx, TIMESTAMP_US_MAX);
+    process_t *proc = proc_get(pid);
+    if (proc) {
+        proc_start_raw(ec, proc, executable);
+    } else {
+        badge_err_set(ec, ELOC_PROCESS, ECAUSE_NOTFOUND);
+    }
+    mutex_release_shared(NULL, &proc_mtx);
+}
+
+
+// Allocate more memory to a process.
+// Returns actual virtual address on success, 0 on failure.
+size_t proc_map(badge_err_t *ec, pid_t pid, size_t vaddr_req, size_t min_size, size_t min_align) {
+    mutex_acquire_shared(NULL, &proc_mtx, TIMESTAMP_US_MAX);
+    process_t *proc = proc_get(pid);
+    size_t     res  = 0;
+    if (proc) {
+        res = proc_map_raw(ec, proc, vaddr_req, min_size, min_align);
+    } else {
+        badge_err_set(ec, ELOC_PROCESS, ECAUSE_NOTFOUND);
+    }
+    mutex_release_shared(NULL, &proc_mtx);
+    return res;
+}
+
+// Release memory allocated to a process.
+void proc_unmap(badge_err_t *ec, pid_t pid, size_t base) {
+    mutex_acquire_shared(NULL, &proc_mtx, TIMESTAMP_US_MAX);
+    process_t *proc = proc_get(pid);
+    if (proc) {
+        proc_unmap_raw(ec, proc, base);
+    } else {
+        badge_err_set(ec, ELOC_PROCESS, ECAUSE_NOTFOUND);
+    }
+    mutex_release_shared(NULL, &proc_mtx);
 }

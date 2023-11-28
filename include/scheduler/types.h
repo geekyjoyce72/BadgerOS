@@ -7,6 +7,7 @@
 #include "badge_err.h"
 #include "isr_ctx.h"
 #include "list.h"
+#include "process/process.h"
 #include "scheduler.h"
 
 #include <stdbool.h>

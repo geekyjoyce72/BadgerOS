@@ -5,6 +5,7 @@
 #include "badge_strings.h"
 #include "filesystem.h"
 #include "malloc.h"
+#include "process/internal.h"
 #include "process/process.h"
 #include "process/types.h"
 
@@ -90,7 +91,7 @@ bool kbelfx_seg_alloc(kbelf_inst inst, size_t segs_len, kbelf_segment *segs) {
         logkf(LOG_DEBUG, "Segment %{size;d}: %{size;x} - %{size;x}", i, start, end);
     }
 
-    size_t vaddr_real = proc_map(NULL, proc, min_addr, max_addr - min_addr, min_align);
+    size_t vaddr_real = proc_map_raw(NULL, proc, min_addr, max_addr - min_addr, min_align);
     if (!vaddr_real)
         return false;
 
@@ -114,7 +115,7 @@ void kbelfx_seg_free(kbelf_inst inst, size_t segs_len, kbelf_segment *segs) {
     (void)segs;
     process_t *proc = proc_get(kbelf_inst_getpid(inst));
     assert_dev_keep(proc != NULL);
-    proc_unmap(NULL, proc, (size_t)segs[0].alloc_cookie);
+    proc_unmap_raw(NULL, proc, (size_t)segs[0].alloc_cookie);
 }
 
 
