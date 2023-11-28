@@ -6,6 +6,7 @@
 #include "arrays.h"
 #include "badge_strings.h"
 #include "cpu/panic.h"
+#include "housekeeping.h"
 #include "isr_ctx.h"
 #include "kbelf.h"
 #include "log.h"
@@ -16,7 +17,6 @@
 #include "scheduler/types.h"
 
 #include <stdatomic.h>
-
 
 
 // Globally unique PID number counter.
@@ -34,6 +34,27 @@ static bool        allow_proc1_death = false;
 
 
 
+// Clean up: the housekeeping task.
+static void clean_up_from_housekeeping(int taskno, void *arg) {
+    (void)taskno;
+    proc_delete((pid_t)arg);
+}
+
+// Kill a process from one of its own threads.
+void proc_exit_self(int code) {
+    // Mark this process as exiting.
+    sched_thread_t *thread  = sched_get_current_thread();
+    process_t      *process = thread->process;
+    assert_always(mutex_acquire(NULL, &process->mtx, PROC_MTX_TIMEOUT));
+    process->flags     |= PROC_EXITING;
+    process->exit_code  = code;
+    mutex_release(NULL, &process->mtx);
+
+    // Add deleting runtime to the housekeeping list.
+    hk_add_once(0, clean_up_from_housekeeping, (void *)process->pid);
+}
+
+
 // Compare processes by ID.
 int proc_sort_pid_cmp(void const *a, void const *b) {
     return (*(process_t **)a)->pid - (*(process_t **)b)->pid;
@@ -49,6 +70,7 @@ process_t *proc_create_raw(badge_err_t *ec) {
     if (!handle) {
         mutex_release(NULL, &proc_mtx);
         badge_err_set(ec, ELOC_PROCESS, ECAUSE_NOMEM);
+        return NULL;
     }
 
     // Install default values.
@@ -72,6 +94,7 @@ process_t *proc_create_raw(badge_err_t *ec) {
         free(handle);
         mutex_release(NULL, &proc_mtx);
         badge_err_set(ec, ELOC_PROCESS, ECAUSE_NOMEM);
+        return NULL;
     }
     procs[res.index] = handle;
     pid_counter++;

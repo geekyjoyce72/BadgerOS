@@ -32,9 +32,8 @@ static bool thresh_add_atomic_int(atomic_int *var, timestamp_us_t timeout, int t
     do {
         int old_value = atomic_load(var);
         int new_value = old_value + 1;
-        if (old_value >= threshold || new_value >= threshold) {
-            sched_yield();
-        } else if (atomic_compare_exchange_weak_explicit(var, &old_value, new_value, order, memory_order_relaxed)) {
+        if (!(old_value >= threshold || new_value >= threshold) &&
+            atomic_compare_exchange_weak_explicit(var, &old_value, new_value, order, memory_order_relaxed)) {
             return true;
         } else {
             sched_yield();
@@ -48,9 +47,8 @@ static bool unequal_sub_atomic_int(atomic_int *var, int unequal0, int unequal1, 
     while (1) {
         int old_value = atomic_load(var);
         int new_value = old_value - 1;
-        if (old_value == unequal0 || old_value == unequal1) {
-            sched_yield();
-        } else if (atomic_compare_exchange_weak_explicit(var, &old_value, new_value, order, memory_order_relaxed)) {
+        if (!(old_value == unequal0 || old_value == unequal1) &&
+            atomic_compare_exchange_weak_explicit(var, &old_value, new_value, order, memory_order_relaxed)) {
             return true;
         } else {
             sched_yield();

@@ -5,6 +5,9 @@
 
 #include "process/process.h"
 
+// Kill a process from one of its own threads.
+void proc_exit_self(int code);
+
 // Look up a process without locking the global process mutex.
 process_t *proc_get_unsafe(pid_t pid);
 
