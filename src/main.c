@@ -100,3 +100,43 @@ void debug_func(void *arg) {
     proc_start(&ec, pid, "/a.out");
     check_ec(&ec);
 }
+
+
+
+// After control handover, the booting CPU core starts here and other cores wait.
+// This sets up the basics of everything needed by the other systems of the kernel.
+// When finished, the booting CPU will perform kernel initialization.
+void basic_runtime_init() {
+}
+
+
+
+// After basic runtime initialization, the booting CPU core continues here.
+// This finishes the initialization of all kernel systems, resources and services.
+// When finished, the non-booting CPUs will be started (method and entrypoints to be determined).
+void kernel_init() {
+}
+
+
+
+// After kernel initialization, the booting CPU core continues here.
+// This starts up the `init` process while other CPU cores wait for processes to be scheduled for them.
+// When finished, this function returns and the thread should wait for a shutdown event.
+void userland_init() {
+}
+
+
+
+// When a shutdown event begins, exactly one CPU core runs this entire function.
+// This signals all processes to exit (or be killed if they wait too long) and shuts down other CPU cores.
+// When finished, the CPU continues to shut down the kernel.
+void userland_shutdown() {
+}
+
+
+
+// When the userspace has been shut down, the CPU continues here.
+// This will synchronize all filesystems and clean up any other resources not needed to finish hardware shutdown.
+// When finished, the CPU continues to the platform-specific hardware shutdown / reboot handler.
+void kernel_shutdown() {
+}
