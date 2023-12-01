@@ -6,9 +6,14 @@
 #include "cpu/isr.h"
 #include "cpu/isr_ctx.h"
 #include "cpu/panic.h"
+#include "process/internal.h"
+#include "process/process.h"
 #include "rawprint.h"
 #include "scheduler/cpu.h"
 #include "scheduler/scheduler.h"
+
+// Syscall implementations.
+#include "process/syscall_impl.h"
 
 
 
@@ -24,8 +29,8 @@ static void invalid_syscall(long sysno) {
     rawprint("\n");
     isr_ctx_dump(ctx);
 
-    // TODO: Terminate thread.
-    panic_poweroff();
+    // Terminate thread.
+    proc_exit_self(-1);
 }
 
 // System call handler jump table thing.
@@ -36,6 +41,7 @@ __SYSCALL_HANDLER_SIGNATURE {
     switch (sysnum) {
         case SYSCALL_TEMP_WRITE: rawprint_substr((char const *)a0, (size_t)a1); break;
         case SYSCALL_THREAD_YIELD: sched_yield(); break;
+        case SYSCALL_SELF_EXIT: syscall_self_exit(a0); break;
         default: invalid_syscall(sysnum); break;
     }
     __syscall_return(retval);

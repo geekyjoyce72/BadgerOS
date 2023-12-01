@@ -12,6 +12,7 @@
 #include "meta.h"
 #include "port/hardware_allocation.h"
 #include "port/interrupt.h"
+#include "process/internal.h"
 #include "process/process.h"
 #include "scheduler/cpu.h"
 #include "scheduler/isr.h"
@@ -327,7 +328,7 @@ pop_thread:
         if (next_thread->flags & THREAD_PRIVILEGED) {
             isr_ctx_switch_set(&next_thread->kernel_isr_ctx);
         } else {
-            if (proc_getflags(next_thread->process) & PROC_EXITING) {
+            if (proc_getflags_raw(next_thread->process) & PROC_EXITING) {
                 // If a thread's process is exiting, suspend it and get the next one instead.
                 reset_flag(next_thread->flags, THREAD_RUNNING);
                 goto pop_thread;

@@ -16,6 +16,7 @@ void panic_abort() {
 // Call this function when and only when the kernel has encountered a fatal error.
 // Immediately power off or reset the system.
 void panic_poweroff() {
-    rawprint("**** KERNEL PANIC ****\nPowering off.\n");
-    while (1) continue;
+    rawprint("**** KERNEL PANIC ****\nhalted\n");
+    asm volatile("csrci mstatus, 0xa");
+    while (1) asm volatile("wfi");
 }

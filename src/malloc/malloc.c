@@ -53,7 +53,7 @@ void *__real_reallocarray(void *ptr, size_t nmemb, size_t size);
 // NOLINTEND
 #endif
 
-#define ALIGNMENT   8
+#define ALIGNMENT   16
 #define ALIGN(size) (((size) + (ALIGNMENT - 1)) & ~(ALIGNMENT - 1))
 
 #define ALIGN_UP(x, y)   (void *)(((size_t)(x) + ((y)-1)) & ~((y)-1))

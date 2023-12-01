@@ -9,6 +9,7 @@
 #include "mutex.h"
 #include "port/hardware_allocation.h"
 #include "port/process/types.h"
+#include "scheduler/scheduler.h"
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -60,7 +61,7 @@ typedef struct process_t {
     // Resource mutex used for multithreading processes.
     mutex_t          mtx;
     // Process status flags.
-    uint32_t         flags;
+    atomic_int       flags;
     // Exit code if applicable.
     int              exit_code;
 } process_t;

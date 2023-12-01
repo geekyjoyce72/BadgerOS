@@ -6,6 +6,8 @@
 #include "cpu/isr_ctx.h"
 #include "cpu/panic.h"
 #include "log.h"
+#include "process/internal.h"
+#include "process/types.h"
 #include "rawprint.h"
 #include "scheduler/cpu.h"
 #include "scheduler/types.h"
@@ -36,8 +38,16 @@ enum { TRAPNAMES_LEN = sizeof(trapnames) / sizeof(trapnames[0]) };
 // Bitmask of traps that have associated memory addresses.
 #define MEM_ADDR_TRAPS 0x00050f0
 
+// Kill a process from a trap / ISR.
+static void kill_proc_on_trap() {
+    proc_exit_self(-1);
+    isr_global_disable();
+    sched_lower_from_isr();
+    isr_context_switch();
+    __builtin_unreachable();
+}
+
 // Called from ASM on non-system call trap.
-// TODO: Subject to be moved to scheduler when scheduler is implemented.
 void __trap_handler() {
     uint32_t mcause, mstatus, mtval, mepc;
     asm volatile("csrr %0, mstatus" : "=r"(mstatus));
@@ -74,17 +84,30 @@ void __trap_handler() {
 
     // Print privilige mode.
     if (mstatus & (3 << RV32_MSTATUS_MPP_BASE_BIT)) {
-        rawprint("Running in kernel mode\n");
+        rawprint("Running in kernel mode");
     } else {
-        rawprint("Running in user mode\n");
+        rawprint("Running in user mode");
     }
 
     isr_ctx_t *kctx;
     asm volatile("csrr %0, mscratch" : "=r"(kctx));
+
+    // Print current process.
+    if (!(kctx->thread->flags & THREAD_KERNEL)) {
+        rawprint(" in process ");
+        rawprintdec(kctx->thread->process->pid, 1);
+    }
+    rawprint("\n");
+
     isr_ctx_dump(kctx);
 
-    // When the kernel traps it's a bad time.
-    panic_poweroff();
+    if (mstatus & (3 << RV32_MSTATUS_MPP_BASE_BIT)) {
+        // When the kernel traps it's a bad time.
+        panic_poweroff();
+    } else {
+        // When the user traps just stop the process.
+        sched_raise_from_isr(false, kill_proc_on_trap);
+    }
 }
 
 // Return a value from the syscall handler.

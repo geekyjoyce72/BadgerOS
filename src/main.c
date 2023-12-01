@@ -95,8 +95,8 @@ void debug_func(void *arg) {
     check_ec(&ec);
 
     // Start a process.
-    process_t *proc = proc_create(&ec);
+    pid_t pid = proc_create(&ec);
     check_ec(&ec);
-    proc_start(&ec, proc, "/a.out");
+    proc_start(&ec, pid, "/a.out");
     check_ec(&ec);
 }
