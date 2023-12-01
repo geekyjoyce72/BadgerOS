@@ -138,7 +138,7 @@ static vfs_ramfs_inode_t *
 
     // Write a directory entry.
     vfs_ramfs_dirent_t ent = {
-        .size     = sizeof(ent) - VFS_RAMFS_NAME_MAX - 1 + name_len,
+        .size     = offsetof(vfs_ramfs_dirent_t, name) + name_len + 1,
         .name_len = name_len,
         .inode    = inum,
     };

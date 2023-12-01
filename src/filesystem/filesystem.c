@@ -528,7 +528,7 @@ static bool is_dir_handle(badge_err_t *ec, file_t dir) {
 bool fs_dir_create(badge_err_t *ec, char const *path) {
     file_t fd = fs_open(ec, path, OFLAGS_DIRECTORY | OFLAGS_READONLY | OFLAGS_CREATE);
     if (fd >= 0) {
-        // fs_close(ec, fd);
+        fs_close(ec, fd);
     } else if (ec && badge_err_is_ok(ec)) {
         badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_IS_FILE);
     }
