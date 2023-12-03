@@ -5,6 +5,7 @@
 
 #include "cpu/isr.h"
 #include "log.h"
+#include "port/hardware.h"
 #include "port/hardware_allocation.h"
 #include "port/interrupt.h"
 #include "port/intmtx.h"

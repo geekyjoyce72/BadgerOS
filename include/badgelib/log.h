@@ -3,7 +3,11 @@
 
 #pragma once
 
+#include "mutex.h"
+
 #include <stddef.h>
+
+
 
 typedef enum {
     LOG_FATAL,
@@ -12,6 +16,8 @@ typedef enum {
     LOG_INFO,
     LOG_DEBUG,
 } log_level_t;
+
+extern mutex_t log_mtx;
 
 // Print an unformatted message.
 void logk(log_level_t level, char const *msg);

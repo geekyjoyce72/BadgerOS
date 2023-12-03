@@ -3,10 +3,8 @@
 
 #pragma once
 
-#include "badge_err.h"
-#include "time.h"
-
 #include <stdatomic.h>
+#include <stdbool.h>
 
 // Magic value for the magic field.
 #define MUTEX_MAGIC (int)0xcafebabe
@@ -23,12 +21,18 @@ typedef struct {
 #define MUTEX_T_INIT        ((mutex_t){MUTEX_MAGIC, 0, 0})
 #define MUTEX_T_INIT_SHARED ((mutex_t){MUTEX_MAGIC, 1, 0})
 
+#include "badge_err.h"
+#include "time.h"
+
+
+
 // Initialise a mutex for unshared use.
 void mutex_init(badge_err_t *ec, mutex_t *mutex);
 // Initialise a mutex for shared use.
 void mutex_init_shared(badge_err_t *ec, mutex_t *mutex);
 // Clean up the mutex.
 void mutex_destroy(badge_err_t *ec, mutex_t *mutex);
+
 // Try to acquire `mutex` within `max_wait_us` microseconds.
 // If `max_wait_us` is too long or negative, do not use the timeout.
 // Returns true if the mutex was successully acquired.

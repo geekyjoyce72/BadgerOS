@@ -47,8 +47,7 @@ void sched_lower_from_isr() {
     assert_dev_drop(!(thread->flags & THREAD_KERNEL) && (thread->flags & THREAD_PRIVILEGED));
     thread->flags &= ~THREAD_PRIVILEGED;
 
-    assert_always(mutex_acquire_shared(NULL, &process->mtx, PROC_MTX_TIMEOUT));
-    if (process->flags & PROC_EXITING) {
+    if (atomic_load(&process->flags) & PROC_EXITING) {
         // Request a context switch to a different thread.
         thread->flags &= ~THREAD_RUNNING;
         sched_request_switch_from_isr();
@@ -57,7 +56,6 @@ void sched_lower_from_isr() {
         // Set context switch target to user thread.
         isr_ctx_switch_set(&thread->user_isr_ctx);
     }
-    mutex_release_shared(NULL, &process->mtx);
 }
 
 // Return to exit the thread.

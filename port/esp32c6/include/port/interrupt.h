@@ -38,7 +38,7 @@ static inline bool interrupt_is_enabled() {
 // Disable interrupts and return whether they were enabled.
 static inline bool interrupt_disable() {
     uint32_t mstatus;
-    asm volatile("csrrc %0, mstatus, %1" : "=r"(mstatus) : "r"(8));
+    asm volatile("csrrci %0, mstatus, 8" : "=r"(mstatus));
     return mstatus & 8;
 }
 // Enable interrupts.

@@ -6,6 +6,7 @@
 #include "cpu/isr.h"
 #include "cpu/isr_ctx.h"
 #include "cpu/panic.h"
+#include "log.h"
 #include "process/internal.h"
 #include "process/process.h"
 #include "rawprint.h"
@@ -42,7 +43,11 @@ __SYSCALL_HANDLER_SIGNATURE {
 
     long long retval = 0;
     switch (sysnum) {
-        case SYSCALL_TEMP_WRITE: rawprint_substr((char const *)a0, (size_t)a1); break;
+        case SYSCALL_TEMP_WRITE:
+            mutex_acquire(NULL, &log_mtx, TIMESTAMP_US_MAX);
+            rawprint_substr((char const *)a0, (size_t)a1);
+            mutex_release(NULL, &log_mtx);
+            break;
         case SYSCALL_THREAD_YIELD: sched_yield(); break;
         case SYSCALL_SELF_EXIT: syscall_self_exit(a0); break;
         case SYSCALL_SYS_SHUTDOWN: syscall_sys_shutdown(a0); break;

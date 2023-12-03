@@ -3,10 +3,6 @@
 
 #pragma once
 
-#include "assertions.h"
-#include "log.h"
-#include "meta.h"
-
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -118,6 +114,10 @@ typedef enum {
     // Number of badge_ecause_t values
     _badge_ecause_num,
 } badge_ecause_t;
+
+#include "assertions.h"
+#include "log.h"
+#include "meta.h"
 
 
 

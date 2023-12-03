@@ -405,8 +405,8 @@ void proc_delete_runtime(process_t *process) {
     // Mark the process as exited.
     process->flags |= PROC_EXITED;
     process->flags &= ~PROC_EXITING & ~PROC_RUNNING;
+    logkf(LOG_INFO, "Process %{d} stopped with code %{d}", process->pid, process->exit_code);
     mutex_release(NULL, &process->mtx);
-    logkf(LOG_INFO, "Process %{d} stopped", process->pid);
 }
 
 

@@ -4,7 +4,6 @@
 #pragma once
 
 #include "attributes.h"
-#include "port/hardware.h"
 
 #include <stdbool.h>
 #include <stddef.h>

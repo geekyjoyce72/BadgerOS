@@ -5,6 +5,7 @@
 
 #include "badge_format_str.h"
 #include "badge_strings.h"
+#include "mutex.h"
 #include "rawprint.h"
 
 #include <stdarg.h>
@@ -13,6 +14,8 @@
 #include <stdint.h>
 
 #define isvalidlevel(level) ((level) >= 0 && (level) < 5)
+
+mutex_t log_mtx = MUTEX_T_INIT;
 
 
 
@@ -36,8 +39,7 @@ static char const *const term = "\033[0m\r\n";
 
 
 
-// Print an unformatted message.
-void logk(log_level_t level, char const *msg) {
+void logk_prefix(log_level_t level) {
     if (isvalidlevel(level))
         rawprint(colcode[level]);
     rawprintuptime();
@@ -46,11 +48,16 @@ void logk(log_level_t level, char const *msg) {
         rawprint(prefix[level]);
     else
         rawprint("      ");
-    rawprint(msg);
-    rawprint(term);
 }
 
-
+// Print an unformatted message.
+void logk(log_level_t level, char const *msg) {
+    mutex_acquire(NULL, &log_mtx, TIMESTAMP_US_MAX);
+    logk_prefix(level);
+    rawprint(msg);
+    rawprint(term);
+    mutex_release(NULL, &log_mtx);
+}
 
 static bool putccb(char const *msg, size_t len, void *cookie) {
     (void)cookie;
@@ -62,19 +69,14 @@ static bool putccb(char const *msg, size_t len, void *cookie) {
 
 // Print a formatted message.
 void logkf(log_level_t level, char const *msg, ...) {
-    if (isvalidlevel(level))
-        rawprint(colcode[level]);
-    rawprintuptime();
-    rawputc(' ');
-    if (isvalidlevel(level))
-        rawprint(prefix[level]);
-    else
-        rawprint("      ");
+    mutex_acquire(NULL, &log_mtx, TIMESTAMP_US_MAX);
+    logk_prefix(level);
     va_list vararg;
     va_start(vararg, msg);
     format_str_va(msg, cstr_length(msg), putccb, NULL, vararg);
     va_end(vararg);
     rawprint(term);
+    mutex_release(NULL, &log_mtx);
 }
 
 
@@ -88,9 +90,11 @@ void logk_hexdump(log_level_t level, char const *msg, void const *data, size_t s
 #define LOGK_HEXDUMP_GROUPS 4
 // Print a hexdump, override the address shown (usually for debug purposes).
 void logk_hexdump_vaddr(log_level_t level, char const *msg, void const *data, size_t size, size_t vaddr) {
-    logk(level, msg);
-    if (isvalidlevel(level))
-        rawprint(colcode[level]);
+    mutex_acquire(NULL, &log_mtx, TIMESTAMP_US_MAX);
+    logk_prefix(level);
+    rawprint(msg);
+    rawputc('\r');
+    rawputc('\n');
 
     uint8_t const *ptr = data;
     for (size_t y = 0; y * LOGK_HEXDUMP_COLS < size; y++) {
@@ -126,4 +130,5 @@ void logk_hexdump_vaddr(log_level_t level, char const *msg, void const *data, si
         rawputc('\n');
     }
     rawprint("\033[0m");
+    mutex_release(NULL, &log_mtx);
 }
