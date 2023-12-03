@@ -115,6 +115,7 @@ extern size_t const  elf_rom_len;
         logkf(LOG_INFO, #name ": %{long;x}", csr);                                                                     \
     } while (0)
 
+extern void init_ramfs();
 static void kernel_init();
 static void userland_init();
 // static void userland_shutdown();
@@ -209,16 +210,7 @@ static void kernel_init() {
     // Temporary filesystem image.
     fs_mount(&ec, FS_TYPE_RAMFS, NULL, "/", 0);
     badge_err_assert_always(&ec);
-
-    fs_dir_create(&ec, "/sbin");
-    badge_err_assert_always(&ec);
-
-    file_t fd = fs_open(&ec, "/sbin/init", OFLAGS_CREATE | OFLAGS_WRITEONLY);
-    badge_err_assert_always(&ec);
-    fs_write(&ec, fd, elf_rom, (long)elf_rom_len);
-    badge_err_assert_always(&ec);
-    fs_close(&ec, fd);
-    badge_err_assert_always(&ec);
+    init_ramfs();
 }
 
 

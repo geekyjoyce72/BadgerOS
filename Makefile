@@ -1,19 +1,21 @@
 
 # SPDX-License-Identifier: MIT
 
-MAKEFLAGS += --silent --no-print-directory
-IDF_PATH ?= $(shell pwd)/../esp-idf
-SHELL    := /usr/bin/env bash
-PORT     ?= $(shell find /dev/ -name ttyUSB* -or -name ttyACM* | head -1)
-OUTPUT   ?= "$(shell pwd)/firmware"
-BUILDDIR ?= "build"
+MAKEFLAGS         += --silent
+IDF_PATH          ?= $(shell pwd)/../esp-idf
+SHELL             := /usr/bin/env bash
+PORT              ?= $(shell find /dev/ -name ttyUSB* -or -name ttyACM* | head -1)
+OUTPUT            ?= "$(shell pwd)/firmware"
+BUILDDIR          ?= "build"
+BADGER_RAMFS_ROOT ?= root
 
 .PHONY: all clean-tools clean build flash monitor test clang-format-check clang-tidy-check openocd gdb
 
 all: build flash monitor
 
-build:
+build: build/fs_root.c
 	make -C testapp
+	./tools/ramfs-gen.py '$(BADGER_RAMFS_ROOT)' build/fs_root.c init_ramfs
 	mkdir -p "$(BUILDDIR)"
 	cmake -B "$(BUILDDIR)"
 	cmake --build "$(BUILDDIR)"

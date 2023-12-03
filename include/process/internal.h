@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "filesystem.h"
 #include "process/process.h"
 
 // Kill a process from one of its own threads.
@@ -25,6 +26,8 @@ process_t *proc_create_raw(badge_err_t *ec);
 process_t *proc_get(pid_t pid);
 // Get the process' flags.
 uint32_t   proc_getflags_raw(process_t *process);
+// Get a handle to the current process, if any.
+process_t *proc_current();
 
 // Set arguments for a process.
 // If omitted, argc will be 0 and argv will be NULL.
@@ -44,3 +47,9 @@ void   proc_delete_thread_raw_unsafe(badge_err_t *ec, process_t *process, sched_
 size_t proc_map_raw(badge_err_t *ec, process_t *process, size_t vaddr_req, size_t min_size, size_t min_align);
 // Release memory allocated to a process.
 void   proc_unmap_raw(badge_err_t *ec, process_t *process, size_t base);
+// Add a file to the process file handle list.
+int    proc_add_fd_raw(badge_err_t *ec, process_t *process, file_t real);
+// Find a file in the process file handle list.
+file_t proc_find_fd_raw(badge_err_t *ec, process_t *process, int virt);
+// Remove a file from the process file handle list.
+void   proc_remove_fd_raw(badge_err_t *ec, process_t *process, int virt);

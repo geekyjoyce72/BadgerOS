@@ -5,7 +5,12 @@ cmake_minimum_required(VERSION 3.10.0)
 
 set(CMAKE_TRY_COMPILE_TARGET_TYPE "STATIC_LIBRARY")
 
-# Set the C compiler.
+# Set the RAMFS root
+if(NOT DEFINED BADGER_RAMFS_ROOT)
+    set(BADGER_RAMFS_ROOT ${CMAKE_CURRENT_LIST_DIR}/root)
+endif()
+
+# Set the C compiler
 if(NOT DEFINED CMAKE_C_COMPILER)
     find_program(CMAKE_C_COMPILER NAMES riscv32-unknown-linux-gnu-gcc riscv32-linux-gnu-gcc riscv64-unknown-linux-gnu-gcc riscv64-linux-gnu-gcc REQUIRED)
     message("Detected RISC-V C compiler as '${CMAKE_C_COMPILER}'")
@@ -13,7 +18,7 @@ else()
     message("Using compiler '${CMAKE_C_COMPILER}' from environment")
 endif()
 
-# determine the compiler prefix
+# Determine the compiler prefix
 get_filename_component(compiler_name "${CMAKE_C_COMPILER}" NAME)
 string(REGEX MATCH "^([A-Za-z0-9_]+\-)*" BADGER_COMPILER_PREFIX "${compiler_name}") 
 find_program(BADGER_OBJCOPY NAMES "${BADGER_COMPILER_PREFIX}objcopy" REQUIRED)  
@@ -58,6 +63,7 @@ project(badgeros C ASM)
 # Define executable file.
 set(target badger-os.elf)
 add_executable(${target}
+    ${CMAKE_CURRENT_LIST_DIR}/build/fs_root.c
     ${CMAKE_CURRENT_LIST_DIR}/src/badgelib/arrays.c
     ${CMAKE_CURRENT_LIST_DIR}/src/badgelib/badge_err.c
     ${CMAKE_CURRENT_LIST_DIR}/src/badgelib/badge_format_str.c
@@ -68,11 +74,11 @@ add_executable(${target}
     ${CMAKE_CURRENT_LIST_DIR}/src/blockdevice/blkdev_ram.c
     ${CMAKE_CURRENT_LIST_DIR}/src/blockdevice/blockdevice.c
     ${CMAKE_CURRENT_LIST_DIR}/src/filesystem/filesystem.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/filesystem/syscall_impl.c
     # ${CMAKE_CURRENT_LIST_DIR}/src/filesystem/vfs_fat.c
     ${CMAKE_CURRENT_LIST_DIR}/src/filesystem/vfs_ramfs.c
     ${CMAKE_CURRENT_LIST_DIR}/src/filesystem/vfs_internal.c
     ${CMAKE_CURRENT_LIST_DIR}/src/loading/kbelfx.c
-    ${CMAKE_CURRENT_LIST_DIR}/src/loading/rom.c
     ${CMAKE_CURRENT_LIST_DIR}/src/process/process.c
     ${CMAKE_CURRENT_LIST_DIR}/src/process/syscall_impl.c
     ${CMAKE_CURRENT_LIST_DIR}/src/housekeeping.c

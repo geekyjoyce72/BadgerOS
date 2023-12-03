@@ -131,6 +131,11 @@ uint32_t proc_getflags_raw(process_t *process) {
     return atomic_load(&process->flags);
 }
 
+// Get a handle to the current process, if any.
+process_t *proc_current() {
+    return sched_get_current_thread()->process;
+}
+
 
 // Set arguments for a process.
 // If omitted, argc will be 0 and argv will be NULL.
@@ -318,6 +323,47 @@ void proc_unmap_raw(badge_err_t *ec, process_t *proc, size_t base) {
             free((void *)base);
             array_remove(&map->regions[0], sizeof(map->regions[0]), map->regions_len, NULL, i);
             map->regions_len--;
+            badge_err_set_ok(ec);
+            return;
+        }
+    }
+    badge_err_set(ec, ELOC_PROCESS, ECAUSE_NOTFOUND);
+}
+
+// Add a file to the process file handle list.
+int proc_add_fd_raw(badge_err_t *ec, process_t *process, file_t real) {
+    proc_fd_t fd = {.real = real, .virt = 0};
+    for (size_t i = 0; i < process->fds_len; i++) {
+        if (process->fds[i].virt > fd.virt) {
+            fd.virt = process->fds[i].virt + 1;
+        }
+    }
+    if (array_len_insert(&process->fds, sizeof(proc_fd_t), &process->fds_len, &fd, process->fds_len)) {
+        badge_err_set_ok(ec);
+        return fd.virt;
+    } else {
+        badge_err_set(ec, ELOC_PROCESS, ECAUSE_NOMEM);
+        return -1;
+    }
+}
+
+// Find a file in the process file handle list.
+file_t proc_find_fd_raw(badge_err_t *ec, process_t *process, int virt) {
+    for (size_t i = 0; i < process->fds_len; i++) {
+        if (process->fds[i].virt == virt) {
+            badge_err_set_ok(ec);
+            return process->fds[i].real;
+        }
+    }
+    badge_err_set(ec, ELOC_PROCESS, ECAUSE_NOTFOUND);
+    return -1;
+}
+
+// Remove a file from the process file handle list.
+void proc_remove_fd_raw(badge_err_t *ec, process_t *process, int virt) {
+    for (size_t i = 0; i < process->fds_len; i++) {
+        if (process->fds[i].virt == virt) {
+            array_len_remove(&process->fds, sizeof(proc_fd_t), &process->fds_len, NULL, i);
             badge_err_set_ok(ec);
             return;
         }

@@ -41,6 +41,12 @@ typedef struct proc_memmap_t {
     proc_memmap_ent_t regions[PROC_MEMMAP_MAX_REGIONS];
 } proc_memmap_t;
 
+// Process file descriptor.
+typedef struct {
+    int    virt;
+    file_t real;
+} proc_fd_t;
+
 // Globally unique process ID.
 typedef int pid_t;
 
@@ -50,6 +56,10 @@ typedef struct process_t {
     int              argc;
     // Value of arguments.
     char           **argv;
+    // Number of file descriptors.
+    size_t           fds_len;
+    // File descriptors.
+    proc_fd_t       *fds;
     // Number of threads.
     size_t           threads_len;
     // Thread handles.

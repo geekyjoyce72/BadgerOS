@@ -14,6 +14,7 @@
 #include "scheduler/scheduler.h"
 
 // Syscall implementations.
+#include "filesystem/syscall_impl.h"
 #include "process/syscall_impl.h"
 
 
@@ -51,6 +52,11 @@ __SYSCALL_HANDLER_SIGNATURE {
         case SYSCALL_THREAD_YIELD: sched_yield(); break;
         case SYSCALL_SELF_EXIT: syscall_self_exit(a0); break;
         case SYSCALL_SYS_SHUTDOWN: syscall_sys_shutdown(a0); break;
+        case SYSCALL_FS_OPEN: retval = syscall_fs_open((char const *)a0, a1, a2); break;
+        case SYSCALL_FS_CLOSE: retval = syscall_fs_close(a0); break;
+        case SYSCALL_FS_READ: retval = syscall_fs_read(a0, (void *)a1, a2); break;
+        case SYSCALL_FS_WRITE: retval = syscall_fs_write(a0, (void const *)a1, a2); break;
+        case SYSCALL_FS_GETDENTS: retval = syscall_fs_getdents(a0, (void *)a1, a2); break;
         default: invalid_syscall(sysnum); break;
     }
     __syscall_return(retval);
