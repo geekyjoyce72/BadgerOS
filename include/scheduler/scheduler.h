@@ -30,11 +30,10 @@ typedef enum {
 
 // Initializes the scheduler and setups up the system to be ready to
 // create threads and execute them.
-void sched_init(badge_err_t *ec);
+void sched_init();
 
-// Kicks of the scheduler and runs till the system end.
-// This will never return.
-void sched_exec(void) NORETURN;
+// Create a thread for the current code path and start the schedulder on this core.
+void sched_exec() NORETURN;
 
 // Creates a new suspended userland thread.
 //

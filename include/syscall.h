@@ -98,6 +98,13 @@ SYSCALL_DEF(0x0306, SYSCALL_FS_STAT)
 
 
 
+/* ==== SYSTEM MANAGEMENT SYSCALLS ==== */
+// Start the shutdown process.
+// void(bool is_reboot)
+SYSCALL_DEF(0x0400, SYSCALL_SYS_SHUTDOWN)
+
+
+
 #ifndef __ASSEMBLER__
 }
 syscall_num_t;

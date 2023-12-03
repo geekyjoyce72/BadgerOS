@@ -33,6 +33,9 @@ static void invalid_syscall(long sysno) {
     proc_exit_self(-1);
 }
 
+// Shutdown system call implementation.
+extern void syscall_sys_shutdown(bool is_reboot);
+
 // System call handler jump table thing.
 __SYSCALL_HANDLER_SIGNATURE {
     __SYSCALL_HANDLER_IGNORE_UNUSED;
@@ -42,6 +45,7 @@ __SYSCALL_HANDLER_SIGNATURE {
         case SYSCALL_TEMP_WRITE: rawprint_substr((char const *)a0, (size_t)a1); break;
         case SYSCALL_THREAD_YIELD: sched_yield(); break;
         case SYSCALL_SELF_EXIT: syscall_self_exit(a0); break;
+        case SYSCALL_SYS_SHUTDOWN: syscall_sys_shutdown(a0); break;
         default: invalid_syscall(sysnum); break;
     }
     __syscall_return(retval);

@@ -20,17 +20,20 @@
 
 
 // Globally unique PID number counter.
-static pid_t       pid_counter       = 1;
+static pid_t       pid_counter = 1;
 // Global process lifetime mutex.
-static mutex_t     proc_mtx          = MUTEX_T_INIT_SHARED;
+static mutex_t     proc_mtx    = MUTEX_T_INIT_SHARED;
 // Number of processes.
-static size_t      procs_len         = 0;
+static size_t      procs_len   = 0;
 // Capacity for processes.
-static size_t      procs_cap         = 0;
+static size_t      procs_cap   = 0;
 // Process array.
-static process_t **procs             = NULL;
+static process_t **procs       = NULL;
+extern atomic_int  kernel_shutdown_mode;
 // Allow process 1 to die without kernel panic.
-static bool        allow_proc1_death = false;
+static bool        allow_proc1_death() {
+    return true;
+}
 
 
 
@@ -351,7 +354,8 @@ void proc_delete_runtime(process_t *process) {
         assert_dev_drop(sched_get_current_thread() != process->threads[i]);
     }
 
-    if (process->pid == 1 && !allow_proc1_death) {
+    logk(LOG_DEBUG, "ok");
+    if (process->pid == 1 && !allow_proc1_death()) {
         // Process 1 exited and now the kernel is dead.
         logkf(LOG_FATAL, "Process 1 exited unexpectedly");
         panic_abort();

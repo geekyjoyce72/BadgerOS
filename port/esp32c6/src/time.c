@@ -150,6 +150,12 @@ int64_t time_us() {
 }
 
 void time_set_next_task_switch(timestamp_us_t timestamp) {
+    // TODO: Per-core solution.
+    static bool int_cfg = false;
+    if (!int_cfg) {
+        int_cfg = true;
+        timer_int_config(TIMER_SYSTICK_NUM, true, INT_CHANNEL_TIMER_ALARM);
+    }
     timer_alarm_config(TIMER_SYSTICK_NUM, timestamp, false);
 }
 
@@ -179,11 +185,9 @@ void timer_int_config(int timerno, bool enable, int channel) {
         }
 
         // Enable timer interrupt output.
-        WRITE_REG(base + T0CONFIG_REG, READ_REG(base + T0CONFIG_REG) | TIMG_TCONFIG_ALARM_EN_BIT);
         WRITE_REG(base + INT_ENA_TIMERS_REG, READ_REG(base + INT_ENA_TIMERS_REG) | TIMG_T0_INT_EN_BIT);
     } else {
         // Disable timer interrupt output.
-        WRITE_REG(base + T0CONFIG_REG, READ_REG(base + T0CONFIG_REG) & ~TIMG_TCONFIG_ALARM_EN_BIT);
         WRITE_REG(base + INT_ENA_TIMERS_REG, READ_REG(base + INT_ENA_TIMERS_REG) & ~TIMG_T0_INT_EN_BIT);
     }
 
@@ -209,6 +213,7 @@ void timer_alarm_config(int timerno, int64_t threshold, bool reset_on_alarm) {
     WRITE_REG(base + T0ALARMHI_REG, -1);
     WRITE_REG(base + T0ALARMLO_REG, threshold);
     WRITE_REG(base + T0ALARMHI_REG, threshold >> 32);
+    WRITE_REG(base + T0CONFIG_REG, READ_REG(base + T0CONFIG_REG) | TIMG_TCONFIG_ALARM_EN_BIT);
 }
 
 // Get the current value of timer.
@@ -245,14 +250,12 @@ void timer_stop(int timerno) {
 
 // Callback to the timer driver for when a timer alarm fires.
 void timer_isr_timer_alarm() {
-    if (READ_REG(timg_base(TIMER_PREEMPT_NUM) + INT_ST_TIMERS_REG) & TIMG_T0_INT_ST_BIT) {
-        // Timer used for preempting had an interrupt, perform task switch.
-        sched_request_switch_from_isr();
-    }
+    bool preempt = READ_REG(timg_base(TIMER_PREEMPT_NUM) + INT_ST_TIMERS_REG) & TIMG_T0_INT_ST_BIT;
 
     // Check TIMG0 T0 interrupt.
     if (READ_REG(TIMG0_BASE + INT_ST_TIMERS_REG) & TIMG_T0_INT_ST_BIT) {
         // Acknowledge timer interrupt.
+        WRITE_REG(TIMG0_BASE + T0CONFIG_REG, READ_REG(TIMG0_BASE + T0CONFIG_REG) & ~TIMG_TCONFIG_ALARM_EN_BIT);
         WRITE_REG(TIMG0_BASE + INT_CLR_TIMERS_REG, TIMG_T0_INT_CLR_BIT);
         WRITE_REG(TIMG0_BASE + INT_CLR_TIMERS_REG, 0);
     }
@@ -260,8 +263,15 @@ void timer_isr_timer_alarm() {
     // Check TIMG1 T0 interrupt.
     if (READ_REG(TIMG1_BASE + INT_ST_TIMERS_REG) & TIMG_T0_INT_ST_BIT) {
         // Acknowledge timer interrupt.
+        WRITE_REG(TIMG1_BASE + T0CONFIG_REG, READ_REG(TIMG1_BASE + T0CONFIG_REG) & ~TIMG_TCONFIG_ALARM_EN_BIT);
         WRITE_REG(TIMG1_BASE + INT_CLR_TIMERS_REG, TIMG_T0_INT_CLR_BIT);
         WRITE_REG(TIMG1_BASE + INT_CLR_TIMERS_REG, 0);
+    }
+
+    // Call back to scheduler for preemption.
+    if (preempt) {
+        // Timer used for preempting had an interrupt, perform task switch.
+        sched_request_switch_from_isr();
     }
 }
 

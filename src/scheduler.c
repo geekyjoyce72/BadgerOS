@@ -199,7 +199,7 @@ sched_thread_t *sched_get_current_thread(void) {
 
 #include "rawprint.h"
 
-void sched_init(badge_err_t *const ec) {
+void sched_init() {
     // Set up the idle task:
     sched_prepare_kernel_entry(&idle_thread, idle_thread_function, NULL);
 
@@ -211,22 +211,21 @@ void sched_init(badge_err_t *const ec) {
         };
         dlist_append(&thread_alloc_pool, &thread_alloc_pool_storage[i].schedule_node);
     }
-
-    badge_err_set_ok(ec);
 }
 
-void sched_exec(void) {
-    scheduler_enabled = true;
-
-    // as the "isr" is *now* invoked, we need the correct timestamp for
-    // invocation to be set up correctly.
+void sched_exec() {
+    // Set the first preemption time to now.
     next_isr_invocation_time = time_us();
 
+    // Mark the scheduler as enabled.
+    scheduler_enabled = true;
+
+    // Invoke the first context switch.
     isr_global_disable();
     sched_request_switch_from_isr();
     isr_context_switch();
 
-    // we can never reach this line, as the ISR will switch into the idle task
+    // The context switch will always happen, so this execution context dies.
     __builtin_unreachable();
 }
 
@@ -348,7 +347,7 @@ pop_thread:
     }
     assert_dev_drop(task_time_quota > 0);
 
-    next_isr_invocation_time += task_time_quota;
+    next_isr_invocation_time = now + task_time_quota;
     time_set_next_task_switch(next_isr_invocation_time);
 }
 

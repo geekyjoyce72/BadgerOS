@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT
 
 	# This is the C entrypoint, which will be called when basic CRT is set up.
-	.global main
+	.global basic_runtime_init
 	# The global pointer is used for relaxation of `.data` accesses.
 	.global __global_pointer$
 	# First address in `.bss` (inclusive).
@@ -19,6 +19,9 @@
 	# Reserve stack.
 	.section ".bss"
 	.align 4
+	.global __stack_top
+	.global __stack_bottom
+	.global __stack_size
 	.equ __stack_size, 8192
 	.lcomm __stack_bottom, __stack_size
 	.equ __stack_top, __stack_bottom + __stack_size
@@ -27,6 +30,7 @@
 
 	# Entrypoint from the bootloader.
 	.text
+	.align 2
 	.global _start
 	.type _start, %function
 _start:
@@ -60,8 +64,6 @@ _start:
 .initfun_skip:
 	
 	# Jump to the C entrypoint.
-	jal main
-	
-	# If this function returns, halt.
-.halt:
-	j .halt
+	jal basic_runtime_init
+	# This function isn't allowed to return.
+	ebreak
