@@ -354,7 +354,6 @@ void proc_delete_runtime(process_t *process) {
         assert_dev_drop(sched_get_current_thread() != process->threads[i]);
     }
 
-    logk(LOG_DEBUG, "ok");
     if (process->pid == 1 && !allow_proc1_death()) {
         // Process 1 exited and now the kernel is dead.
         logkf(LOG_FATAL, "Process 1 exited unexpectedly");

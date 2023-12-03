@@ -90,9 +90,6 @@ void __interrupt_handler() {
     int mcause;
     asm("csrr %0, mcause" : "=r"(mcause));
     mcause &= 31;
-    rawprint("IRQ #");
-    rawprintdec(mcause, 2);
-    rawprint("\n");
 
     // Jump to ISRs.
     switch (mcause) {

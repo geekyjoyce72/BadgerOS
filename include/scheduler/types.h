@@ -18,9 +18,9 @@
 
 enum {
     // The minimum time a thread will run. `SCHED_PRIO_LOW` maps to this.
-    SCHEDULER_MIN_TASK_TIME_US   = 1000, // 1ms
+    SCHEDULER_MIN_TASK_TIME_US   = 5000, // 5ms
     // The time quota increment per increased priority.
-    SCHEDULER_TIME_QUOTA_INCR_US = 100, // 0.1ms * priority
+    SCHEDULER_TIME_QUOTA_INCR_US = 500, // 0.5ms * priority
     // Quota for the idle task. This can be pretty high as the idle task
     // will only run when nothing else runs.
     // 1 second is a good measure, idle task will always be interrupted by other

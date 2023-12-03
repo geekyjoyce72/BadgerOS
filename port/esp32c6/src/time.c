@@ -210,7 +210,6 @@ void timer_alarm_config(int timerno, int64_t threshold, bool reset_on_alarm) {
         logk(LOG_ERROR, "Unachievable timer alarm value requested");
         threshold = (1ll << 56) - 1;
     }
-    WRITE_REG(base + T0ALARMHI_REG, -1);
     WRITE_REG(base + T0ALARMLO_REG, threshold);
     WRITE_REG(base + T0ALARMHI_REG, threshold >> 32);
     WRITE_REG(base + T0CONFIG_REG, READ_REG(base + T0CONFIG_REG) | TIMG_TCONFIG_ALARM_EN_BIT);
@@ -255,17 +254,13 @@ void timer_isr_timer_alarm() {
     // Check TIMG0 T0 interrupt.
     if (READ_REG(TIMG0_BASE + INT_ST_TIMERS_REG) & TIMG_T0_INT_ST_BIT) {
         // Acknowledge timer interrupt.
-        WRITE_REG(TIMG0_BASE + T0CONFIG_REG, READ_REG(TIMG0_BASE + T0CONFIG_REG) & ~TIMG_TCONFIG_ALARM_EN_BIT);
         WRITE_REG(TIMG0_BASE + INT_CLR_TIMERS_REG, TIMG_T0_INT_CLR_BIT);
-        WRITE_REG(TIMG0_BASE + INT_CLR_TIMERS_REG, 0);
     }
 
     // Check TIMG1 T0 interrupt.
     if (READ_REG(TIMG1_BASE + INT_ST_TIMERS_REG) & TIMG_T0_INT_ST_BIT) {
         // Acknowledge timer interrupt.
-        WRITE_REG(TIMG1_BASE + T0CONFIG_REG, READ_REG(TIMG1_BASE + T0CONFIG_REG) & ~TIMG_TCONFIG_ALARM_EN_BIT);
         WRITE_REG(TIMG1_BASE + INT_CLR_TIMERS_REG, TIMG_T0_INT_CLR_BIT);
-        WRITE_REG(TIMG1_BASE + INT_CLR_TIMERS_REG, 0);
     }
 
     // Call back to scheduler for preemption.
