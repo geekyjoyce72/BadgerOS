@@ -13,10 +13,10 @@ BADGER_RAMFS_ROOT ?= root
 
 all: build flash monitor
 
-build: build/fs_root.c
+build:
 	make -C testapp
-	./tools/ramfs-gen.py '$(BADGER_RAMFS_ROOT)' build/fs_root.c init_ramfs
 	mkdir -p "$(BUILDDIR)"
+	./tools/ramfs-gen.py '$(BADGER_RAMFS_ROOT)' build/fs_root.c init_ramfs
 	cmake -B "$(BUILDDIR)"
 	cmake --build "$(BUILDDIR)"
 	cmake --install "$(BUILDDIR)" --prefix "$(OUTPUT)"
