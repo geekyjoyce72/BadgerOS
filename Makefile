@@ -1,61 +1,31 @@
 
 # SPDX-License-Identifier: MIT
 
-MAKEFLAGS         += --silent
-IDF_PATH          ?= $(shell pwd)/../esp-idf
-SHELL             := /usr/bin/env bash
-PORT              ?= $(shell find /dev/ -name ttyUSB* -or -name ttyACM* | head -1)
-OUTPUT            ?= "$(shell pwd)/firmware"
-BUILDDIR          ?= "build"
-BADGER_RAMFS_ROOT ?= root
+MAKEFLAGS += --silent
+SHELL    := /usr/bin/env bash
+OUTPUT   ?= $(shell pwd)/root
 
-.PHONY: all clean-tools clean build flash monitor test clang-format-check clang-tidy-check openocd gdb
+.PHONY: all flash monitor clean-all clean build clang-format-check clang-tidy-check
 
-all: build flash monitor
+all: build
 
 build:
-	make -C testapp
-	mkdir -p "$(BUILDDIR)"
-	./tools/ramfs-gen.py '$(BADGER_RAMFS_ROOT)' build/fs_root.c init_ramfs
-	cmake -B "$(BUILDDIR)"
-	cmake --build "$(BUILDDIR)"
-	cmake --install "$(BUILDDIR)" --prefix "$(OUTPUT)"
+	$(MAKE) -C files build
+	$(MAKE) -C kernel build
 
-test:
-	mkdir -p "$(BUILDDIR)"
-	echo "Testing list.c…"
-	cc -g -I include -o "./$(BUILDDIR)/list-test" test/list.c src/list.c
-	./build/list-test
-
-clang-format-check: build
-	echo "clang-format check the following files:"
-	jq -r '.[].file' build/compile_commands.json | grep '\.[ch]$$'
-	echo "analysis results:"
-	clang-format --dry-run $(shell jq -r '.[].file' build/compile_commands.json | grep '\.[ch]$$')
-
-clang-tidy-check: build
-	echo "clang-tidy check the following files:"
-	jq -r '.[].file' build/compile_commands.json | grep '\.[ch]$$'
-	echo "analysis results:"
-	clang-tidy -p build $(shell jq -r '.[].file' build/compile_commands.json | grep '\.[ch]$$') --warnings-as-errors="*"
-
-openocd:
-	openocd -c 'set ESP_RTOS "none"' -f board/esp32c6-builtin.cfg
-
-gdb:
-	riscv32-unknown-elf-gdb -x port/esp32c6/gdbinit build/badger-os.elf
-
+clean-all: clean
 clean:
-	@make -C testapp clean
-	rm -rf "$(BUILDDIR)"
+	$(MAKE) -C files clean-all
+	$(MAKE) -C kernel clean-all
 
-flash: build
-	esptool.py -b 921600 --port "$(PORT)" \
-		write_flash --flash_mode dio --flash_freq 80m --flash_size 2MB \
-		0x0 bin/bootloader.bin \
-		0x10000 "$(OUTPUT)/badger-os.bin" \
-		0x8000 bin/partition-table.bin
+flash:
+	$(MAKE) -C kernel flash
 
 monitor:
-	echo -e "\033[1mType ^A^X to exit.\033[0m"
-	picocom -q -b 115200 $(PORT) | ./tools/address-filter.py "$(OUTPUT)/badger-os.elf"; echo -e '\033[0m'
+	$(MAKE) -C kernel monitor
+
+clang-format-check:
+	$(MAKE) -C kernel clang-format-check
+
+clang-tidy-check:
+	$(MAKE) -C kernel clang-tidy-check

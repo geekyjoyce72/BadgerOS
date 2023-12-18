@@ -63,7 +63,7 @@ void print(char const *message) {
 int main(int argc, char **argv) {
     char buf[128];
     print("Hello World from C???\n");
-    int fd = syscall_fs_open("/lol.txt", 0, OFLAGS_READONLY);
+    int fd = syscall_fs_open("/etc/motd", 0, OFLAGS_READONLY);
     if (fd < 0)
         print("No FD :c\n");
     long count = syscall_fs_read(fd, buf, sizeof(buf));

@@ -65,15 +65,5 @@ add_executable(${target}
 )
 target_include_directories(${target} PUBLIC ${CMAKE_CURRENT_LIST_DIR}/src)
 
-# Convert the raw binary file into a ESP32 image file
-add_custom_command(
-    OUTPUT app.elf.c
-    COMMAND python3 "${CMAKE_CURRENT_LIST_DIR}/../tools/bin2c.py" app.elf app.elf.c elf_rom
-    DEPENDS app.elf
-)
-# Proxy target to allow installation of the bin file
-add_custom_target(app.elf.c.target ALL DEPENDS app.elf.c)
-
 # Declare which files are installed to the output directory:
 install(TARGETS app.elf DESTINATION .)
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/app.elf.c DESTINATION .)
