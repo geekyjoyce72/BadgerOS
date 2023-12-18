@@ -38,15 +38,12 @@ jobs:
 
       - name: Build Statistics
         run: |
-          riscv32-unknown-linux-gnu-size -B build/badger-os.elf
-
-      - name: Create firmware image
-        run: cmake --install build --prefix output
+          riscv32-unknown-linux-gnu-size -B kernel/firmware/badger-os.elf
 
       - name: Upload
         uses: actions/upload-artifact@v3
         with:
           name: Firmware
           path: |
-            output/badger-os.elf
-            output/badger-os.bin
+            kernel/firmware/badger-os.elf
+            kernel/firmware/badger-os.bin

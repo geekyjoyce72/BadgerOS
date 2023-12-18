@@ -28,4 +28,4 @@ clang-format-check:
 	$(MAKE) -C kernel clang-format-check
 
 clang-tidy-check:
-	$(MAKE) -C kernel clang-format-check
+	$(MAKE) -C kernel clang-tidy-check
