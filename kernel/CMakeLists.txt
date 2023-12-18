@@ -53,7 +53,7 @@ set(common_compiler_flags
 
 # we must pass the same options to GCC and LD when using LTO, as the linker will actually do the codegen
 add_compile_options(${common_compiler_flags})
-add_link_options(${common_compiler_flags} -nostartfiles -T${CMAKE_CURRENT_LIST_DIR}/linker.ld)
+add_link_options(${common_compiler_flags} -nostartfiles)
 
 # For IDE users.
 set(CMAKE_EXPORT_COMPILE_COMMANDS true)
@@ -91,7 +91,7 @@ add_executable(${target}
 target_include_directories(${target} PUBLIC ${CMAKE_CURRENT_LIST_DIR}/include ${CMAKE_CURRENT_LIST_DIR}/include/badgelib)
 
 # Include port-specific.
-include(cpu/rv32imac/CMakeLists.txt)
+include(cpu/riscv/CMakeLists.txt)
 include(port/esp32c6/CMakeLists.txt)
 
 # Add libraries.
@@ -105,7 +105,7 @@ add_custom_command(
     OUTPUT badger-os.bin
     COMMAND cp badger-os.elf badger-os.elf.patch
     COMMAND "${BADGER_OBJCOPY}" -O binary badger-os.elf badger-os.nochecksum.bin
-    COMMAND python3 "${CMAKE_CURRENT_LIST_DIR}/tools/pack-image.py" badger-os.nochecksum.bin badger-os.bin
+    COMMAND python3 "${CMAKE_CURRENT_LIST_DIR}/../tools/pack-image.py" badger-os.nochecksum.bin badger-os.bin
     DEPENDS badger-os.elf
 )
 # Proxy target to allow installation of the bin file

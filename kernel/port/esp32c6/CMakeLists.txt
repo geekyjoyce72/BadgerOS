@@ -16,3 +16,4 @@ target_sources(${target} PUBLIC
 	${CMAKE_CURRENT_LIST_DIR}/src/time.c
 )
 target_include_directories(${target} PUBLIC ${CMAKE_CURRENT_LIST_DIR}/include)
+target_link_options(${target} PUBLIC -T${CMAKE_CURRENT_LIST_DIR}/linker.ld)
