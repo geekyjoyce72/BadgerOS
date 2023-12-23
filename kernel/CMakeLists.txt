@@ -5,6 +5,13 @@ cmake_minimum_required(VERSION 3.10.0)
 
 set(CMAKE_TRY_COMPILE_TARGET_TYPE "STATIC_LIBRARY")
 
+# The target platform
+if(NOT DEFINED ENV{BADGEROS_PORT})
+    set(BADGEROS_PORT esp32c6)
+else()
+    set(BADGEROS_PORT $ENV{BADGEROS_PORT})
+endif()
+
 # Set the RAMFS root
 if(NOT DEFINED BADGER_RAMFS_ROOT)
     set(BADGER_RAMFS_ROOT ${CMAKE_CURRENT_LIST_DIR}/root)
@@ -91,8 +98,8 @@ add_executable(${target}
 target_include_directories(${target} PUBLIC ${CMAKE_CURRENT_LIST_DIR}/include ${CMAKE_CURRENT_LIST_DIR}/include/badgelib)
 
 # Include port-specific.
+include(port/${BADGEROS_PORT}/CMakeLists.txt)
 include(cpu/riscv/CMakeLists.txt)
-include(port/esp32c6/CMakeLists.txt)
 
 # Add libraries.
 add_compile_options(-I${CMAKE_CURRENT_LIST_DIR}/include -I${CMAKE_CURRENT_LIST_DIR}/include/badgelib -include ${CMAKE_CURRENT_LIST_DIR}/include/loading/kbelf_pre.h)
