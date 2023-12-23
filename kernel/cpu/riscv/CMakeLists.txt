@@ -3,7 +3,7 @@
 
 cmake_minimum_required(VERSION 3.10.0)
 
-target_sources(${target} PUBLIC
+set(cpu_src
     ${CMAKE_CURRENT_LIST_DIR}/src/int64.S
     ${CMAKE_CURRENT_LIST_DIR}/src/isr.S
     ${CMAKE_CURRENT_LIST_DIR}/src/isr_ctx.S
@@ -15,4 +15,6 @@ target_sources(${target} PUBLIC
     ${CMAKE_CURRENT_LIST_DIR}/src/riscv_pmp.c
     ${CMAKE_CURRENT_LIST_DIR}/src/scheduler.c
 )
-target_include_directories(${target} PUBLIC ${CMAKE_CURRENT_LIST_DIR}/include)
+set(cpu_include ${CMAKE_CURRENT_LIST_DIR}/include)
+set(cpu_link)
+set(cpu_flags)

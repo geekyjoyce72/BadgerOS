@@ -3,10 +3,10 @@
 
 cmake_minimum_required(VERSION 3.10.0)
 
-set(target_arch rv32imac_zicsr_zifencei)
-set(target_abi ilp32)
+set(target_arch "rv32imac_zicsr_zifencei")
+set(target_abi "ilp32")
 
-target_sources(${target} PUBLIC
+set(port_src
 	${CMAKE_CURRENT_LIST_DIR}/src/entrypoint.S
 	
 	${CMAKE_CURRENT_LIST_DIR}/src/clkconfig.c
@@ -18,5 +18,6 @@ target_sources(${target} PUBLIC
 	${CMAKE_CURRENT_LIST_DIR}/src/rawprint.c
 	${CMAKE_CURRENT_LIST_DIR}/src/time.c
 )
-target_include_directories(${target} PUBLIC ${CMAKE_CURRENT_LIST_DIR}/include)
-target_link_options(${target} PUBLIC -T${CMAKE_CURRENT_LIST_DIR}/linker.ld)
+set(port_include ${CMAKE_CURRENT_LIST_DIR}/include)
+set(port_link -T${CMAKE_CURRENT_LIST_DIR}/linker.ld)
+set(port_flags)
