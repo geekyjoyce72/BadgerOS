@@ -3,6 +3,9 @@
 
 cmake_minimum_required(VERSION 3.10.0)
 
+set(target_arch rv32imac_zicsr_zifencei)
+set(target_abi ilp32)
+
 target_sources(${target} PUBLIC
 	${CMAKE_CURRENT_LIST_DIR}/src/entrypoint.S
 	
