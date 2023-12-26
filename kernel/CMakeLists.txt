@@ -40,8 +40,8 @@ set(common_compiler_flags
     -ffreestanding                     # We do not compile against an OS.
     -march=${target_arch}              # Selects the target CPU.
     -mabi=${target_abi}                # Selects target ABI 
-    -nodefaultlibs                     # Do not link any default libraries like libgcc or libc.
-    -O1                                # Optimize the code.
+    -nodefaultlibs -nostdlib           # Do not link any default libraries like libgcc or libc.
+    -O2                                # Optimize the code.
     -ggdb                              # Generate debug information in default extended format.
     -fsanitize=undefined               # Adds sanitizer for undefined behaviour.
     -fsanitize-undefined-trap-on-error # Invoke a trap instruction instead of calling into the UBsan runtime.
@@ -50,6 +50,8 @@ set(common_compiler_flags
     -std=gnu11                         # We use the C11 standard
     -DBADGEROS_KERNEL                  # Tell the code we're building for the kernel
     -DBADGEROS_MALLOC_DEBUG_LEVEL=4    # Turn on all malloc() debug stuff for now. 
+    -ffunction-sections
+    -fno-exceptions
 )
 
 # we must pass the same options to GCC and LD when using LTO, as the linker will actually do the codegen
