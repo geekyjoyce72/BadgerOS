@@ -4,7 +4,6 @@
 cmake_minimum_required(VERSION 3.10.0)
 
 set(cpu_src
-    ${CMAKE_CURRENT_LIST_DIR}/src/int64.S
     ${CMAKE_CURRENT_LIST_DIR}/src/isr.S
     ${CMAKE_CURRENT_LIST_DIR}/src/isr_ctx.S
 
