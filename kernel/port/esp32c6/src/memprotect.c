@@ -89,14 +89,7 @@ void memprotect_init() {
 
 // Add a memory protection region.
 bool memprotect(mpu_ctx_t *ctx, size_t vaddr, size_t paddr, size_t length, uint32_t flags) {
-    // return vaddr == paddr && riscv_pmp_memprotect(ctx, vaddr, length, flags);
-    assert_dev_drop(vaddr == paddr);
-    (void)ctx;
-    (void)vaddr;
-    (void)paddr;
-    (void)length;
-    (void)flags;
-    return true;
+    return vaddr == paddr && riscv_pmp_memprotect(ctx, vaddr, length, flags);
 }
 
 

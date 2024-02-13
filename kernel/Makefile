@@ -16,7 +16,7 @@ all: build flash monitor
 build:
 	mkdir -p "$(BUILDDIR)"
 	../tools/ramfs-gen.py '$(BADGER_RAMFS_ROOT)' build/fs_root.c init_ramfs
-	cmake -B "$(BUILDDIR)"
+	cmake -B "$(BUILDDIR)" "-DCMAKE_BUILD_TYPE=$${CMAKE_BUILD_TYPE:-Debug}"
 	cmake --build "$(BUILDDIR)"
 	cmake --install "$(BUILDDIR)" --prefix "$(OUTPUT)"
 

@@ -5,6 +5,8 @@
 
 #include "cpu/panic.h"
 #include "log.h"
+#include "memprotect.h"
+#include "port/hardware_allocation.h"
 
 // Initialise memory protection driver.
 void riscv_pmp_init() {
@@ -277,5 +279,185 @@ void riscv_pmpaddr_write_all(size_t const addr_in[RISCV_PMP_REGION_COUNT]) {
     asm volatile("csrw pmpaddr61, %0" ::"r"(addr_in[61]));
     asm volatile("csrw pmpaddr62, %0" ::"r"(addr_in[62]));
     asm volatile("csrw pmpaddr63, %0" ::"r"(addr_in[63]));
+#endif
+}
+
+
+
+// Add a memory protection region.
+// For kernels using PMP as memory protection.
+bool riscv_pmp_memprotect(riscv_pmp_ctx_t *ctx, size_t paddr, size_t length, uint32_t flags) {
+    if (paddr % MEMMAP_PAGE_SIZE)
+        return false;
+
+    // Corresponding NAPOT pmpaddr value.
+    size_t napot_addr = riscv_pmpaddr_calc_napot(paddr, length);
+
+    // Look for a matching range.
+    int empty = -1;
+    for (int i = 0; i < PROC_RISCV_PMP_COUNT; i++) {
+        if (ctx->pmpaddr[i] == napot_addr && ctx->pmpcfg[i].addr_match_mode) {
+            // Matching region found; update permissions.
+            ctx->pmpcfg[i].value &= ~7;
+            ctx->pmpcfg[i].value |= flags & 7;
+            return true;
+        } else if ((ctx->pmpcfg[i].value & 7) == 0) {
+            // Empty region found.
+            empty = i;
+        }
+    }
+
+    if (empty >= 0 && (flags & 7)) {
+        // Empty region found to apply flags to.
+        ctx->pmpcfg[empty].value |= flags & 7;
+        ctx->pmpaddr[empty]       = napot_addr;
+        return true;
+
+    } else {
+        // No region found.
+        return false;
+    }
+}
+
+
+// Generate a PMPCFG swap instruction for RV32, if required.
+#define PMP_CFG_SWAP_RV32(ctx, n)                                                                                      \
+    if ((n)*4 >= PROC_RISCV_PMP_START && (n)*4 + 3 < PROC_RISCV_PMP_START + PROC_RISCV_PMP_COUNT) {                    \
+        /* Entire pmpcfg register in use. */                                                                           \
+        uint32_t pmpcfg_val;                                                                                           \
+        if (PROC_RISCV_PMP_START % 4) {                                                                                \
+            /* Misaligned load. */                                                                                     \
+            pmpcfg_val  = (ctx)->pmpcfg[n * 4 + 0].value;                                                              \
+            pmpcfg_val |= (ctx)->pmpcfg[n * 4 + 1].value << 8;                                                         \
+            pmpcfg_val |= (ctx)->pmpcfg[n * 4 + 2].value << 16;                                                        \
+            pmpcfg_val |= (ctx)->pmpcfg[n * 4 + 3].value << 24;                                                        \
+        } else {                                                                                                       \
+            /* Aligned load. */                                                                                        \
+            pmpcfg_val = *(uint32_t *)&(ctx)->pmpcfg[n * 4];                                                           \
+        }                                                                                                              \
+        asm volatile("csrw pmpcfg" #n ", %0" ::"r"(pmpcfg_val));                                                       \
+    } else {                                                                                                           \
+        /* Partial pmpcfg register in use. */                                                                          \
+        bool has0 = (n)*4 + 0 >= PROC_RISCV_PMP_START && (n)*4 + 0 < PROC_RISCV_PMP_START + PROC_RISCV_PMP_COUNT;      \
+        bool has1 = (n)*4 + 1 >= PROC_RISCV_PMP_START && (n)*4 + 1 < PROC_RISCV_PMP_START + PROC_RISCV_PMP_COUNT;      \
+        bool has2 = (n)*4 + 2 >= PROC_RISCV_PMP_START && (n)*4 + 2 < PROC_RISCV_PMP_START + PROC_RISCV_PMP_COUNT;      \
+        bool has3 = (n)*4 + 3 >= PROC_RISCV_PMP_START && (n)*4 + 3 < PROC_RISCV_PMP_START + PROC_RISCV_PMP_COUNT;      \
+                                                                                                                       \
+        if ((has0 | has1 | has2 | has3)) {                                                                             \
+            /* Clear PMPs in use. */                                                                                   \
+            uint32_t pmpcfg_clear =                                                                                    \
+                (has0 * 0x000000ff) | (has0 * 0x0000ff00) | (has0 * 0x00ff0000) | (has0 * 0xff000000);                 \
+            asm volatile("csrc pmpcfg" #n ", %0" ::"r"(pmpcfg_clear));                                                 \
+                                                                                                                       \
+            /* Set PMPs in use. */                                                                                     \
+            uint32_t pmpcfg_val = 0;                                                                                   \
+            if (has0)                                                                                                  \
+                pmpcfg_val |= (ctx)->pmpcfg[n * 4 + 0].value;                                                          \
+            if (has1)                                                                                                  \
+                pmpcfg_val |= (ctx)->pmpcfg[n * 4 + 0].value << 8;                                                     \
+            if (has2)                                                                                                  \
+                pmpcfg_val |= (ctx)->pmpcfg[n * 4 + 0].value << 16;                                                    \
+            if (has3)                                                                                                  \
+                pmpcfg_val |= (ctx)->pmpcfg[n * 4 + 0].value << 24;                                                    \
+            asm volatile("csrs pmpcfg" #n ", %0" ::"r"(pmpcfg_val));                                                   \
+        }                                                                                                              \
+    }
+
+// Generate a PMPADDR swap instruction.
+#define PMP_ADDR_SWAP(ctx, n)                                                                                          \
+    if ((n) >= PROC_RISCV_PMP_START && (n) < PROC_RISCV_PMP_START + PROC_RISCV_PMP_COUNT) {                            \
+        asm volatile("csrw pmpaddr" #n ", %0" ::"r"((ctx)->pmpaddr[(n)-PROC_RISCV_PMP_START]));                        \
+    }
+
+// Swap in the set of PMP entries.
+void riscv_pmp_memprotect_swap(riscv_pmp_ctx_t *ctx) {
+    assert_dev_drop(ctx);
+
+    // Swap PMPCFG registers.
+    PMP_CFG_SWAP_RV32(ctx, 0)
+    PMP_CFG_SWAP_RV32(ctx, 1)
+    PMP_CFG_SWAP_RV32(ctx, 2)
+    PMP_CFG_SWAP_RV32(ctx, 3)
+#if RISCV_PMP_REGION_COUNT == 64
+    PMP_CFG_SWAP_RV32(ctx, 4)
+    PMP_CFG_SWAP_RV32(ctx, 5)
+    PMP_CFG_SWAP_RV32(ctx, 6)
+    PMP_CFG_SWAP_RV32(ctx, 7)
+    PMP_CFG_SWAP_RV32(ctx, 8)
+    PMP_CFG_SWAP_RV32(ctx, 9)
+    PMP_CFG_SWAP_RV32(ctx, 10)
+    PMP_CFG_SWAP_RV32(ctx, 11)
+    PMP_CFG_SWAP_RV32(ctx, 12)
+    PMP_CFG_SWAP_RV32(ctx, 13)
+    PMP_CFG_SWAP_RV32(ctx, 14)
+    PMP_CFG_SWAP_RV32(ctx, 15)
+#endif
+
+    // Swap PMPADDR registers.
+    PMP_ADDR_SWAP(ctx, 0)
+    PMP_ADDR_SWAP(ctx, 1)
+    PMP_ADDR_SWAP(ctx, 2)
+    PMP_ADDR_SWAP(ctx, 3)
+    PMP_ADDR_SWAP(ctx, 4)
+    PMP_ADDR_SWAP(ctx, 5)
+    PMP_ADDR_SWAP(ctx, 6)
+    PMP_ADDR_SWAP(ctx, 7)
+    PMP_ADDR_SWAP(ctx, 8)
+    PMP_ADDR_SWAP(ctx, 9)
+    PMP_ADDR_SWAP(ctx, 10)
+    PMP_ADDR_SWAP(ctx, 11)
+    PMP_ADDR_SWAP(ctx, 12)
+    PMP_ADDR_SWAP(ctx, 13)
+    PMP_ADDR_SWAP(ctx, 14)
+    PMP_ADDR_SWAP(ctx, 15)
+#if RISCV_PMP_REGION_COUNT == 64
+    PMP_ADDR_SWAP(ctx, 16)
+    PMP_ADDR_SWAP(ctx, 17)
+    PMP_ADDR_SWAP(ctx, 18)
+    PMP_ADDR_SWAP(ctx, 19)
+    PMP_ADDR_SWAP(ctx, 20)
+    PMP_ADDR_SWAP(ctx, 21)
+    PMP_ADDR_SWAP(ctx, 22)
+    PMP_ADDR_SWAP(ctx, 23)
+    PMP_ADDR_SWAP(ctx, 24)
+    PMP_ADDR_SWAP(ctx, 25)
+    PMP_ADDR_SWAP(ctx, 26)
+    PMP_ADDR_SWAP(ctx, 27)
+    PMP_ADDR_SWAP(ctx, 28)
+    PMP_ADDR_SWAP(ctx, 29)
+    PMP_ADDR_SWAP(ctx, 30)
+    PMP_ADDR_SWAP(ctx, 31)
+    PMP_ADDR_SWAP(ctx, 32)
+    PMP_ADDR_SWAP(ctx, 33)
+    PMP_ADDR_SWAP(ctx, 34)
+    PMP_ADDR_SWAP(ctx, 35)
+    PMP_ADDR_SWAP(ctx, 36)
+    PMP_ADDR_SWAP(ctx, 37)
+    PMP_ADDR_SWAP(ctx, 38)
+    PMP_ADDR_SWAP(ctx, 39)
+    PMP_ADDR_SWAP(ctx, 40)
+    PMP_ADDR_SWAP(ctx, 41)
+    PMP_ADDR_SWAP(ctx, 42)
+    PMP_ADDR_SWAP(ctx, 43)
+    PMP_ADDR_SWAP(ctx, 44)
+    PMP_ADDR_SWAP(ctx, 45)
+    PMP_ADDR_SWAP(ctx, 46)
+    PMP_ADDR_SWAP(ctx, 47)
+    PMP_ADDR_SWAP(ctx, 48)
+    PMP_ADDR_SWAP(ctx, 49)
+    PMP_ADDR_SWAP(ctx, 50)
+    PMP_ADDR_SWAP(ctx, 51)
+    PMP_ADDR_SWAP(ctx, 52)
+    PMP_ADDR_SWAP(ctx, 53)
+    PMP_ADDR_SWAP(ctx, 54)
+    PMP_ADDR_SWAP(ctx, 55)
+    PMP_ADDR_SWAP(ctx, 56)
+    PMP_ADDR_SWAP(ctx, 57)
+    PMP_ADDR_SWAP(ctx, 58)
+    PMP_ADDR_SWAP(ctx, 59)
+    PMP_ADDR_SWAP(ctx, 60)
+    PMP_ADDR_SWAP(ctx, 61)
+    PMP_ADDR_SWAP(ctx, 62)
+    PMP_ADDR_SWAP(ctx, 63)
 #endif
 }
