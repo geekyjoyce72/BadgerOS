@@ -3,6 +3,7 @@
 
 #include "memprotect.h"
 
+#include "assertions.h"
 #include "cpu/riscv_pmp.h"
 #include "port/hardware_allocation.h"
 #include "port/interrupt.h"
@@ -84,80 +85,23 @@ void memprotect_init() {
     );
 }
 
-// Set the range of external RAM currently assigned to userland.
-void memprotect_set_user_extram(size_t base, size_t top) {
-    bool mie = interrupt_disable();
 
-    // Disable existing entry.
-    riscv_pmpcfg_clear(PMP_ENTRY_USER_EXTRAM_TOR);
-    // Write new addresses.
-    riscv_pmpaddr_write(PMP_ENTRY_USER_EXTRAM_BASE, base);
-    riscv_pmpaddr_write(PMP_ENTRY_USER_EXTRAM_TOR, top);
-    // Set PMP region type.
-    riscv_pmpcfg_set(
-        PMP_ENTRY_USER_EXTRAM_TOR,
-        ((riscv_pmpcfg_t){
-            .read            = true,
-            .write           = true,
-            .exec            = true,
-            .addr_match_mode = RISCV_PMPCFG_TOR,
-            ._reserved       = 0,
-            .lock            = false,
-        })
-    );
 
-    if (mie)
-        interrupt_enable();
+// Add a memory protection region.
+bool memprotect(mpu_ctx_t *ctx, size_t vaddr, size_t paddr, size_t length, uint32_t flags) {
+    // return vaddr == paddr && riscv_pmp_memprotect(ctx, vaddr, length, flags);
+    assert_dev_drop(vaddr == paddr);
+    (void)ctx;
+    (void)vaddr;
+    (void)paddr;
+    (void)length;
+    (void)flags;
+    return true;
 }
 
-// Set the range of SRAM currently assigned to userland.
-void memprotect_set_user_sram(size_t base, size_t top) {
-    bool mie = interrupt_disable();
 
-    // Disable existing entry.
-    riscv_pmpcfg_clear(PMP_ENTRY_USER_SRAM_TOR);
-    // Write new addresses.
-    riscv_pmpaddr_write(PMP_ENTRY_USER_SRAM_BASE, base);
-    riscv_pmpaddr_write(PMP_ENTRY_USER_SRAM_TOR, top);
-    // Set PMP region type.
-    riscv_pmpcfg_set(
-        PMP_ENTRY_USER_SRAM_TOR,
-        ((riscv_pmpcfg_t){
-            .read            = true,
-            .write           = true,
-            .exec            = true,
-            .addr_match_mode = RISCV_PMPCFG_TOR,
-            ._reserved       = 0,
-            .lock            = false,
-        })
-    );
 
-    if (mie)
-        interrupt_enable();
-}
-
-// Set the range of flash currently assigned to userland.
-void memprotect_set_user_flash(size_t base, size_t top) {
-    bool mie = interrupt_disable();
-
-    // Disable existing entry.
-    riscv_pmpcfg_clear(PMP_ENTRY_USER_FLASH_TOR);
-    // Write new addresses.
-    riscv_pmpaddr_write(PMP_ENTRY_USER_FLASH_BASE, base);
-    riscv_pmpaddr_write(PMP_ENTRY_USER_FLASH_TOR, top);
-    // Set PMP region type.
-    riscv_pmpcfg_set(
-        PMP_ENTRY_USER_FLASH_TOR,
-        ((riscv_pmpcfg_t){
-            .read            = true,
-            .write           = true,
-            .exec            = true,
-            .addr_match_mode = RISCV_PMPCFG_TOR,
-            ._reserved       = 0,
-            .lock            = false,
-        })
-    );
-
-    if (mie)
-        interrupt_enable();
+// Commit pending memory protections, if any.
+void memprotect_commit(mpu_ctx_t *ctx) {
+    (void)ctx;
 }
