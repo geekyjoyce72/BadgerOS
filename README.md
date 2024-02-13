@@ -5,6 +5,12 @@ The goal is the allow future badge users to get both the performance that native
 
 _(1) MCH2025 is a preliminary name, MCH2025 is an event that will be organised by IFCAT in 2025._
 
+## Index
+- [Contributing](#contributing)
+- [Prerequisites](#prerequisites)
+- [Build system](#build-system)
+- [Credits](#credits)
+
 
 
 # Contributing
@@ -58,4 +64,18 @@ To build, flash and open picocom: `make` or `make all`
 
 To check cody style: `make clang-format-check` (code formatting) and `make clang-tidy-check` (programming guidelines)
 
-Build artifacts will be put into the `firmware` folder once the project was successfully built.
+Build artifacts will be put into the `kernel/firmware` folder once the project was successfully built.
+
+
+
+# Credits
+Contributors
+| Nickname     | Name                  | Components
+| :----------- | :-------------------- | :---------
+| RobotMan2412 | Julian Scheffers      | CPU low-level, peripheral low-level
+| TMM2K        | Hein-Pieter van Braam | Memory management
+Ex-contributors
+| Nickname     | Name                  | Components
+| :----------- | :-------------------- | :---------
+| Ronaksm      | Ronak S. Manai        | SPI research
+| ikskuh       | Felix queißner        | Continuous integration, temporary scheduler
