@@ -8,6 +8,7 @@
 #include "assertions.h"
 #include "meta.h"
 #include "port/hardware.h"
+#include "port/hardware_allocation.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -330,6 +331,13 @@ typedef union {
     uint8_t value;
 } riscv_pmpcfg_t;
 
+typedef struct {
+    // PMP configurations.
+    riscv_pmpcfg_t pmpcfg[PROC_RISCV_PMP_COUNT];
+    // PMP addresses.
+    size_t         pmpaddr[PROC_RISCV_PMP_COUNT];
+} riscv_pmp_ctx_t;
+
 
 
 // Initialise memory protection driver.
@@ -343,6 +351,14 @@ void riscv_pmpaddr_read_all(size_t addr_out[RISCV_PMP_REGION_COUNT]);
 void riscv_pmpcfg_write_all(riscv_pmpcfg_t const cfg_in[RISCV_PMP_REGION_COUNT]);
 // Write all raw PMP addresses.
 void riscv_pmpaddr_write_all(size_t const addr_in[RISCV_PMP_REGION_COUNT]);
+
+// Add a memory protection region.
+// For kernels using PMP as memory protection.
+bool riscv_pmp_memprotect(riscv_pmp_ctx_t *ctx, size_t paddr, size_t length, uint32_t flags);
+// Swap in the set of PMP entries.
+void riscv_pmp_memprotect_swap(riscv_pmp_ctx_t *ctx);
+
+
 
 // Compute NAPOT address value.
 // Assumes `base` is aligned to `size` bytes and that `size` is a power of two >= 8.

@@ -12,10 +12,7 @@
 #define MEMPROTECT_FLAG_X      0x00000004
 #define MEMPROTECT_FLAG_KERNEL 0x80000000
 
-// #include <port/memprotect.h>
-// #include <process/process.h>
-typedef struct {
-} mpu_ctx_t;
+#include <port/memprotect.h>
 
 
 

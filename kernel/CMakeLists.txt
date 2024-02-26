@@ -43,8 +43,6 @@ set(common_compiler_flags
     -nodefaultlibs -nostdlib           # Do not link any default libraries like libgcc or libc.
     -O2                                # Optimize the code.
     -ggdb                              # Generate debug information in default extended format.
-    -fsanitize=undefined               # Adds sanitizer for undefined behaviour.
-    -fsanitize-undefined-trap-on-error # Invoke a trap instruction instead of calling into the UBsan runtime.
     -Werror=return-type                # Error when a function doesn't return a value, but declares to do so.
     -Wall -Wextra                      # Ramp up warning level.
     -std=gnu11                         # We use the C11 standard
@@ -53,6 +51,15 @@ set(common_compiler_flags
     -ffunction-sections
     -fno-exceptions
 )
+if("${CMAKE_BUILD_TYPE}" MATCHES "Release")
+message("Building in release mode")
+else()
+message("Building in debug mode")
+set(common_compiler_flags ${common_compiler_flags}
+    -fsanitize=undefined               # Adds sanitizer for undefined behaviour.
+    -fsanitize-undefined-trap-on-error # Invoke a trap instruction instead of calling into the UBsan runtime.
+)
+endif()
 
 # we must pass the same options to GCC and LD when using LTO, as the linker will actually do the codegen
 add_compile_options(${common_compiler_flags} ${cpu_flags} ${port_flags})
