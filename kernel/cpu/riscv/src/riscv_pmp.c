@@ -327,13 +327,13 @@ bool riscv_pmp_memprotect(riscv_pmp_ctx_t *ctx, size_t paddr, size_t length, uin
         uint32_t pmpcfg_val;                                                                                           \
         if (PROC_RISCV_PMP_START % 4) {                                                                                \
             /* Misaligned load. */                                                                                     \
-            pmpcfg_val  = (ctx)->pmpcfg[n * 4 + 0].value;                                                              \
-            pmpcfg_val |= (ctx)->pmpcfg[n * 4 + 1].value << 8;                                                         \
-            pmpcfg_val |= (ctx)->pmpcfg[n * 4 + 2].value << 16;                                                        \
-            pmpcfg_val |= (ctx)->pmpcfg[n * 4 + 3].value << 24;                                                        \
+            pmpcfg_val  = (ctx)->pmpcfg[(n)*4 + 0].value;                                                              \
+            pmpcfg_val |= (ctx)->pmpcfg[(n)*4 + 1].value << 8;                                                         \
+            pmpcfg_val |= (ctx)->pmpcfg[(n)*4 + 2].value << 16;                                                        \
+            pmpcfg_val |= (ctx)->pmpcfg[(n)*4 + 3].value << 24;                                                        \
         } else {                                                                                                       \
             /* Aligned load. */                                                                                        \
-            pmpcfg_val = *(uint32_t *)&(ctx)->pmpcfg[n * 4];                                                           \
+            pmpcfg_val = *(uint32_t *)&(ctx)->pmpcfg[(n)*4];                                                           \
         }                                                                                                              \
         asm volatile("csrw pmpcfg" #n ", %0" ::"r"(pmpcfg_val));                                                       \
     } else {                                                                                                           \
@@ -346,19 +346,21 @@ bool riscv_pmp_memprotect(riscv_pmp_ctx_t *ctx, size_t paddr, size_t length, uin
         if ((has0 | has1 | has2 | has3)) {                                                                             \
             /* Clear PMPs in use. */                                                                                   \
             uint32_t pmpcfg_clear =                                                                                    \
-                (has0 * 0x000000ff) | (has0 * 0x0000ff00) | (has0 * 0x00ff0000) | (has0 * 0xff000000);                 \
+                (has0 * 0x000000ff) | (has1 * 0x0000ff00) | (has2 * 0x00ff0000) | (has3 * 0xff000000);                 \
             asm volatile("csrc pmpcfg" #n ", %0" ::"r"(pmpcfg_clear));                                                 \
                                                                                                                        \
             /* Set PMPs in use. */                                                                                     \
             uint32_t pmpcfg_val = 0;                                                                                   \
+            /* NOLINTBEGIN */                                                                                          \
             if (has0)                                                                                                  \
-                pmpcfg_val |= (ctx)->pmpcfg[n * 4 + 0].value;                                                          \
+                pmpcfg_val |= (ctx)->pmpcfg[(n)*4 + 0].value;                                                          \
             if (has1)                                                                                                  \
-                pmpcfg_val |= (ctx)->pmpcfg[n * 4 + 0].value << 8;                                                     \
+                pmpcfg_val |= (ctx)->pmpcfg[(n)*4 + 1].value << 8;                                                     \
             if (has2)                                                                                                  \
-                pmpcfg_val |= (ctx)->pmpcfg[n * 4 + 0].value << 16;                                                    \
+                pmpcfg_val |= (ctx)->pmpcfg[(n)*4 + 2].value << 16;                                                    \
             if (has3)                                                                                                  \
-                pmpcfg_val |= (ctx)->pmpcfg[n * 4 + 0].value << 24;                                                    \
+                pmpcfg_val |= (ctx)->pmpcfg[(n)*4 + 3].value << 24;                                                    \
+            /* NOLINTEND */                                                                                            \
             asm volatile("csrs pmpcfg" #n ", %0" ::"r"(pmpcfg_val));                                                   \
         }                                                                                                              \
     }
