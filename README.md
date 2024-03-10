@@ -74,7 +74,7 @@ Contributors
 | :------------- | :-------------------- | :---------
 | RobotMan2412   | Julian Scheffers      | CPU low-level, peripheral low-level
 | TMM2K          | Hein-Pieter van Braam | Memory management
-| Quantumcatgirl | Joyce Ng              | Filesystems
+| Quantumcatgirl | Joyce Ng Rui Lin      | Filesystems
 
 Ex-contributors
 | Nickname     | Name                  | Components
