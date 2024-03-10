@@ -70,12 +70,14 @@ Build artifacts will be put into the `kernel/firmware` folder once the project w
 
 # Credits
 Contributors
-| Nickname     | Name                  | Components
-| :----------- | :-------------------- | :---------
-| RobotMan2412 | Julian Scheffers      | CPU low-level, peripheral low-level
-| TMM2K        | Hein-Pieter van Braam | Memory management
+| Nickname       | Name                  | Components
+| :------------- | :-------------------- | :---------
+| RobotMan2412   | Julian Scheffers      | CPU low-level, peripheral low-level
+| TMM2K          | Hein-Pieter van Braam | Memory management
+| Quantumcatgirl | Joyce Ng              | Filesystems
+
 Ex-contributors
 | Nickname     | Name                  | Components
 | :----------- | :-------------------- | :---------
-| Ronaksm      | Ronak S. Manai        | SPI research
+| Ronaksm      | Ronak S. Manani       | SPI research
 | ikskuh       | Felix queißner        | Continuous integration, temporary scheduler
