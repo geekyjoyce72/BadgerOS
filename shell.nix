@@ -50,5 +50,6 @@ mkShell {
     riscv32-unknown-linux-gnu
     cmake
     esptool
+    picocom
   ];
 }
