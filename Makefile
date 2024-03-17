@@ -5,7 +5,7 @@ MAKEFLAGS += --silent
 SHELL    := /usr/bin/env bash
 OUTPUT   ?= $(shell pwd)/root
 
-.PHONY: all flash monitor clean-all clean build clang-format-check clang-tidy-check
+.PHONY: all openocd gdb flash monitor clean-all clean build clang-format-check clang-tidy-check
 
 all: build
 
@@ -17,6 +17,12 @@ clean-all: clean
 clean:
 	$(MAKE) -C files clean-all
 	$(MAKE) -C kernel clean-all
+
+openocd:
+	$(MAKE) -C kernel openocd
+
+gdb:
+	$(MAKE) -C kernel gdb
 
 flash:
 	$(MAKE) -C kernel flash
