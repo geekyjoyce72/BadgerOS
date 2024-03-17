@@ -140,8 +140,6 @@ void i2c_master_init(badge_err_t *ec, int i2c_num, int sda_pin, int scl_pin, int
 
     I2C0.ctr.conf_upgate = true;
 
-    logkf(LOG_DEBUG, "ctr:      %{u32;x}", I2C0.ctr.val);
-
     // Make GPIO open-drain.
     GPIO.pin[sda_pin]    = (gpio_pin_reg_t){.pad_driver = true};
     GPIO.pin[scl_pin]    = (gpio_pin_reg_t){.pad_driver = true};
@@ -171,13 +169,6 @@ void i2c_master_init(badge_err_t *ec, int i2c_num, int sda_pin, int scl_pin, int
         .in_inv_sel = false,
         .sig_in_sel = true,
     };
-
-    logkf(LOG_DEBUG, "XTAL:     %{u32;x}", PMU.hp_sys[0].xtal.val);
-    logkf(LOG_DEBUG, "XTAL:     %{u32;x}", PMU.hp_sys[1].xtal.val);
-    logkf(LOG_DEBUG, "XTAL:     %{u32;x}", PMU.hp_sys[2].xtal.val);
-    logkf(LOG_DEBUG, "PWRS:     %{u32;x}", PMU.pwr_state.val);
-    timestamp_us_t time = time_us() + 1000000;
-    while (time_us() < time);
 }
 
 // De-initialises I²C peripheral i2c_num in master mode.
