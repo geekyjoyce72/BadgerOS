@@ -1,9 +1,7 @@
 # BadgerOS
 
-BadgerOS is the operating system currently in development for the upcoming MCH2025<sup>(1)</sup> badge.
+BadgerOS is the operating system currently in development for the upcoming [WHY2025](https://why2025.org/) badge.
 The goal is the allow future badge users to get both the performance that native apps can afford as well as the portability made possible by this OS.
-
-_(1) MCH2025 is a preliminary name, MCH2025 is an event that will be organised by IFCAT in 2025._
 
 ## Index
 - [Contributing](#contributing)
@@ -28,40 +26,34 @@ After that, see [Project structure](./docs/project_structure.md) for reference a
 
 
 # Prerequisites
-
-To build BadgerOS:
-
+- `git`
 - `build-essential`
 - `cmake`
-- `riscv32-unknown-elf-gcc` ([RISC-V collab toolchain](https://github.com/riscv-collab/riscv-gnu-toolchain))
+- `gcc-riscv64-linux-gnu`
 - `python3`
-
-To flash to an ESP:
-
-- `esptool.py` from [ESP-IDF](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/get-started/#installation)
-
-Optional recommends:
-
 - `picocom`
 
 
 
 # Build system
-
 The build system is based on Makefiles and CMake.
 The following commands can be used to perform relevant actions:
+
+To select target chip, choose one of:
+- `export BADGEROS_PORT=esp32p4`
+- `export BADGEROS_PORT=esp32c6` (default)
 
 To build: `make build`
 
 To remove build files: `make clean`
 
-To flash to an ESP: `source <path to ESP-IDF>/export.sh` (once) `make flash` (every time you flash)
+To flash to an ESP: `make flash`
 
 To open picocom: `make monitor`
 
 To build, flash and open picocom: `make` or `make all`
 
-To check cody style: `make clang-format-check` (code formatting) and `make clang-tidy-check` (programming guidelines)
+To check code style: `make clang-format-check` (code formatting) and `make clang-tidy-check` (programming guidelines)
 
 Build artifacts will be put into the `kernel/firmware` folder once the project was successfully built.
 

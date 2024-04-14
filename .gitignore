@@ -6,3 +6,4 @@ build/
 firmware/
 app/
 root/
+.venv/

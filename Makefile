@@ -3,13 +3,14 @@
 
 MAKEFLAGS += --silent
 SHELL    := /usr/bin/env bash
-OUTPUT   ?= $(shell pwd)/root
 
 .PHONY: all prepare openocd gdb flash monitor clean-all clean build clang-format-check clang-tidy-check
 
 all: build
 
 prepare:
+	python -m venv .venv
+	.venv/bin/pip install esptool
 	git submodule update --init
 
 build:
