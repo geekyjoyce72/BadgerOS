@@ -9,6 +9,7 @@ set(target_abi "ilp32")
 set(port_src
     ${CMAKE_CURRENT_LIST_DIR}/src/hal/gpio.c
     ${CMAKE_CURRENT_LIST_DIR}/src/hal/i2c.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/hal/spi.c
     
     ${CMAKE_CURRENT_LIST_DIR}/src/clkconfig.c
     ${CMAKE_CURRENT_LIST_DIR}/src/interrupt.c
