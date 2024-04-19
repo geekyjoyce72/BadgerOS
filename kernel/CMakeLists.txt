@@ -50,6 +50,7 @@ set(common_compiler_flags
     -std=gnu11                         # We use the C11 standard
     -DBADGEROS_KERNEL                  # Tell the code we're building for the kernel
     -DBADGEROS_PORT_${BADGEROS_PORT}
+    -DBADGEROS_PORT="${BADGEROS_PORT}"
     -DBADGEROS_MALLOC_DEBUG_LEVEL=3    # Malloc debug level set to WARN
     -DSOFTBIT                          # Turn on our emulated bit operations
     -fno-omit-frame-pointer            # Always use frame pointer

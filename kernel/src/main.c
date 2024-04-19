@@ -96,7 +96,7 @@ void basic_runtime_init() {
     time_init();
 
     // Announce that we're alive.
-    logk(LOG_INFO, "BadgerOS starting...");
+    logk(LOG_INFO, "BadgerOS " BADGEROS_PORT " starting...");
 
     // Kernel memory allocator initialization.
     kernel_heap_init();
@@ -148,7 +148,7 @@ static void kernel_init() {
 static void userland_init() {
     badge_err_t ec = {0};
     logk(LOG_INFO, "Kernel initialized");
-    logk(LOG_INFO, "Staring init process");
+    logk(LOG_INFO, "Starting init process");
 
     pid_t pid = proc_create(&ec);
     badge_err_assert_always(&ec);
