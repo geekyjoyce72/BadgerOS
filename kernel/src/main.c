@@ -3,6 +3,7 @@
 
 #include "backtrace.h"
 #include "badge_err.h"
+#include "esp_intmtx.h"
 #include "filesystem.h"
 #include "hal/gpio.h"
 #include "hal/i2c.h"
@@ -16,6 +17,7 @@
 #include "port/port.h"
 #include "process/process.h"
 #include "scheduler/scheduler.h"
+#include "soc/timer_group_struct.h"
 #include "time.h"
 
 #include <stdatomic.h>
@@ -153,7 +155,6 @@ static void userland_init() {
     assert_dev_drop(pid == 1);
     proc_start(&ec, pid, "/sbin/init");
     badge_err_assert_always(&ec);
-    while (1) continue;
 }
 
 

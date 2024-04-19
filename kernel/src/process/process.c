@@ -44,7 +44,6 @@ static bool        allow_proc1_death() {
 // Clean up: the housekeeping task.
 static void clean_up_from_housekeeping(int taskno, void *arg) {
     (void)taskno;
-    logk(LOG_DEBUG, "kaboom");
     proc_delete((pid_t)arg);
 }
 
@@ -261,7 +260,7 @@ sched_thread_t *proc_create_thread_raw_unsafe(
     // Add the thread to the list.
     array_insert(process->threads, sizeof(sched_thread_t *), process->threads_len, &thread, process->threads_len);
     process->threads_len++;
-    logkf(LOG_DEBUG, "Creating user thread, PC: 0x%{size;x}", entry_point);
+    // logkf(LOG_DEBUG, "Creating user thread, PC: 0x%{size;x}", entry_point);
 
     return thread;
 }
@@ -298,6 +297,7 @@ size_t proc_map_raw(badge_err_t *ec, process_t *proc, size_t vaddr_req, size_t m
 
     proc_memmap_t *map = &proc->memmap;
     if (map->regions_len >= PROC_MEMMAP_MAX_REGIONS) {
+        logk(LOG_WARN, "Out of regions");
         badge_err_set(ec, ELOC_PROCESS, ECAUSE_NOMEM);
         return 0;
     }
@@ -305,6 +305,7 @@ size_t proc_map_raw(badge_err_t *ec, process_t *proc, size_t vaddr_req, size_t m
     // Allocate memory to the process.
     void *base = buddy_allocate(min_size, BLOCK_TYPE_USER, 0);
     if (!base) {
+        logk(LOG_WARN, "Out of vmem");
         badge_err_set(ec, ELOC_PROCESS, ECAUSE_NOMEM);
         return 0;
     }

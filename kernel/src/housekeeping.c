@@ -49,7 +49,7 @@ int hk_task_time_cmp(void const *a, void const *b) {
 
 
 // Stack for the housekeeping thread.
-static uint8_t         hk_stack[8192];
+static uint8_t         hk_stack[8192] ALIGNED_TO(16);
 // The housekeeping thread handle.
 static sched_thread_t *hk_thread;
 // Task mutex.
@@ -74,7 +74,7 @@ void hk_thread_func(void *ignored) {
             if (task.interval > 0 && task.next_time <= TIMESTAMP_US_MAX - task.interval) {
                 // Repeated tasks get put back into the queue.
                 task.next_time += task.interval;
-                array_sorted_insert(queue, sizeof(taskent_t), queue_len, &task, hk_task_time_cmp);
+                array_sorted_insert(queue, sizeof(taskent_t), queue_len - 1, &task, hk_task_time_cmp);
             } else {
                 // One-time tasks are removed.
                 queue_len--;

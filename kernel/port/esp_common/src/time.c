@@ -38,16 +38,18 @@ void time_init() {
     LP_WDT.wprotect.val = 0x50D83AA1;
     LP_WDT.config0.val  = 0;
 
+    TIMERG0.regclk.clk_en = true;
+    TIMERG1.regclk.clk_en = true;
+
     // Configure interrupts.
 #ifdef BADGEROS_PORT_esp32c6
-#if TIMER_SYSTICK_NUM / ESP_TIMG_TIMER_COUNT
-    irq_ch_route(EXT_IRQ_TG1_T0_INTR, INT_CHANNEL_TIMER_ALARM);
-#else
     irq_ch_route(EXT_IRQ_TG0_T0_INTR, INT_CHANNEL_TIMER_ALARM);
+#endif
+#ifdef BADGEROS_PORT_esp32p4
+    irq_ch_route(ETS_TG0_T0_INTR_SOURCE, INT_CHANNEL_TIMER_ALARM);
 #endif
     irq_ch_set_isr(INT_CHANNEL_TIMER_ALARM, timer_isr_timer_alarm);
     irq_ch_enable(INT_CHANNEL_TIMER_ALARM, true);
-#endif
 
     // Configure SYSTICK timer.
     timer_set_freq(TIMER_SYSTICK_NUM, TIMER_SYSTICK_RATE);
@@ -71,7 +73,7 @@ void timer_set_freq(int timerno, frequency_hz_t freq) {
     frequency_hz_t base_freq;
 #ifdef BADGEROS_PORT_esp32p4
     // TODO: Determine what selects timer clock source.
-    base_freq = 80000000;
+    base_freq = 40000000;
 #endif
 #ifdef BADGEROS_PORT_esp32c6
     uint32_t clksrc;
@@ -102,7 +104,9 @@ void timer_set_freq(int timerno, frequency_hz_t freq) {
 // Start timer.
 void timer_start(int timerno) {
     GET_TIMER_INFO(timerno)
-    timg->hw_timer[timer].config.tx_en = true;
+    timg->hw_timer[timer].config.tx_divcnt_rst = false;
+    timg->hw_timer[timer].config.tx_increase   = true;
+    timg->hw_timer[timer].config.tx_en         = true;
 }
 
 // Stop timer.
@@ -114,12 +118,12 @@ void timer_stop(int timerno) {
 // Configure timer alarm.
 void timer_alarm_config(int timerno, int64_t threshold, bool reset_on_alarm) {
     GET_TIMER_INFO(timerno)
+    timg->hw_timer[timer].alarmlo.val = threshold;
+    timg->hw_timer[timer].alarmhi.val = threshold >> 32;
     timg_txconfig_reg_t tmp           = timg->hw_timer[timer].config;
     tmp.tx_autoreload                 = reset_on_alarm;
     tmp.tx_alarm_en                   = true;
     timg->hw_timer[timer].config      = tmp;
-    timg->hw_timer[timer].alarmlo.val = threshold;
-    timg->hw_timer[timer].alarmhi.val = threshold >> 32;
 }
 
 // Disable timer alarm.
