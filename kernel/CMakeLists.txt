@@ -19,7 +19,7 @@ endif()
 
 # Set the C compiler
 if(NOT DEFINED CMAKE_C_COMPILER)
-    find_program(CMAKE_C_COMPILER NAMES riscv32-unknown-linux-gnu-gcc riscv32-linux-gnu-gcc riscv64-unknown-linux-gnu-gcc riscv64-linux-gnu-gcc REQUIRED)
+    find_program(CMAKE_C_COMPILER NAMES riscv32-badgeros-linux-gnu-gcc riscv32-unknown-linux-gnu-gcc riscv32-linux-gnu-gcc riscv64-unknown-linux-gnu-gcc riscv64-linux-gnu-gcc REQUIRED)
     message("Detected RISC-V C compiler as '${CMAKE_C_COMPILER}'")
 else()
     message("Using compiler '${CMAKE_C_COMPILER}' from environment")
@@ -27,8 +27,8 @@ endif()
 
 # Determine the compiler prefix
 get_filename_component(compiler_name "${CMAKE_C_COMPILER}" NAME)
-string(REGEX MATCH "^([A-Za-z0-9_]+\-)*" BADGER_COMPILER_PREFIX "${compiler_name}") 
-find_program(BADGER_OBJCOPY NAMES "${BADGER_COMPILER_PREFIX}objcopy" REQUIRED)  
+string(REGEX MATCH "^([A-Za-z0-9_]+\-)*" BADGER_COMPILER_PREFIX "${compiler_name}")
+find_program(BADGER_OBJCOPY NAMES "${BADGER_COMPILER_PREFIX}objcopy" REQUIRED)
 find_program(BADGER_OBJDUMP NAMES "${BADGER_COMPILER_PREFIX}objdump" REQUIRED)
 
 # Include port-specific.
@@ -38,8 +38,10 @@ include(cpu/riscv/CMakeLists.txt)
 # LTO is disabled due to GCC bugs inserting calls to memcpy everywhere
 set(common_compiler_flags
     -ffreestanding                     # We do not compile against an OS.
+    -static -fno-pic                   # Disable PIC
+    -fno-exceptions
     -march=${target_arch}              # Selects the target CPU.
-    -mabi=${target_abi}                # Selects target ABI 
+    -mabi=${target_abi}                # Selects target ABI
     -nodefaultlibs -nostdlib           # Do not link any default libraries like libgcc or libc.
     -O2                                # Optimize the code.
     -ggdb                              # Generate debug information in default extended format.
@@ -48,10 +50,12 @@ set(common_compiler_flags
     -std=gnu11                         # We use the C11 standard
     -DBADGEROS_KERNEL                  # Tell the code we're building for the kernel
     -DBADGEROS_PORT_${BADGEROS_PORT}
+    -DBADGEROS_PORT="${BADGEROS_PORT}"
     -DBADGEROS_MALLOC_DEBUG_LEVEL=3    # Malloc debug level set to WARN
     -DSOFTBIT                          # Turn on our emulated bit operations
     -fno-omit-frame-pointer            # Always use frame pointer
     -ffunction-sections
+    -fno-stack-protector
     -fno-exceptions
 )
 if("${CMAKE_BUILD_TYPE}" MATCHES "Release")
@@ -60,7 +64,7 @@ else()
 message("Building in debug mode")
 set(common_compiler_flags ${common_compiler_flags}
     -fsanitize=undefined               # Adds sanitizer for undefined behaviour.
-    -fsanitize-undefined-trap-on-error # Invoke a trap instruction instead of calling into the UBsan runtime.
+    -fsanitize-undefined-trap-on-error
 )
 endif()
 
@@ -141,7 +145,7 @@ add_custom_command(
 # Proxy target to allow installation of the bin file
 add_custom_target(badger-os.bin.target ALL DEPENDS badger-os.bin)
 
-# Also build a dump file that is put into the 
+# Also build a dump file that is put into the
 add_custom_target(
     badger-os.elf.disasm
     ALL

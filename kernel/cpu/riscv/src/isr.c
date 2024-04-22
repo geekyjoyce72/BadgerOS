@@ -7,6 +7,7 @@
 #include "cpu/isr_ctx.h"
 #include "cpu/panic.h"
 #include "log.h"
+#include "port/hardware.h"
 #include "process/internal.h"
 #include "process/types.h"
 #include "rawprint.h"
@@ -53,14 +54,26 @@ void riscv_trap_handler() {
     // TODO: Per-CPU double trap detection.
     static int trap_depth = 0;
 
-    uint32_t mcause, mstatus, mtval, mepc;
-    asm volatile("csrr %0, mstatus" : "=r"(mstatus));
+    long mcause, mstatus, mtval, mepc;
     asm volatile("csrr %0, mcause" : "=r"(mcause));
+    if (mcause < 0) {
+        riscv_interrupt_handler();
+        return;
+    }
+    asm volatile("csrr %0, mstatus" : "=r"(mstatus));
 
     trap_depth++;
-    if ((mcause & 31) == RISCV_TRAP_U_ECALL) {
+    isr_ctx_t recurse_ctx;
+    recurse_ctx.mpu_ctx          = NULL;
+    recurse_ctx.is_kernel_thread = true;
+    recurse_ctx.use_sp           = true;
+    isr_ctx_t *kctx              = isr_ctx_swap(&recurse_ctx);
+    recurse_ctx.thread           = kctx->thread;
+
+    if ((mcause & RISCV_VT_ICAUSE_MASK) == RISCV_TRAP_U_ECALL) {
         // ECALL from U-mode goes to system call handler instead of trap handler.
         sched_raise_from_isr(true, syscall_handler);
+        isr_ctx_swap(kctx);
         trap_depth--;
         return;
     }
@@ -100,9 +113,6 @@ void riscv_trap_handler() {
     rawputc('\r');
     rawputc('\n');
 
-    isr_ctx_t *kctx;
-    asm volatile("csrr %0, mscratch" : "=r"(kctx));
-
     // Print privilige mode.
     if (trap_depth == 1) {
         if (mstatus & (3 << RISCV_STATUS_MPP_BASE_BIT)) {
@@ -124,9 +134,7 @@ void riscv_trap_handler() {
         rawprintdec(kctx->thread->process->pid, 1);
     }
     rawprint("\n");
-    if (trap_depth == 1) {
-        backtrace_from_ptr(kctx->frameptr);
-    }
+    backtrace_from_ptr(kctx->frameptr);
 
     isr_ctx_dump(kctx);
 
@@ -137,6 +145,7 @@ void riscv_trap_handler() {
         // When the user traps just stop the process.
         sched_raise_from_isr(false, kill_proc_on_trap);
     }
+    isr_ctx_swap(kctx);
     trap_depth--;
 }
 

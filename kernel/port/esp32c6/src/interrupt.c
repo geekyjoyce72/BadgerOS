@@ -110,3 +110,23 @@ void riscv_interrupt_handler() {
     // Acknowledge interrupt.
     irq_ch_ack(mcause);
 }
+
+
+
+// Enable/disable an internal interrupt.
+void irq_ch_enable(int int_irq, bool enable) {
+    assert_dev_drop(int_irq > 0 && int_irq < 32);
+    long mask = 1 << int_irq;
+    if (enable) {
+        asm volatile("csrs mie, %0" ::"r"(mask));
+    } else {
+        asm volatile("csrc mie, %0" ::"r"(mask));
+    }
+}
+
+// Query whether an internal interrupt is enabled.
+bool irq_ch_enabled(int int_irq) {
+    long mask;
+    asm("csrr %0, mie" : "=r"(mask));
+    return ((mask) >> int_irq) & 1;
+}

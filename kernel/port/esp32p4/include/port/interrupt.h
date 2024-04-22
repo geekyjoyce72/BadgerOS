@@ -4,6 +4,6 @@
 #pragma once
 
 #include "cpu/interrupt.h"
-// #include "soc/ext_irq.h"
+#include "soc/interrupts.h"
 
-#define EXT_IRQ_COUNT 77
+#define EXT_IRQ_COUNT ETS_MAX_INTR_SOURCE

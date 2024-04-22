@@ -44,7 +44,6 @@ static bool        allow_proc1_death() {
 // Clean up: the housekeeping task.
 static void clean_up_from_housekeeping(int taskno, void *arg) {
     (void)taskno;
-    logk(LOG_DEBUG, "kaboom");
     proc_delete((pid_t)arg);
 }
 
@@ -261,7 +260,7 @@ sched_thread_t *proc_create_thread_raw_unsafe(
     // Add the thread to the list.
     array_insert(process->threads, sizeof(sched_thread_t *), process->threads_len, &thread, process->threads_len);
     process->threads_len++;
-    logkf(LOG_DEBUG, "Creating user thread, PC: 0x%{size;x}", entry_point);
+    // logkf(LOG_DEBUG, "Creating user thread, PC: 0x%{size;x}", entry_point);
 
     return thread;
 }
@@ -298,6 +297,7 @@ size_t proc_map_raw(badge_err_t *ec, process_t *proc, size_t vaddr_req, size_t m
 
     proc_memmap_t *map = &proc->memmap;
     if (map->regions_len >= PROC_MEMMAP_MAX_REGIONS) {
+        logk(LOG_WARN, "Out of regions");
         badge_err_set(ec, ELOC_PROCESS, ECAUSE_NOMEM);
         return 0;
     }
@@ -305,18 +305,12 @@ size_t proc_map_raw(badge_err_t *ec, process_t *proc, size_t vaddr_req, size_t m
     // Allocate memory to the process.
     void *base = buddy_allocate(min_size, BLOCK_TYPE_USER, 0);
     if (!base) {
+        logk(LOG_WARN, "Out of vmem");
         badge_err_set(ec, ELOC_PROCESS, ECAUSE_NOMEM);
         return 0;
     }
     size_t size = buddy_get_size(base);
     mem_set(base, 0, size);
-
-    // Update memory protection.
-    if (!memprotect(&map->mpu_ctx, (size_t)base, (size_t)base, size, flags & MEMPROTECT_FLAG_RWX)) {
-        buddy_deallocate(base);
-        badge_err_set(ec, ELOC_PROCESS, ECAUSE_NOMEM);
-        return 0;
-    }
 
     // Account the process's memory.
     map->regions[map->regions_len] = (proc_memmap_ent_t){
@@ -327,6 +321,20 @@ size_t proc_map_raw(badge_err_t *ec, process_t *proc, size_t vaddr_req, size_t m
     };
     map->regions_len++;
     proc_memmap_sort_raw(map);
+
+    // Update memory protection.
+    if (!memprotect(map, &map->mpu_ctx, (size_t)base, (size_t)base, size, flags & MEMPROTECT_FLAG_RWX)) {
+        for (size_t i = 0; i < map->regions_len; i++) {
+            if (map->regions[i].base == (size_t)base) {
+                array_remove(&map->regions[0], sizeof(map->regions[0]), map->regions_len, NULL, i);
+                break;
+            }
+        }
+        map->regions_len--;
+        buddy_deallocate(base);
+        badge_err_set(ec, ELOC_PROCESS, ECAUSE_NOMEM);
+        return 0;
+    }
     memprotect_commit(&map->mpu_ctx);
 
     logkf(LOG_INFO, "Mapped %{size;d} bytes at %{size;x} to process %{d}", size, base, proc->pid);
@@ -339,12 +347,14 @@ void proc_unmap_raw(badge_err_t *ec, process_t *proc, size_t base) {
     proc_memmap_t *map = &proc->memmap;
     for (size_t i = 0; i < map->regions_len; i++) {
         if (map->regions[i].base == base) {
-            assert_dev_drop(memprotect(&map->mpu_ctx, base, base, map->regions[i].size, 0));
-            memprotect_commit(&map->mpu_ctx);
-            buddy_deallocate((void *)base);
+            proc_memmap_ent_t region = map->regions[i];
             array_remove(&map->regions[0], sizeof(map->regions[0]), map->regions_len, NULL, i);
             map->regions_len--;
+            assert_dev_keep(memprotect(map, &map->mpu_ctx, base, base, region.size, 0));
+            memprotect_commit(&map->mpu_ctx);
+            buddy_deallocate((void *)base);
             badge_err_set_ok(ec);
+            logkf(LOG_INFO, "Unmapped %{size;d} bytes at %{size;x} from process %{d}", region.size, base, proc->pid);
             return;
         }
     }
