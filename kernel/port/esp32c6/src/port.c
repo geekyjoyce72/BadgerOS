@@ -3,7 +3,9 @@
 
 #include "port/port.h"
 
+#include "port/clkconfig.h"
 #include "port/pmu_init.h"
+#include "soc/pcr_struct.h"
 #include "soc/uart_struct.h"
 #include "soc/usb_serial_jtag_struct.h"
 #include "time.h"
@@ -15,6 +17,11 @@
 void port_early_init() {
     // Initialise PMU.
     pmu_init();
+    // Power up UART.
+    PCR.uart0_pd_ctrl.uart0_mem_force_pd = false;
+    PCR.uart0_pd_ctrl.uart0_mem_force_pu = true;
+    PCR.uart0_conf.uart0_rst_en          = false;
+    PCR.uart0_conf.uart0_clk_en          = true;
 }
 
 // Full hardware initialization.
