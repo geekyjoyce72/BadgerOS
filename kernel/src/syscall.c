@@ -59,7 +59,7 @@ SYSCALL_HANDLER_SIGNATURE {
         case SYSCALL_FS_READ: retval = syscall_fs_read(a0, (void *)a1, a2); break;
         case SYSCALL_FS_WRITE: retval = syscall_fs_write(a0, (void const *)a1, a2); break;
         case SYSCALL_FS_GETDENTS: retval = syscall_fs_getdents(a0, (void *)a1, a2); break;
-        case SYSCALL_MEM_ALLOC: retval = (long long)syscall_mem_alloc(a0, a1, a2, a3); break;
+        case SYSCALL_MEM_ALLOC: retval = (size_t)syscall_mem_alloc(a0, a1, a2, a3); break;
         case SYSCALL_MEM_SIZE: retval = syscall_mem_size((void *)a0); break;
         case SYSCALL_MEM_DEALLOC: syscall_mem_dealloc((void *)a0); break;
         default: invalid_syscall(sysnum); break;
