@@ -18,11 +18,14 @@ if(NOT DEFINED BADGER_RAMFS_ROOT)
 endif()
 
 # Set the C compiler
-if(NOT DEFINED CMAKE_C_COMPILER)
+if(DEFINED CMAKE_C_COMPILER)
+    message("Using compiler '${CMAKE_C_COMPILER}' from environment")
+elseif(DEFINED ENV{CMAKE_C_COMPILER})
+    set(CMAKE_C_COMPILER $ENV{CMAKE_C_COMPILER})
+    message("Using compiler '${CMAKE_C_COMPILER}' from environment")
+else()
     find_program(CMAKE_C_COMPILER NAMES riscv32-badgeros-linux-gnu-gcc riscv32-unknown-linux-gnu-gcc riscv32-linux-gnu-gcc riscv64-unknown-linux-gnu-gcc riscv64-linux-gnu-gcc REQUIRED)
     message("Detected RISC-V C compiler as '${CMAKE_C_COMPILER}'")
-else()
-    message("Using compiler '${CMAKE_C_COMPILER}' from environment")
 endif()
 
 # Determine the compiler prefix

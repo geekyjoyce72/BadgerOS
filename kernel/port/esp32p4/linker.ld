@@ -15,7 +15,7 @@ MEMORY
 
 SECTIONS
 {
-	/DISCARD/ : { *(.note.gnu.build-id) *(.eh_frame*) }
+	/DISCARD/ : { *(.note.GNU-stack) *(.eh_frame) *(.eh_frame.*) }
 
 	/* Import hardware addresses. */
 INCLUDE esp32p4.peripherals.ld
@@ -56,7 +56,7 @@ PROVIDE(CLIC_CTL = 0x20801000);
 		SHORT(0xffff);		/* Max chip rev. */
 		LONG(0x00000000);	/* (reserved) */
 		BYTE(0x00);			/* SHA256 appended (not appended). */
-	} > xip
+	} >xip
 	
 	/* ESP image segment 0: code. */
 	.espseg.0 : AT(LOADADDR(.esphdr) + SIZEOF(.esphdr)) {
@@ -74,7 +74,7 @@ PROVIDE(CLIC_CTL = 0x20801000);
 	.text : AT(LOADADDR(.init_array) + SIZEOF(.init_array)) {
 		. = ALIGN(256);
 		*(.interrupt_vector_table)
-		*(.text) *(.text*)
+		*(.text) *(.text.*)
 		. = ALIGN(4);
 	} >xip
 	__stop_text = .;
@@ -88,13 +88,13 @@ PROVIDE(CLIC_CTL = 0x20801000);
 	__start_rodata = .;
 	.got : AT(LOADADDR(.espseg.1) + SIZEOF(.espseg.1)) {
 		*(.got.plt) *(.igot.plt) *(.got) *(.igot)
-	}
+	} >xip
 	.plt : AT(LOADADDR(.got) + SIZEOF(.got)) {
 		*(.plt) *(.iplt)
-	}
+	} >xip
 	.rodata : AT(LOADADDR(.plt) + SIZEOF(.plt)) {
 		. = ALIGN(__section_alignment);
-		*(.rodata) *(.rodata*)
+		*(.rodata) *(.rodata.*)
 		. = ALIGN(4);
 	} >xip
 	__stop_rodata = .;
@@ -109,13 +109,13 @@ PROVIDE(CLIC_CTL = 0x20801000);
 	__start_data = .;
 	.data : AT(LOADADDR(.espseg.2) + SIZEOF(.espseg.2)) {
 		. = ALIGN(__section_alignment);
-		*(.data) *(.data*)
+		*(.data) *(.data.*)
 		. = ALIGN(__section_alignment);
 	} >sram
 	__start_ss = .;
 	.sdata : AT(LOADADDR(.data) + SIZEOF(.data)) {
-		*(.sdata) *(.sdata*)
-		*(.srodata) *(.srodata*)
+		*(.sdata) *(.sdata.*)
+		*(.srodata) *(.srodata.*)
 		. = ALIGN(4);
 	} >sram
 	__stop_data = .;
@@ -129,7 +129,7 @@ PROVIDE(CLIC_CTL = 0x20801000);
 	__stop_ss = .;
 	.bss : {
 		. = ALIGN(__section_alignment);
-		*(.bss) *(.bss.*)
+		*(.bss) *(.bss.*) *(COMMON)
 	} >sram :NONE
 	__stop_bss = .;
 	PROVIDE( __global_pointer$ = (__stop_ss + __start_ss) / 2 );
