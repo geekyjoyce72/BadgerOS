@@ -49,6 +49,7 @@ set(common_compiler_flags
     -O2                                # Optimize the code.
     -ggdb                              # Generate debug information in default extended format.
     -Werror=return-type                # Error when a function doesn't return a value, but declares to do so.
+    -Werror=implicit-fallthrough
     -Wall -Wextra                      # Ramp up warning level.
     -std=gnu11                         # We use the C11 standard
     -DBADGEROS_KERNEL                  # Tell the code we're building for the kernel
@@ -103,6 +104,7 @@ add_executable(${target}
     ${CMAKE_CURRENT_LIST_DIR}/src/filesystem/vfs_internal.c
     ${CMAKE_CURRENT_LIST_DIR}/src/loading/kbelfx.c
     ${CMAKE_CURRENT_LIST_DIR}/src/process/process.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/process/sighandler.c
     ${CMAKE_CURRENT_LIST_DIR}/src/process/syscall_impl.c
     ${CMAKE_CURRENT_LIST_DIR}/src/housekeeping.c
     ${CMAKE_CURRENT_LIST_DIR}/src/main.c
