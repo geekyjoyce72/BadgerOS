@@ -18,11 +18,14 @@ if(NOT DEFINED BADGER_RAMFS_ROOT)
 endif()
 
 # Set the C compiler
-if(NOT DEFINED CMAKE_C_COMPILER)
+if(DEFINED CMAKE_C_COMPILER)
+    message("Using compiler '${CMAKE_C_COMPILER}' from environment")
+elseif(DEFINED ENV{CMAKE_C_COMPILER})
+    set(CMAKE_C_COMPILER $ENV{CMAKE_C_COMPILER})
+    message("Using compiler '${CMAKE_C_COMPILER}' from environment")
+else()
     find_program(CMAKE_C_COMPILER NAMES riscv32-badgeros-linux-gnu-gcc riscv32-unknown-linux-gnu-gcc riscv32-linux-gnu-gcc riscv64-unknown-linux-gnu-gcc riscv64-linux-gnu-gcc REQUIRED)
     message("Detected RISC-V C compiler as '${CMAKE_C_COMPILER}'")
-else()
-    message("Using compiler '${CMAKE_C_COMPILER}' from environment")
 endif()
 
 # Determine the compiler prefix
@@ -46,6 +49,7 @@ set(common_compiler_flags
     -O2                                # Optimize the code.
     -ggdb                              # Generate debug information in default extended format.
     -Werror=return-type                # Error when a function doesn't return a value, but declares to do so.
+    -Werror=implicit-fallthrough
     -Wall -Wextra                      # Ramp up warning level.
     -std=gnu11                         # We use the C11 standard
     -DBADGEROS_KERNEL                  # Tell the code we're building for the kernel
@@ -100,6 +104,7 @@ add_executable(${target}
     ${CMAKE_CURRENT_LIST_DIR}/src/filesystem/vfs_internal.c
     ${CMAKE_CURRENT_LIST_DIR}/src/loading/kbelfx.c
     ${CMAKE_CURRENT_LIST_DIR}/src/process/process.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/process/sighandler.c
     ${CMAKE_CURRENT_LIST_DIR}/src/process/syscall_impl.c
     ${CMAKE_CURRENT_LIST_DIR}/src/housekeeping.c
     ${CMAKE_CURRENT_LIST_DIR}/src/main.c

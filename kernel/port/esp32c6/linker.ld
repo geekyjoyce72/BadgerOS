@@ -1,9 +1,19 @@
 
 /* SPDX-License-Identifier: MIT */
 
+OUTPUT_FORMAT("elf32-littleriscv")
+OUTPUT_ARCH(riscv)
+ENTRY(_start)
+
+MEMORY
+{
+	xip    (RX)  : ORIGIN = 0x42000000, LENGTH = 16M
+	sram   (RWX) : ORIGIN = 0x40800000, LENGTH = 512K
+	lpsram (RWX) : ORIGIN = 0x50000000, LENGTH = 16K
+}
+
 PHDRS
 {
-	hdrseg    PT_LOAD;
 	codeseg   PT_LOAD;
 	rodataseg PT_LOAD;
 	dataseg   PT_LOAD;
@@ -11,7 +21,7 @@ PHDRS
 
 SECTIONS
 {
-	/DISCARD/ : { *(.note.gnu.build-id) }
+	/DISCARD/ : { *(.note) *(.note.*) *(.eh_frame) *(.eh_frame.*) }
 
 	/* Import hardware addresses. */
 INCLUDE esp32c6.peripherals.ld
@@ -31,34 +41,13 @@ PROVIDE(CLINT_U = 0x20001C00);
 	
 	__section_alignment = 16;
 	
-	/* RAM sections. */
-	. = __start_sram;
-	__start_data = .;
-	.data : AT(SIZEOF(.esphdr) + SIZEOF(.espseg.0)) {
-		__global_pointer$ = .;
-		*(.data) *(.data*)
-		*(.sdata) *(.sdata*)
-		. = ALIGN(__section_alignment);
-	} :dataseg
-	__stop_data = .;
-	
-	__start_bss = .;
-	.bss : {
-		*(.bss) *(.bss*)
-		*(.sbss) *(.sbss*)
-		. = ALIGN(__section_alignment);
-	} :NONE
-	__stop_bss = .;
-	
-	/* FLASH sections. */
-	. = __start_xip;
-	
 	/* ESP image header. */
+	. = __start_xip;
 	.esphdr : AT(0) {
 		BYTE(0xE9);			/* Magic byte. */
 		BYTE(3);			/* Segment count. */
 		BYTE(0x02);			/* SPI mode. */
-		BYTE(0x10);			/* SPI speed/size. */
+		BYTE(0x1f);			/* SPI speed/size. */
 		LONG(_start);		/* Entrypoint. */
 		BYTE(0xee);			/* WP pin state. */
 		BYTE(0x00);			/* Drive settings. */
@@ -67,58 +56,94 @@ PROVIDE(CLINT_U = 0x20001C00);
 		SHORT(0x000D);		/* Chip (ESP32-C6). */
 		BYTE(0x00);			/* (deprecated) */
 		SHORT(0x0000);		/* Min chip rev. */
-		SHORT(0x0000);		/* Max chip rev. */
+		SHORT(0xffff);		/* Max chip rev. */
 		LONG(0x00000000);	/* (reserved) */
 		BYTE(0x00);			/* SHA256 appended (not appended). */
-	} :hdrseg
+	} >xip :codeseg
 	
-	/* ESP image segment 0. */
+	/* ESP image segment 0: code. */
 	.espseg.0 : AT(LOADADDR(.esphdr) + SIZEOF(.esphdr)) {
-		LONG(__start_data);
-		LONG(__stop_data - __start_data);
-	} :hdrseg
-	
-	/* Defined above: Initialised data segment. */
-	. = . + SIZEOF(.data);
-	
-	/* ESP image segment 1. */
-	.espseg.1 : AT(LOADADDR(.data) + SIZEOF(.data)) {
 		LONG(__start_text);
 		LONG(__stop_text - __start_text);
-	} :codeseg
+	} >xip :codeseg
 	
-	/* Code sections. */
 	__start_text = .;
-	.text : AT(LOADADDR(.espseg.1) + SIZEOF(.espseg.1)) {
+	.init_array : AT(LOADADDR(.espseg.0) + SIZEOF(.espseg.0)) {
+		. = ALIGN(4);
+		__start_init_array = .;
+		*(.init_array)
+		__stop_init_array = .;
+	} >xip :codeseg
+	.text : AT(LOADADDR(.init_array) + SIZEOF(.init_array)) {
 		. = ALIGN(256);
 		*(.interrupt_vector_table)
-		*(.text) *(.text*)
-		. = ALIGN(__section_alignment);
-	} :codeseg
+		*(.text) *(.text.*)
+		. = ALIGN(4);
+	} >xip :codeseg
 	__stop_text = .;
 	
-	/* ESP image segment 2. */
-	.espseg.2 : AT(LOADADDR(.text) + SIZEOF(.text)) {
+	/* ESP image segment 1: rodata. */
+	.espseg.1 : AT(LOADADDR(.text) + SIZEOF(.text)) {
 		LONG(__start_rodata);
 		LONG(__stop_rodata - __start_rodata);
-	} :rodataseg
+	} >xip :codeseg
 	
-	/* Read-only data sections. */
 	__start_rodata = .;
-	.init_array : AT(LOADADDR(.espseg.2) + SIZEOF(.espseg.2)) {
-		/* Create symbols to keep track of `.init_array`. */
-		__start_init_array = .;
-		KEEP(*(.init_array))
-		__stop_init_array = .;
+	.got : AT(LOADADDR(.espseg.1) + SIZEOF(.espseg.1)) {
+		*(.got.plt) *(.igot.plt) *(.got) *(.igot)
+	} >xip :rodataseg
+	.plt : AT(LOADADDR(.got) + SIZEOF(.got)) {
+		*(.plt) *(.iplt)
+	} >xip :rodataseg
+	.rodata : AT(LOADADDR(.plt) + SIZEOF(.plt)) {
 		. = ALIGN(__section_alignment);
-	} :rodataseg
-	.rodata : AT(LOADADDR(.init_array) + SIZEOF(.init_array)) {
-		*(.rodata) *(.rodata*)
-		*(.srodata) *(.srodata*)
-		*(.eh_frame) *(.eh_frame_hdr*)
-		. = ALIGN(__section_alignment);
-	} :rodataseg
+		*(.rodata) *(.rodata.*)
+		. = ALIGN(4);
+	} >xip :rodataseg
 	__stop_rodata = .;
+	
+	/* ESP image segment 2: data. */
+	.espseg.2 : AT(LOADADDR(.rodata) + SIZEOF(.rodata)) {
+		LONG(__start_data);
+		LONG(__stop_data - __start_data);
+	} >xip :rodataseg
+	
+	. = __start_sram;
+	__start_data = .;
+	.data : AT(LOADADDR(.espseg.2) + SIZEOF(.espseg.2)) {
+		. = ALIGN(__section_alignment);
+		*(.data) *(.data.*)
+		. = ALIGN(__section_alignment);
+	} >sram :dataseg
+	__start_ss = .;
+	.sdata : AT(LOADADDR(.data) + SIZEOF(.data)) {
+		*(.sdata) *(.sdata.*)
+		*(.srodata) *(.srodata.*)
+		. = ALIGN(4);
+	} >sram :dataseg
+	__stop_data = .;
+	
+	/* Zero-initialized */
+	__start_bss = .;
+	.sbss : {
+		. = ALIGN(__section_alignment);
+		*(.sbss) *(.sbss.*)
+	} >sram :NONE
+	__stop_ss = .;
+	.bss : {
+		. = ALIGN(__section_alignment);
+		*(.bss) *(.bss.*) *(COMMON)
+	} >sram :NONE
+	__stop_bss = .;
+	PROVIDE( __global_pointer$ = (__stop_ss + __start_ss) / 2 );
+	
+	/* Uninitialized */
+	. = ALIGN(__section_alignment);
+	__start_noinit = .;
+	.noinit : {
+		*(.noinit) *(.noinit.*)
+	} >sram :NONE
+	__stop_noinit = .;
 	
 	/* Unallocated physical memory. */
 	__start_free_xip    = (__stop_rodata + 0xffff) & 0xffff0000;
@@ -128,5 +153,3 @@ PROVIDE(CLINT_U = 0x20001C00);
 	__start_free_lpsram = __start_lpsram;
 	__stop_free_lpsram  = __stop_lpsram;
 }
-
-ENTRY(_start)

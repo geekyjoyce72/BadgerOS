@@ -269,14 +269,20 @@ void pmu_init() {
         PMU_HP_PD_CPU,
         PMU_HP_PD_WIFI,
     };
+    pmu_power_domain_cntl_reg_t powerup = {
+        .force_reset    = false,
+        .force_iso      = false,
+        .force_pu       = false,
+        .force_no_reset = false,
+        .force_no_iso   = false,
+        .force_pd       = false,
+        .mask           = 0x1f,
+        .pd_mask        = 0x00,
+    };
     for (int i = 0; i < 4; i++) {
-        pmu_hp_power_domain_t domain           = domains[i];
-        PMU.power.hp_pd[domain].force_reset    = false;
-        PMU.power.hp_pd[domain].force_iso      = false;
-        PMU.power.hp_pd[domain].force_pu       = false;
-        PMU.power.hp_pd[domain].force_no_reset = false;
-        PMU.power.hp_pd[domain].force_no_iso   = false;
-        PMU.power.hp_pd[domain].force_pd       = false;
+        pmu_hp_power_domain_t domain = domains[i];
+        PMU.power.hp_pd[domain].val  = powerup.val;
     }
-    PMU.power.mem_cntl.force_hp_mem_no_iso = false;
+    PMU.power.mem_cntl.force_hp_mem_no_iso = 0x0;
+    PMU.power.mem_cntl.force_hp_mem_pd     = 0x0;
 }

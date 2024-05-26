@@ -5,18 +5,18 @@
 
 #include "filesystem.h"
 #include "kbelf.h"
+#include "list.h"
 #include "memprotect.h"
 #include "mutex.h"
 #include "port/hardware_allocation.h"
 #include "scheduler/scheduler.h"
+#include "signal.h"
 
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
 
-
-#define PROC_MTX_TIMEOUT 50000
 
 // A memory map entry.
 typedef struct {
@@ -46,15 +46,31 @@ typedef struct {
     file_t real;
 } proc_fd_t;
 
+// Pending signal entry.
+typedef struct {
+    // Doubly-linked list node.
+    dlist_node_t node;
+    // Signal number.
+    int          signum;
+} sigpending_t;
+
 // Globally unique process ID.
 typedef int pid_t;
 
 // A process and all of its resources.
 typedef struct process_t {
+    // Node for child process list.
+    dlist_node_t     node;
+    // Parent process, NULL for process 1.
+    process_t       *parent;
+    // Process binary.
+    char const      *binary;
     // Number of arguments.
     int              argc;
     // Value of arguments.
     char           **argv;
+    // Size required to store all of argv.
+    size_t           argv_size;
     // Number of file descriptors.
     size_t           fds_len;
     // File descriptors.
@@ -71,6 +87,13 @@ typedef struct process_t {
     mutex_t          mtx;
     // Process status flags.
     atomic_int       flags;
+    // Pending signals list.
+    dlist_t          sigpending;
+    // Child process list.
+    dlist_t          children;
+    // Signal handler virtual addresses.
+    // First index is for signal handler returns.
+    size_t           sighandlers[SIG_COUNT];
     // Exit code if applicable.
-    int              exit_code;
+    int              state_code;
 } process_t;

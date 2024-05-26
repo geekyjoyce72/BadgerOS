@@ -35,11 +35,25 @@ static void timer_isr_timer_alarm() {
 
 // Initialise timer and watchdog subsystem.
 void time_init() {
-    LP_WDT.wprotect.val = 0x50D83AA1;
-    LP_WDT.config0.val  = 0;
-
+#ifdef BADGEROS_PORT_esp32c6
+    // Power up timers.
+    PCR.timergroup0_conf.tg0_rst_en                  = false;
+    PCR.timergroup0_conf.tg0_clk_en                  = true;
+    PCR.timergroup0_timer_clk_conf.tg0_timer_clk_sel = 0;
+    PCR.timergroup0_timer_clk_conf.tg0_timer_clk_en  = true;
+    PCR.timergroup0_wdt_clk_conf.tg0_wdt_clk_sel     = 0;
+    PCR.timergroup0_wdt_clk_conf.tg0_wdt_clk_en      = true;
+#endif
     TIMERG0.regclk.clk_en = true;
     TIMERG1.regclk.clk_en = true;
+
+    // Turn off watchdogs.
+    LP_WDT.wprotect.val     = 0x50D83AA1;
+    LP_WDT.config0.val      = 0;
+    TIMERG0.wdtwprotect.val = 0x50D83AA1;
+    TIMERG0.wdtconfig0.val  = 0;
+    TIMERG1.wdtwprotect.val = 0x50D83AA1;
+    TIMERG1.wdtconfig0.val  = 0;
 
     // Configure interrupts.
 #ifdef BADGEROS_PORT_esp32c6

@@ -18,10 +18,10 @@ void proc_suspend(process_t *process, sched_thread_t *current);
 void proc_resume(process_t *process);
 // Release all process runtime resources (threads, memory, files, etc.).
 // Does not remove args, exit code, etc.
-void proc_delete_runtime(process_t *process);
+void proc_delete_runtime_raw(process_t *process);
 
 // Create a new, empty process.
-process_t *proc_create_raw(badge_err_t *ec);
+process_t *proc_create_raw(badge_err_t *ec, pid_t parent, char const *binary, int argc, char const *const *argv);
 // Get a process handle by ID.
 process_t *proc_get(pid_t pid);
 // Get the process' flags.
@@ -29,11 +29,8 @@ uint32_t   proc_getflags_raw(process_t *process);
 // Get a handle to the current process, if any.
 process_t *proc_current();
 
-// Set arguments for a process.
-// If omitted, argc will be 0 and argv will be NULL.
-void proc_setargs_raw(badge_err_t *ec, process_t *process, int argc, char const *const *argv);
 // Load an executable and start a prepared process.
-void proc_start_raw(badge_err_t *ec, process_t *process, char const *executable);
+void proc_start_raw(badge_err_t *ec, process_t *process);
 
 // Create a new thread in a process.
 // Returns created thread handle.
@@ -56,3 +53,11 @@ int    proc_add_fd_raw(badge_err_t *ec, process_t *process, file_t real);
 file_t proc_find_fd_raw(badge_err_t *ec, process_t *process, int virt);
 // Remove a file from the process file handle list.
 void   proc_remove_fd_raw(badge_err_t *ec, process_t *process, int virt);
+
+// Perform a pre-resume check for a user thread.
+// Used to implement asynchronous events.
+void proc_pre_resume_cb(sched_thread_t *thread);
+// Atomically whether signals are pending.
+bool proc_signals_pending_raw(process_t *process);
+// Raise a signal to a process' main thread or a specified thread, while suspending it's other threads.
+void proc_raise_signal_raw(badge_err_t *ec, process_t *process, int signum);
