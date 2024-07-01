@@ -18,6 +18,12 @@ set(cpu_src
     ${CMAKE_CURRENT_LIST_DIR}/src/scheduler.c
     ${CMAKE_CURRENT_LIST_DIR}/src/usercopy.c
 )
+if(DEFINED cpu_riscv_enable_riscv_intc)
+    set(cpu_src ${cpu_src} ${CMAKE_CURRENT_LIST_DIR}/src/interrupt/riscv_intc.c)
+endif()
+if(DEFINED cpu_riscv_enable_sifive_plic)
+    set(cpu_src ${cpu_src} ${CMAKE_CURRENT_LIST_DIR}/src/interrupt/sifive_plic.c)
+endif()
 set(cpu_include ${CMAKE_CURRENT_LIST_DIR}/include)
 set(cpu_link)
 set(cpu_flags)

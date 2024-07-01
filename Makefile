@@ -27,9 +27,16 @@ openocd:
 gdb:
 	$(MAKE) -C kernel gdb
 
+qemu:
+	$(MAKE) -C kernel qemu
+
 flash:
 	$(MAKE) -C files build
 	$(MAKE) -C kernel flash
+
+image:
+	$(MAKE) -C files build
+	$(MAKE) -C kernel image
 
 monitor:
 	$(MAKE) -C kernel monitor

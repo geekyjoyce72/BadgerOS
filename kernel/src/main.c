@@ -1,23 +1,16 @@
 
 // SPDX-License-Identifier: MIT
 
-#include "backtrace.h"
 #include "badge_err.h"
-#include "esp_intmtx.h"
 #include "filesystem.h"
-#include "hal/gpio.h"
-#include "hal/i2c.h"
-#include "hal/spi.h"
 #include "housekeeping.h"
 #include "interrupt.h"
-#include "isr_ctx.h"
 #include "log.h"
 #include "malloc.h"
 #include "memprotect.h"
 #include "port/port.h"
 #include "process/process.h"
 #include "scheduler/scheduler.h"
-#include "soc/timer_group_struct.h"
 #include "time.h"
 
 #include <stdatomic.h>

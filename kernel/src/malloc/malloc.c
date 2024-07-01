@@ -61,7 +61,9 @@ void kernel_heap_init();
 
 void kernel_heap_init() {
 #ifdef BADGEROS_KERNEL
+#ifndef BADGEROS_PORT_generic
     init_pool(__start_free_sram, __stop_free_sram, 0);
+#endif
     init_kernel_slabs();
 #else
     SPIN_LOCK_LOCK(lock);

@@ -4,3 +4,9 @@
 [submodule "kernel/port/esp_common/esp-idf"]
 	path = kernel/port/esp_common/esp-idf
 	url = https://github.com/espressif/esp-idf
+[submodule "kernel/lib/opensbi"]
+	path = kernel/lib/opensbi
+	url = https://github.com/riscv-software-src/opensbi
+[submodule "kernel/lib/u-boot"]
+	path = kernel/lib/u-boot
+	url = https://github.com/u-boot/u-boot

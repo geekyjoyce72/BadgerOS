@@ -21,3 +21,4 @@ set(port_link ${port_link}
     -L${CMAKE_CURRENT_LIST_DIR}/esp-idf/components/soc/${BADGEROS_PORT}/ld/
     -L${CMAKE_CURRENT_LIST_DIR}/esp-idf/components/esp_rom/${BADGEROS_PORT}/ld/
 )
+set(create_esp32_bin true)

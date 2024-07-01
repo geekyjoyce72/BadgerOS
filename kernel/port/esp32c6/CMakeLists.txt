@@ -24,6 +24,8 @@ set(port_link
     -T${CMAKE_CURRENT_LIST_DIR}/linker.ld
     -L${CMAKE_CURRENT_LIST_DIR}/../esp_common/esp-idf/components/soc/esp32c6/ld/
 )
-set(port_flags)
+set(port_flags
+    -static -fno-pic
+)
 
 include(port/esp_common/CMakeLists.txt)

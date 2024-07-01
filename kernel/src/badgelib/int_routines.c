@@ -30,7 +30,7 @@ typedef unsigned int uti_t __attribute__((mode(TI)));
         u##type result;                                                                                                \
     } divmod_##name##_t;                                                                                               \
     static divmod_##name##_t divmod_##name(u##type remainder, u##type divisor) {                                       \
-        u##type const msb    = 1ull << (sizeof(type) * 8 - 1);                                                         \
+        u##type const msb    = (type)1 << (sizeof(type) * 8 - 1);                                                      \
         u##type       result = 0;                                                                                      \
         unsigned int  shift  = 0;                                                                                      \
         while (!(divisor & msb)) {                                                                                     \
@@ -204,7 +204,8 @@ int __clzti2(__uint128_t a) {
         a |= a >> i;
     }
     a++;
-    return hash_table[(a * 0x01061438916347932a5cd9d3ead7b77f) >> 121];
+    __uint128_t mul = ((__uint128_t)0x0106143891634793 << 64) | 0x2a5cd9d3ead7b77f;
+    return hash_table[(a * mul) >> 121];
 }
 #endif
 

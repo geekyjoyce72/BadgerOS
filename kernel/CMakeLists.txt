@@ -3,6 +3,9 @@
 
 cmake_minimum_required(VERSION 3.10.0)
 
+# For IDE users.
+set(CMAKE_EXPORT_COMPILE_COMMANDS true)
+
 set(CMAKE_TRY_COMPILE_TARGET_TYPE "STATIC_LIBRARY")
 
 # Set the RAMFS root
@@ -19,10 +22,9 @@ include(cpu/riscv/CMakeLists.txt)
 
 set(common_compiler_flags
     -ffreestanding                     # We do not compile against an OS.
-    -static -fno-pic                   # Disable PIC
     -march=${target_arch}              # Selects the target CPU.
     -mabi=${target_abi}                # Selects target ABI
-    -nodefaultlibs -nostdlib           # Do not link any default libraries like libgcc or libc.
+    -nodefaultlibs                     # Do not link any default libraries like libgcc or libc.
     -O2                                # Optimize the code.
     -ggdb                              # Generate debug information in default extended format.
     -Werror=return-type                # Error when a function doesn't return a value, but declares to do so.
@@ -51,10 +53,11 @@ endif()
 
 # we must pass the same options to GCC and LD when using LTO, as the linker will actually do the codegen
 add_compile_options(${common_compiler_flags} ${cpu_flags} ${port_flags})
-add_link_options(${common_compiler_flags} ${cpu_link} ${port_link} -Wl,--gc-sections -nostartfiles)
-
-# For IDE users.
-set(CMAKE_EXPORT_COMPILE_COMMANDS true)
+add_link_options(
+    ${common_compiler_flags} ${cpu_flags} ${port_flags}
+    ${cpu_link} ${port_link}
+    -Wl,--gc-sections -nodefaultlibs -nostartfiles
+)
 
 project(badgeros C ASM)
 
@@ -122,26 +125,28 @@ target_include_directories(kbelf PRIVATE
 target_link_libraries(${target} PRIVATE kbelf)
 
 
-# Convert the raw binary file into a ESP32 image file
-add_custom_command(
-    OUTPUT badger-os.bin
-    COMMAND cp badger-os.elf badger-os.elf.patch
-    COMMAND "${BADGER_OBJCOPY}" -O binary badger-os.elf badger-os.nochecksum.bin
-    COMMAND python3 "${CMAKE_CURRENT_LIST_DIR}/../tools/pack-image.py" badger-os.nochecksum.bin badger-os.bin
-    DEPENDS badger-os.elf
-)
-# Proxy target to allow installation of the bin file
-add_custom_target(badger-os.bin.target ALL DEPENDS badger-os.bin)
+# Copy the BadgerOS binary to the output directory.
+install(TARGETS badger-os.elf DESTINATION .)
 
-# Also build a dump file that is put into the
+# Create a disassembled version for easier debugging.
 add_custom_target(
     badger-os.elf.disasm
     ALL
-    COMMAND "${BADGER_OBJDUMP}" -Sd badger-os.elf > badger-os.elf.disasm
+    COMMAND ${BADGER_OBJDUMP} -Sd badger-os.elf > badger-os.elf.disasm
     DEPENDS badger-os.elf
 )
 
-# Declare which files are installed to the output directory:
-install(TARGETS badger-os.elf DESTINATION .)
-install(FILES "${CMAKE_CURRENT_BINARY_DIR}/badger-os.bin" DESTINATION .)
+if(${create_esp32_bin})
+    # Convert the raw binary file into a ESP32 image file
+    add_custom_command(
+        OUTPUT badger-os.bin
+        COMMAND cp badger-os.elf badger-os.elf.patch
+        COMMAND ${BADGER_OBJCOPY} -O binary badger-os.elf badger-os.nochecksum.bin
+        COMMAND python3 ${CMAKE_CURRENT_LIST_DIR}/../tools/pack-image.py badger-os.nochecksum.bin badger-os.bin
+        DEPENDS badger-os.elf
+    )
 
+    # Install the ESP32 image.
+    add_custom_target(badger-os.bin.target ALL DEPENDS badger-os.bin)
+    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/badger-os.bin DESTINATION .)
+endif()

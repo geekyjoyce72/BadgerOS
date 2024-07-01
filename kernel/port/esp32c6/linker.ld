@@ -70,13 +70,7 @@ PROVIDE(CLINT_U = 0x20001C00);
 	} >xip :codeseg
 	
 	__start_text = .;
-	.init_array : AT(LOADADDR(.espseg.0) + SIZEOF(.espseg.0)) {
-		. = ALIGN(4);
-		__start_init_array = .;
-		*(.init_array)
-		__stop_init_array = .;
-	} >xip :codeseg
-	.text : AT(LOADADDR(.init_array) + SIZEOF(.init_array)) {
+	.text : AT(LOADADDR(.espseg.0) + SIZEOF(.espseg.0)) {
 		. = ALIGN(256);
 		*(.interrupt_vector_table)
 		*(.text) *(.text.*)

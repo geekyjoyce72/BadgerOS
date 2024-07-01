@@ -67,18 +67,12 @@ PROVIDE(CLIC_CTL = 0x20801000);
 	} >xip :codeseg
 	
 	/* ESP image segment 0: code. */
-	.espseg.0 : AT(LOADADDR(.esphdr) + SIZEOF(.esphdr)) {
+	.espseg.0 : AT(LOADADDR(.espseg.0) + SIZEOF(.espseg.0)) {
 		LONG(__start_text);
 		LONG(__stop_text - __start_text);
 	} >xip :codeseg
 	
 	__start_text = .;
-	.init_array : AT(LOADADDR(.espseg.0) + SIZEOF(.espseg.0)) {
-		. = ALIGN(4);
-		__start_init_array = .;
-		*(.init_array)
-		__stop_init_array = .;
-	} >xip :codeseg
 	.text : AT(LOADADDR(.init_array) + SIZEOF(.init_array)) {
 		. = ALIGN(256);
 		*(.interrupt_vector_table)
