@@ -1,0 +1,3 @@
+file firmware/badger-os.elf
+b basic_runtime_init
+target remote :1234

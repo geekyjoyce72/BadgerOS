@@ -82,7 +82,7 @@
 #include <stdarg.h>
 
 #define FMT_I  "%{d}"
-#define FMT_ZI "%{d}"
+#define FMT_ZI "%{size;d}"
 #define FMT_S  "%{cs}"
 #define FMT_D  "%{d}"
 #define FMT_P  "%{size;x}"

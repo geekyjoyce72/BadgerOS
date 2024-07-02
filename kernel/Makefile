@@ -8,7 +8,7 @@ OUTPUT            ?= $(shell pwd)/firmware
 BUILDDIR          ?= build
 BADGER_RAMFS_ROOT ?= ../files/root
 BADGEROS_PORT     ?= esp32c6
-CROSS_COMPILE     ?= riscv32-badgeros-linux-gnu
+CROSS_COMPILE     ?= riscv64-unknown-linux-gnu-
 
 include port/$(BADGEROS_PORT)/port.mk
 
@@ -44,4 +44,4 @@ clang-tidy-check: configure
 
 .PHONY: gdb
 gdb:
-	$(CROSS_COMPILE)-gdb -x port/$(BADGEROS_PORT)/gdbinit build/badger-os.elf
+	$(CROSS_COMPILE)gdb -x port/$(BADGEROS_PORT)/gdbinit build/badger-os.elf

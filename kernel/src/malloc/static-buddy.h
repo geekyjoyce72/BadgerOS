@@ -10,7 +10,7 @@
 #include <stdint.h>
 
 #define PAGE_SIZE        4096
-#define MAX_MEMORY_POOLS 2
+#define MAX_MEMORY_POOLS 4
 #define MAX_SLAB_SIZE    256
 
 #define ALIGN_UP(x, y)   (void *)(((size_t)(x) + (y - 1)) & ~(y - 1))

@@ -20,6 +20,7 @@ set(port_src
 )
 set(port_include
     ${CMAKE_CURRENT_LIST_DIR}/include
+    lib/limine
 )
 set(port_link
     -T${CMAKE_CURRENT_LIST_DIR}/linker.ld

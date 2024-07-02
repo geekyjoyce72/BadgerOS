@@ -40,9 +40,9 @@ SECTIONS
 
     .data : {
         /* Limine requests. */
-        KEEP(*(.requests_start_marker))
+        KEEP(*(.requests_start))
         KEEP(*(.requests))
-        KEEP(*(.requests_end_marker))
+        KEEP(*(.requests_end))
         *(.data .data.*)
         *(.sdata .sdata.*)
     } :data
