@@ -27,6 +27,6 @@ void panic_abort() {
 // Immediately power off or reset the system.
 void panic_poweroff() {
     rawprint("**** KERNEL PANIC ****\nhalted\n");
-    asm volatile("csrci mstatus, 0xa");
+    asm volatile("csrci " CSR_STATUS_STR ", %0" ::"ri"(1 << CSR_STATUS_IE_BIT));
     while (1) asm volatile("wfi");
 }

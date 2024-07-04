@@ -2,87 +2,138 @@
 # SPDX-License-Identifier: MIT
 
 #include "cpu/regs.h"
-	.global kernel_reg_dump_arr
+    .global kernel_reg_dump_arr
 
 
 
-	# Print a register dump of the current registers.
-	.global kernel_cur_regs_dump
-	.type kernel_cur_regs_dump, %function
+#if __riscv_xlen == 64
+#define ST_REG sd
+#define LD_REG ld
+#else
+#define ST_REG sw
+#define LD_REG lw
+#endif
+
+
+
+    # Print a register dump of the current registers.
+    .global kernel_cur_regs_dump
+    .type kernel_cur_regs_dump, %function
 kernel_cur_regs_dump:
-	# Save all registers to stack.
-	addi sp, sp, -128
-	sw ra, cpu_regs_t_pc(sp) # PC inferred.
-	sw x0, cpu_regs_t_ra(sp) # RA omitted.
-	# sw sp, cpu_regs_t_sp(sp) # SP inferred.
-	sw gp, cpu_regs_t_gp(sp)
-	sw tp, cpu_regs_t_tp(sp)
-	sw t0, cpu_regs_t_t0(sp)
-	sw t1, cpu_regs_t_t1(sp)
-	sw t2, cpu_regs_t_t2(sp)
-	sw s0, cpu_regs_t_s0(sp)
-	sw s1, cpu_regs_t_s1(sp)
-	sw a0, cpu_regs_t_a0(sp)
-	sw a1, cpu_regs_t_a1(sp)
-	sw a2, cpu_regs_t_a2(sp)
-	sw a3, cpu_regs_t_a3(sp)
-	sw a4, cpu_regs_t_a4(sp)
-	sw a5, cpu_regs_t_a5(sp)
-	sw a6, cpu_regs_t_a6(sp)
-	sw a7, cpu_regs_t_a7(sp)
-	sw s2, cpu_regs_t_s2(sp)
-	sw s3, cpu_regs_t_s3(sp)
-	sw s4, cpu_regs_t_s4(sp)
-	sw s5, cpu_regs_t_s5(sp)
-	sw s6, cpu_regs_t_s6(sp)
-	sw s7, cpu_regs_t_s7(sp)
-	sw s8, cpu_regs_t_s8(sp)
-	sw s9, cpu_regs_t_s9(sp)
-	sw s10, cpu_regs_t_s10(sp)
-	sw s11, cpu_regs_t_s11(sp)
-	sw t3, cpu_regs_t_t3(sp)
-	sw t4, cpu_regs_t_t4(sp)
-	sw t5, cpu_regs_t_t5(sp)
-	sw t6, cpu_regs_t_t6(sp)
-	# Store the real value of SP and call the printer.
-	addi a0, sp, 128
-	sw a0, cpu_regs_t_sp(sp)
-	mv a0, sp
-	jal kernel_reg_dump_arr
-	# Restore all registers.
-	lw ra, cpu_regs_t_pc(sp) # PC inferred.
-	# lw ra, cpu_regs_t_ra(sp) # RA omitted.
-	# lw sp, cpu_regs_t_sp(sp) # SP inferred.
-	lw gp, cpu_regs_t_gp(sp)
-	lw tp, cpu_regs_t_tp(sp)
-	lw t0, cpu_regs_t_t0(sp)
-	lw t1, cpu_regs_t_t1(sp)
-	lw t2, cpu_regs_t_t2(sp)
-	lw s0, cpu_regs_t_s0(sp)
-	lw s1, cpu_regs_t_s1(sp)
-	lw a0, cpu_regs_t_a0(sp)
-	lw a1, cpu_regs_t_a1(sp)
-	lw a2, cpu_regs_t_a2(sp)
-	lw a3, cpu_regs_t_a3(sp)
-	lw a4, cpu_regs_t_a4(sp)
-	lw a5, cpu_regs_t_a5(sp)
-	lw a6, cpu_regs_t_a6(sp)
-	lw a7, cpu_regs_t_a7(sp)
-	lw s2, cpu_regs_t_s2(sp)
-	lw s3, cpu_regs_t_s3(sp)
-	lw s4, cpu_regs_t_s4(sp)
-	lw s5, cpu_regs_t_s5(sp)
-	lw s6, cpu_regs_t_s6(sp)
-	lw s7, cpu_regs_t_s7(sp)
-	lw s8, cpu_regs_t_s8(sp)
-	lw s9, cpu_regs_t_s9(sp)
-	lw s10, cpu_regs_t_s10(sp)
-	lw s11, cpu_regs_t_s11(sp)
-	lw t3, cpu_regs_t_t3(sp)
-	lw t4, cpu_regs_t_t4(sp)
-	lw t5, cpu_regs_t_t5(sp)
-	lw t6, cpu_regs_t_t6(sp)
-	# Return.
-	addi sp, sp, 128
-	ret
-	
+    # Save all registers to stack.
+    addi sp, sp, -4*__riscv_xlen
+    ST_REG ra, cpu_regs_t_pc(sp) # PC inferred.
+    ST_REG x0, cpu_regs_t_ra(sp) # RA omitted.
+    # ST_REG sp, cpu_regs_t_sp(sp) # SP inferred.
+    ST_REG gp, cpu_regs_t_gp(sp)
+    ST_REG tp, cpu_regs_t_tp(sp)
+    ST_REG t0, cpu_regs_t_t0(sp)
+    ST_REG t1, cpu_regs_t_t1(sp)
+    ST_REG t2, cpu_regs_t_t2(sp)
+    ST_REG s0, cpu_regs_t_s0(sp)
+    ST_REG s1, cpu_regs_t_s1(sp)
+    ST_REG a0, cpu_regs_t_a0(sp)
+    ST_REG a1, cpu_regs_t_a1(sp)
+    ST_REG a2, cpu_regs_t_a2(sp)
+    ST_REG a3, cpu_regs_t_a3(sp)
+    ST_REG a4, cpu_regs_t_a4(sp)
+    ST_REG a5, cpu_regs_t_a5(sp)
+    ST_REG a6, cpu_regs_t_a6(sp)
+    ST_REG a7, cpu_regs_t_a7(sp)
+    ST_REG s2, cpu_regs_t_s2(sp)
+    ST_REG s3, cpu_regs_t_s3(sp)
+    ST_REG s4, cpu_regs_t_s4(sp)
+    ST_REG s5, cpu_regs_t_s5(sp)
+    ST_REG s6, cpu_regs_t_s6(sp)
+    ST_REG s7, cpu_regs_t_s7(sp)
+    ST_REG s8, cpu_regs_t_s8(sp)
+    ST_REG s9, cpu_regs_t_s9(sp)
+    ST_REG s10, cpu_regs_t_s10(sp)
+    ST_REG s11, cpu_regs_t_s11(sp)
+    ST_REG t3, cpu_regs_t_t3(sp)
+    ST_REG t4, cpu_regs_t_t4(sp)
+    ST_REG t5, cpu_regs_t_t5(sp)
+    ST_REG t6, cpu_regs_t_t6(sp)
+    # Store the real value of SP and call the printer.
+    addi a0, sp, 4*__riscv_xlen
+    ST_REG a0, cpu_regs_t_sp(sp)
+    mv a0, sp
+    jal kernel_reg_dump_arr
+    # Restore all registers.
+    LD_REG ra, cpu_regs_t_pc(sp) # PC inferred.
+    # LD_REG ra, cpu_regs_t_ra(sp) # RA omitted.
+    # LD_REG sp, cpu_regs_t_sp(sp) # SP inferred.
+    LD_REG gp, cpu_regs_t_gp(sp)
+    LD_REG tp, cpu_regs_t_tp(sp)
+    LD_REG t0, cpu_regs_t_t0(sp)
+    LD_REG t1, cpu_regs_t_t1(sp)
+    LD_REG t2, cpu_regs_t_t2(sp)
+    LD_REG s0, cpu_regs_t_s0(sp)
+    LD_REG s1, cpu_regs_t_s1(sp)
+    LD_REG a0, cpu_regs_t_a0(sp)
+    LD_REG a1, cpu_regs_t_a1(sp)
+    LD_REG a2, cpu_regs_t_a2(sp)
+    LD_REG a3, cpu_regs_t_a3(sp)
+    LD_REG a4, cpu_regs_t_a4(sp)
+    LD_REG a5, cpu_regs_t_a5(sp)
+    LD_REG a6, cpu_regs_t_a6(sp)
+    LD_REG a7, cpu_regs_t_a7(sp)
+    LD_REG s2, cpu_regs_t_s2(sp)
+    LD_REG s3, cpu_regs_t_s3(sp)
+    LD_REG s4, cpu_regs_t_s4(sp)
+    LD_REG s5, cpu_regs_t_s5(sp)
+    LD_REG s6, cpu_regs_t_s6(sp)
+    LD_REG s7, cpu_regs_t_s7(sp)
+    LD_REG s8, cpu_regs_t_s8(sp)
+    LD_REG s9, cpu_regs_t_s9(sp)
+    LD_REG s10, cpu_regs_t_s10(sp)
+    LD_REG s11, cpu_regs_t_s11(sp)
+    LD_REG t3, cpu_regs_t_t3(sp)
+    LD_REG t4, cpu_regs_t_t4(sp)
+    LD_REG t5, cpu_regs_t_t5(sp)
+    LD_REG t6, cpu_regs_t_t6(sp)
+    # Return.
+    addi sp, sp, 4*__riscv_xlen
+#pragma endregion
+    ret
+
+
+
+    # Calls the actual trapping code in `isr_noexc_run`.
+    .global _isr_noexc_run_int
+    .type _isr_noexc_run_int, %function
+_isr_noexc_run_int:
+    ST_REG ra, cpu_regs_t_pc(a1) // PC inferred
+    ST_REG ra, cpu_regs_t_ra(a1)
+    ST_REG sp, cpu_regs_t_sp(a1)
+    ST_REG gp, cpu_regs_t_gp(a1)
+    ST_REG tp, cpu_regs_t_tp(a1)
+    // ST_REG t0, cpu_regs_t_t0(a1) // Tempregs omitted
+    // ST_REG t1, cpu_regs_t_t1(a1)
+    // ST_REG t2, cpu_regs_t_t2(a1)
+    ST_REG s0, cpu_regs_t_s0(a1)
+    ST_REG s1, cpu_regs_t_s1(a1)
+    // ST_REG a0, cpu_regs_t_a0(a1) // Argregs omitted
+    // ST_REG a1, cpu_regs_t_a1(a1)
+    // ST_REG a2, cpu_regs_t_a2(a1)
+    // ST_REG a3, cpu_regs_t_a3(a1)
+    // ST_REG a4, cpu_regs_t_a4(a1)
+    // ST_REG a5, cpu_regs_t_a5(a1)
+    // ST_REG a6, cpu_regs_t_a6(a1)
+    // ST_REG a7, cpu_regs_t_a7(a1)
+    ST_REG s2, cpu_regs_t_s2(a1)
+    ST_REG s3, cpu_regs_t_s3(a1)
+    ST_REG s4, cpu_regs_t_s4(a1)
+    ST_REG s5, cpu_regs_t_s5(a1)
+    ST_REG s6, cpu_regs_t_s6(a1)
+    ST_REG s7, cpu_regs_t_s7(a1)
+    ST_REG s8, cpu_regs_t_s8(a1)
+    ST_REG s9, cpu_regs_t_s9(a1)
+    ST_REG s10, cpu_regs_t_s10(a1)
+    ST_REG s11, cpu_regs_t_s11(a1)
+    // ST_REG t3, cpu_regs_t_t3(a1) // Tempregs omitted
+    // ST_REG t4, cpu_regs_t_t4(a1)
+    // ST_REG t5, cpu_regs_t_t5(a1)
+    // ST_REG t6, cpu_regs_t_t6(a1)
+    jr a2
+#pragma endregion

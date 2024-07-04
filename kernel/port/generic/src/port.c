@@ -5,6 +5,7 @@
 
 #include "assertions.h"
 #include "cpu/panic.h"
+#include "cpu/riscv_mmu.h"
 #include "interrupt.h"
 #include "limine.h"
 #include "malloc.h"
@@ -22,7 +23,7 @@ void init_pool(void *mem_start, void *mem_end, uint32_t flags);
 LIMINE_BASE_REVISION(2);
 __attribute__((section(".requests_start"))) LIMINE_REQUESTS_START_MARKER;
 
-static REQ struct limine_memmap_request memmap_req = {
+static REQ struct limine_memmap_request mm_req = {
     .id       = LIMINE_MEMMAP_REQUEST,
     .revision = 2,
 };
@@ -39,7 +40,7 @@ __attribute__((section(".requests_end"))) LIMINE_REQUESTS_END_MARKER;
 // Early hardware initialization.
 void port_early_init() {
     // Verify needed requests have been answered.
-    if (!memmap_req.response) {
+    if (!mm_req.response) {
         logk_from_isr(LOG_FATAL, "Limine memmap response missing");
         panic_poweroff();
     }
@@ -48,8 +49,8 @@ void port_early_init() {
     //     panic_poweroff();
     // }
 
-    // Inform memory allocator of memory map.
-    struct limine_memmap_response *mem     = memmap_req.response;
+    // Print memory map.
+    struct limine_memmap_response *mem     = mm_req.response;
     char const *const              types[] = {
         [LIMINE_MEMMAP_USABLE]                 = "Usable",
         [LIMINE_MEMMAP_RESERVED]               = "Reserved",
@@ -69,11 +70,6 @@ void port_early_init() {
             mem->entries[i]->base + mem->entries[i]->length - 1,
             types[mem->entries[i]->type]
         );
-        if (mem->entries[i]->length >= 4 * MEMMAP_PAGE_SIZE && mem->entries[i]->type == LIMINE_MEMMAP_USABLE) {
-            size_t start = mem->entries[i]->base;
-            size_t end   = mem->entries[i]->base + mem->entries[i]->length;
-            init_pool((void *)start, (void *)end, 0);
-        }
     }
 }
 
@@ -82,7 +78,9 @@ void port_init() {
 }
 
 // Send a single character to the log output.
+void port_putc(char msg) __attribute__((naked));
 void port_putc(char msg) {
-    // QEMU virtual UART.
-    *(char volatile *)0x10000000 = msg;
+    (void)msg;
+    // SBI console putchar.
+    asm("li a7, 1; ecall; ret");
 }

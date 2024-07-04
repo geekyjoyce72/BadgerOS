@@ -46,3 +46,13 @@ bool isr_noexc_copy_u32(uint32_t *dest, uint32_t const *src);
 // Try to copy uint64_t from src to dest.
 // Returns whether an access trap occurred.
 bool isr_noexc_copy_u64(uint64_t *dest, uint64_t const *src);
+
+// Try to copy size_t from src to dest.
+// Returns whether an access trap occurred.
+static inline bool isr_noexc_copy_size(size_t *dest, size_t const *src) {
+#if __SIZE_BITS__ == __UINT64_BITS__
+    return isr_noexc_copy_u64(dest, src);
+#else
+    return isr_noexc_copy_u32(dest, src);
+#endif
+}

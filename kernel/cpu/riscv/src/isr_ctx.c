@@ -3,6 +3,8 @@
 
 #include "isr_ctx.h"
 
+#include "badge_strings.h"
+#include "interrupt.h"
 #include "rawprint.h"
 
 // Number of columns in register dump.
@@ -16,7 +18,7 @@ static char const regnames[32][4] = {
 };
 
 // Print a register dump given cpu_regs_t.
-void kernel_reg_dump_arr(uint32_t const *arr) {
+void kernel_reg_dump_arr(size_t const *arr) {
     // Print all registers.
     rawprint("Register dump:\n");
     for (int y = 0; y < 32; y += COLS) {
@@ -25,7 +27,7 @@ void kernel_reg_dump_arr(uint32_t const *arr) {
             rawputc(' ');
             rawprint(regnames[y + x]);
             rawprint(" 0x");
-            rawprinthex(arr[y + x], 8);
+            rawprinthex(arr[y + x], sizeof(size_t) * 2);
         }
         rawputc('\n');
     }
@@ -35,26 +37,92 @@ void kernel_reg_dump_arr(uint32_t const *arr) {
     {                                                                                                                  \
         rawprint(name);                                                                                                \
         long tmp;                                                                                                      \
-        asm("csrr %0, " #id : "=r"(tmp));                                                                              \
+        asm("csrr %0, " id : "=r"(tmp));                                                                               \
         rawprinthex(tmp, sizeof(size_t) * 2);                                                                          \
         rawputc('\n');                                                                                                 \
     }
 
 // Print a register dump given isr_ctx_t.
 void isr_ctx_dump(isr_ctx_t const *ctx) {
-    kernel_reg_dump_arr((uint32_t const *)&ctx->regs);
-    DUMP_CSR("  MSTATUS   ", mstatus)
-    DUMP_CSR("  MCAUSE    ", mcause)
-    DUMP_CSR("  PMPCFG0   ", pmpcfg0)
-    DUMP_CSR("  PMPCFG1   ", pmpcfg1)
-    DUMP_CSR("  PMPADDR0  ", pmpaddr0)
-    DUMP_CSR("  PMPADDR1  ", pmpaddr1)
-    DUMP_CSR("  PMPADDR2  ", pmpaddr2)
-    DUMP_CSR("  PMPADDR3  ", pmpaddr3)
-    DUMP_CSR("  PMPADDR4  ", pmpaddr4)
-    DUMP_CSR("  PMPADDR5  ", pmpaddr5)
-    DUMP_CSR("  PMPADDR6  ", pmpaddr6)
-    DUMP_CSR("  PMPADDR7  ", pmpaddr7)
+    kernel_reg_dump_arr((size_t const *)&ctx->regs);
+    DUMP_CSR("  STATUS    ", CSR_STATUS_STR)
+    DUMP_CSR("  CAUSE     ", CSR_CAUSE_STR)
+#if RISCV_M_MODE_KERNEL
+    DUMP_CSR("  PMPCFG0   ", "pmpcfg0")
+    DUMP_CSR("  PMPCFG1   ", "pmpcfg1")
+    DUMP_CSR("  PMPADDR0  ", "pmpaddr0")
+    DUMP_CSR("  PMPADDR1  ", "pmpaddr1")
+    DUMP_CSR("  PMPADDR2  ", "pmpaddr2")
+    DUMP_CSR("  PMPADDR3  ", "pmpaddr3")
+    DUMP_CSR("  PMPADDR4  ", "pmpaddr4")
+    DUMP_CSR("  PMPADDR5  ", "pmpaddr5")
+    DUMP_CSR("  PMPADDR6  ", "pmpaddr6")
+    DUMP_CSR("  PMPADDR7  ", "pmpaddr7")
+#endif
+}
+
+
+
+// Cookie data for `isr_noexc_wrapper`.
+typedef struct {
+    // Custom trap handler to call, if any.
+    isr_catch_t trap_handler;
+    // Cookie for trap handler.
+    void       *cookie;
+    // Regfile to restore in case of trap.
+    cpu_regs_t  regfile;
+    // Whether a trap was encountered.
+    bool        had_trap;
+} isr_noexc_cookie_t;
+
+// Trap handler wrapper for `isr_noexc_run`.
+static bool isr_noexc_wrapper(isr_ctx_t *kctx, void *_cookie) {
+    isr_noexc_cookie_t *cookie = _cookie;
+    cookie->had_trap           = true;
+    if (cookie->trap_handler) {
+        cookie->trap_handler(cookie->cookie, &cookie->regfile);
+    }
+    mem_copy(&kctx->regs, &cookie->regfile, sizeof(cpu_regs_t));
+    return true;
+}
+
+// Calls the actual trapping code in `isr_noexc_run`.
+extern void _isr_noexc_run_int(void *cookie, cpu_regs_t *regs, isr_noexc_t code);
+
+// Run a restricted function and catch exceptions.
+// The code will run with interrupts disabled.
+// All traps will cause the optional `trap_handler` to be called and `code` to terminate early.
+// This should only be used for debug or ISA detection purposes.
+// Returns whether a trap occurred.
+bool isr_noexc_run(isr_noexc_t code, isr_catch_t trap_handler, void *cookie) {
+    isr_noexc_cookie_t data = {
+        .trap_handler = trap_handler,
+        .cookie       = cookie,
+        .had_trap     = false,
+    };
+
+    // Set up for custom trap handler.
+    bool       ie       = irq_enable(false);
+    isr_ctx_t *kctx     = isr_ctx_get();
+    kctx->noexc_cb      = isr_noexc_wrapper;
+    kctx->noexc_cookie  = &data;
+    kctx->flags        |= ISR_CTX_FLAG_NOEXC;
+
+#if __riscv_xlen == 64
+#define ST_REG "sd "
+#define LD_REG "ld "
+#else
+#define ST_REG "sw "
+#define LD_REG "lw "
+#endif
+
+    // Call the possibly trapping code.
+    _isr_noexc_run_int(cookie, &data.regfile, code);
+
+    kctx->flags &= ~ISR_CTX_FLAG_NOEXC;
+
+    irq_enable(ie);
+    return data.had_trap;
 }
 
 

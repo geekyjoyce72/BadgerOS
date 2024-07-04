@@ -59,7 +59,7 @@ static sched_thread_t idle_thread = {
     .kernel_stack_bottom = (size_t)&idle_thread_stack,
     .kernel_stack_top    = (size_t)&idle_thread_stack + IDLE_TASK_STACK_LEN,
     .flags               = THREAD_KERNEL | THREAD_PRIVILEGED,
-    .kernel_isr_ctx      = {.thread = &idle_thread, .is_kernel_thread = 1},
+    .kernel_isr_ctx      = {.thread = &idle_thread, .flags = ISR_CTX_FLAG_KERNEL},
 
 #ifndef NDEBUG
     .name = "idle",
@@ -382,8 +382,8 @@ sched_thread_t *sched_create_userland_thread(
         .flags               = 0,
         .schedule_node       = DLIST_NODE_EMPTY,
         .exit_code           = 0,
-        .kernel_isr_ctx      = {.thread = thread, .is_kernel_thread = 1},
-        .user_isr_ctx        = {.thread = thread, .is_kernel_thread = 0},
+        .kernel_isr_ctx      = {.thread = thread, .flags = ISR_CTX_FLAG_KERNEL},
+        .user_isr_ctx        = {.thread = thread, .flags = 0},
     };
 
     sched_prepare_user_entry(thread, entry_point, arg);
@@ -420,7 +420,7 @@ sched_thread_t *sched_create_kernel_thread(
         .flags               = THREAD_KERNEL | THREAD_PRIVILEGED,
         .schedule_node       = DLIST_NODE_EMPTY,
         .exit_code           = 0,
-        .kernel_isr_ctx      = {.thread = thread, .is_kernel_thread = 1},
+        .kernel_isr_ctx      = {.thread = thread, .flags = ISR_CTX_FLAG_KERNEL},
     };
 
     sched_prepare_kernel_entry(thread, entry_point, arg);

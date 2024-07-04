@@ -1,10 +1,12 @@
 
 // SPDX-License-Identifier: MIT
 
+#include "assertions.h"
 #include "badge_err.h"
 #include "filesystem.h"
 #include "housekeeping.h"
 #include "interrupt.h"
+#include "isr_ctx.h"
 #include "log.h"
 #include "malloc.h"
 #include "memprotect.h"
@@ -91,10 +93,10 @@ void basic_runtime_init() {
     // Announce that we're alive.
     logk(LOG_INFO, "BadgerOS " BADGEROS_PORT " starting...");
 
-    // Kernel memory allocator initialization.
-    kernel_heap_init();
     // Memory protection initialization.
     memprotect_init();
+    // Kernel memory allocator initialization.
+    kernel_heap_init();
 
     // Scheduler initialization.
     sched_init();

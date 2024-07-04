@@ -2,67 +2,75 @@
 # SPDX-License-Identifier: MIT
 
 #include "cpu/isr.h"
-#include "cpu/riscv.h"
+#include "cpu/regs.h"
 #include "port/hardware.h"
     .global __global_pointer$
     .global memprotect_swap_from_isr
 
 
+#if __riscv_xlen == 64
+#define ST_REG sd
+#define LD_REG ld
+#else
+#define ST_REG sw
+#define LD_REG lw
+#endif
 
 
 
     # Entry code for an ISR or trap handler; save T0-T3 and swap out SP/GP/TP.
-    # Assumes valid `isr_ctx_t *` in CSR mscratch.
+    # Assumes valid `isr_ctx_t *` in CSR scratch.
     .macro isr_entry
 #pragma region
     # Save tempregs t0/t1.
-    csrrw t0, mscratch, t0
+    csrrw   t0, CSR_SCRATCH, t0
     .cfi_def_cfa t0, 0
-    sw t1, isr_ctx_t_scratch1(t0)
+    ST_REG  t1, isr_ctx_t_scratch1(t0)
     .cfi_val_offset t0, isr_ctx_t_scratch1
-    csrrw t1, mscratch, t0
-    .cfi_def_cfa mscratch, 0
-    sw t1, isr_ctx_t_scratch0(t0)
+    csrrw   t1, CSR_SCRATCH, t0
+    .cfi_def_cfa CSR_SCRATCH, 0
+    ST_REG  t1, isr_ctx_t_scratch0(t0)
     .cfi_val_offset t1, isr_ctx_t_scratch0
     
-    sw t2, isr_ctx_t_regs+cpu_regs_t_t2(t0)
+    ST_REG  t2, isr_ctx_t_regs+cpu_regs_t_t2(t0)
     .cfi_val_offset t2, isr_ctx_t_regs+cpu_regs_t_t2
-    sw t3, isr_ctx_t_regs+cpu_regs_t_t3(t0)
+    ST_REG  t3, isr_ctx_t_regs+cpu_regs_t_t3(t0)
     .cfi_val_offset t3, isr_ctx_t_regs+cpu_regs_t_t3
     
-    sw ra, isr_ctx_t_regs+cpu_regs_t_ra(t0)
-    sw sp, isr_ctx_t_regs+cpu_regs_t_sp(t0)
+    ST_REG  ra, isr_ctx_t_regs+cpu_regs_t_ra(t0)
+    ST_REG  sp, isr_ctx_t_regs+cpu_regs_t_sp(t0)
     .cfi_val_offset sp, isr_ctx_t_regs+cpu_regs_t_sp
-    sw gp, isr_ctx_t_regs+cpu_regs_t_gp(t0)
+    ST_REG  gp, isr_ctx_t_regs+cpu_regs_t_gp(t0)
     .cfi_val_offset gp, isr_ctx_t_regs+cpu_regs_t_gp
-    sw tp, isr_ctx_t_regs+cpu_regs_t_tp(t0)
+    ST_REG  tp, isr_ctx_t_regs+cpu_regs_t_tp(t0)
     .cfi_val_offset tp, isr_ctx_t_regs+cpu_regs_t_tp
     
     # Clear context to switch field.
-    sw x0, isr_ctx_t_ctxswitch(t0)
+    ST_REG  x0, isr_ctx_t_ctxswitch(t0)
     
     # Move tempregs.
-    lw t1, isr_ctx_t_scratch0(t0)
-    sw t1, isr_ctx_t_regs+cpu_regs_t_t0(t0)
+    LD_REG  t1, isr_ctx_t_scratch0(t0)
+    ST_REG  t1, isr_ctx_t_regs+cpu_regs_t_t0(t0)
     .cfi_val_offset t0, isr_ctx_t_regs+cpu_regs_t_t0
-    lw t1, isr_ctx_t_scratch1(t0)
-    sw t1, isr_ctx_t_regs+cpu_regs_t_t1(t0)
+    LD_REG  t1, isr_ctx_t_scratch1(t0)
+    ST_REG  t1, isr_ctx_t_regs+cpu_regs_t_t1(t0)
     .cfi_val_offset t1, isr_ctx_t_regs+cpu_regs_t_t1
     
     # Save PC.
-    csrr t1, mepc
-    sw t1, isr_ctx_t_regs+cpu_regs_t_pc(t0)
+    csrr    t1, CSR_EPC
+    ST_REG  t1, isr_ctx_t_regs+cpu_regs_t_pc(t0)
     .cfi_val_offset ra, isr_ctx_t_regs+cpu_regs_t_pc
     
     # Set up special regs.
-    li tp, 0
+    li      tp, 0
     .option push
     .option norelax
-    la gp, __global_pointer$
+    la      gp, __global_pointer$
     .option pop
-    lw t1, isr_ctx_t_use_sp(t0)
-    bnez t1, .isr_entry_\@
-    la sp, __interrupt_stack_hi
+    LD_REG  t1, isr_ctx_t_flags(t0)
+    andi    t1, t1, ISR_CTX_FLAG_USE_SP
+    bnez    t1, .isr_entry_\@
+    la      sp, __interrupt_stack_hi
 .isr_entry_\@:
 #pragma endregion
     .endm
@@ -74,21 +82,21 @@
     .macro isr_exit
 #pragma region
     # Restore PC.
-    lw t1, isr_ctx_t_regs+cpu_regs_t_pc(t0)
-    csrw mepc, t1
+    LD_REG  t1, isr_ctx_t_regs+cpu_regs_t_pc(t0)
+    csrw    CSR_EPC, t1
     
-    lw ra, isr_ctx_t_regs+cpu_regs_t_ra(t0)
-    lw sp, isr_ctx_t_regs+cpu_regs_t_sp(t0)
-    lw gp, isr_ctx_t_regs+cpu_regs_t_gp(t0)
-    lw tp, isr_ctx_t_regs+cpu_regs_t_tp(t0)
+    LD_REG  ra, isr_ctx_t_regs+cpu_regs_t_ra(t0)
+    LD_REG  sp, isr_ctx_t_regs+cpu_regs_t_sp(t0)
+    LD_REG  gp, isr_ctx_t_regs+cpu_regs_t_gp(t0)
+    LD_REG  tp, isr_ctx_t_regs+cpu_regs_t_tp(t0)
     
     # Restore tempregs t0-t3.
-    lw t1, isr_ctx_t_regs+cpu_regs_t_t0(t0)
-    csrw mscratch, t1
-    lw t3, isr_ctx_t_regs+cpu_regs_t_t3(t0)
-    lw t2, isr_ctx_t_regs+cpu_regs_t_t2(t0)
-    lw t1, isr_ctx_t_regs+cpu_regs_t_t1(t0)
-    csrrw t0, mscratch, t0
+    LD_REG  t1, isr_ctx_t_regs+cpu_regs_t_t0(t0)
+    csrw    CSR_SCRATCH, t1
+    LD_REG  t3, isr_ctx_t_regs+cpu_regs_t_t3(t0)
+    LD_REG  t2, isr_ctx_t_regs+cpu_regs_t_t2(t0)
+    LD_REG  t1, isr_ctx_t_regs+cpu_regs_t_t1(t0)
+    csrrw   t0, CSR_SCRATCH, t0
 #pragma endregion
     .endm
 
@@ -98,51 +106,51 @@
     # Assumes valid `isr_ctx_t *` in t0.
     .macro save_all_regs
 #pragma region
-    sw s0,  isr_ctx_t_regs+cpu_regs_t_s0(t0)
+    ST_REG  s0,  isr_ctx_t_regs+cpu_regs_t_s0(t0)
     .cfi_offset s0, isr_ctx_t_regs+cpu_regs_t_s0
-    sw s1,  isr_ctx_t_regs+cpu_regs_t_s1(t0)
+    ST_REG  s1,  isr_ctx_t_regs+cpu_regs_t_s1(t0)
     .cfi_offset s1, isr_ctx_t_regs+cpu_regs_t_s1
-    sw a0,  isr_ctx_t_regs+cpu_regs_t_a0(t0)
+    ST_REG  a0,  isr_ctx_t_regs+cpu_regs_t_a0(t0)
     .cfi_offset a0, isr_ctx_t_regs+cpu_regs_t_a0
-    sw a1,  isr_ctx_t_regs+cpu_regs_t_a1(t0)
+    ST_REG  a1,  isr_ctx_t_regs+cpu_regs_t_a1(t0)
     .cfi_offset a1, isr_ctx_t_regs+cpu_regs_t_a1
-    sw a2,  isr_ctx_t_regs+cpu_regs_t_a2(t0)
+    ST_REG  a2,  isr_ctx_t_regs+cpu_regs_t_a2(t0)
     .cfi_offset a2, isr_ctx_t_regs+cpu_regs_t_a2
-    sw a3,  isr_ctx_t_regs+cpu_regs_t_a3(t0)
+    ST_REG  a3,  isr_ctx_t_regs+cpu_regs_t_a3(t0)
     .cfi_offset a3, isr_ctx_t_regs+cpu_regs_t_a3
-    sw a4,  isr_ctx_t_regs+cpu_regs_t_a4(t0)
+    ST_REG  a4,  isr_ctx_t_regs+cpu_regs_t_a4(t0)
     .cfi_offset a4, isr_ctx_t_regs+cpu_regs_t_a4
-    sw a5,  isr_ctx_t_regs+cpu_regs_t_a5(t0)
+    ST_REG  a5,  isr_ctx_t_regs+cpu_regs_t_a5(t0)
     .cfi_offset a5, isr_ctx_t_regs+cpu_regs_t_a5
-    sw a6,  isr_ctx_t_regs+cpu_regs_t_a6(t0)
+    ST_REG  a6,  isr_ctx_t_regs+cpu_regs_t_a6(t0)
     .cfi_offset a6, isr_ctx_t_regs+cpu_regs_t_a6
-    sw a7,  isr_ctx_t_regs+cpu_regs_t_a7(t0)
+    ST_REG  a7,  isr_ctx_t_regs+cpu_regs_t_a7(t0)
     .cfi_offset a7, isr_ctx_t_regs+cpu_regs_t_a7
-    sw s2,  isr_ctx_t_regs+cpu_regs_t_s2(t0)
+    ST_REG  s2,  isr_ctx_t_regs+cpu_regs_t_s2(t0)
     .cfi_offset s2, isr_ctx_t_regs+cpu_regs_t_s2
-    sw s3,  isr_ctx_t_regs+cpu_regs_t_s3(t0)
+    ST_REG  s3,  isr_ctx_t_regs+cpu_regs_t_s3(t0)
     .cfi_offset s3, isr_ctx_t_regs+cpu_regs_t_s3
-    sw s4,  isr_ctx_t_regs+cpu_regs_t_s4(t0)
+    ST_REG  s4,  isr_ctx_t_regs+cpu_regs_t_s4(t0)
     .cfi_offset s4, isr_ctx_t_regs+cpu_regs_t_s4
-    sw s5,  isr_ctx_t_regs+cpu_regs_t_s5(t0)
+    ST_REG  s5,  isr_ctx_t_regs+cpu_regs_t_s5(t0)
     .cfi_offset s5, isr_ctx_t_regs+cpu_regs_t_s5
-    sw s6,  isr_ctx_t_regs+cpu_regs_t_s6(t0)
+    ST_REG  s6,  isr_ctx_t_regs+cpu_regs_t_s6(t0)
     .cfi_offset s6, isr_ctx_t_regs+cpu_regs_t_s6
-    sw s7,  isr_ctx_t_regs+cpu_regs_t_s7(t0)
+    ST_REG  s7,  isr_ctx_t_regs+cpu_regs_t_s7(t0)
     .cfi_offset s7, isr_ctx_t_regs+cpu_regs_t_s7
-    sw s8,  isr_ctx_t_regs+cpu_regs_t_s8(t0)
+    ST_REG  s8,  isr_ctx_t_regs+cpu_regs_t_s8(t0)
     .cfi_offset s8, isr_ctx_t_regs+cpu_regs_t_s8
-    sw s9,  isr_ctx_t_regs+cpu_regs_t_s9(t0)
+    ST_REG  s9,  isr_ctx_t_regs+cpu_regs_t_s9(t0)
     .cfi_offset s9, isr_ctx_t_regs+cpu_regs_t_s9
-    sw s10, isr_ctx_t_regs+cpu_regs_t_s10(t0)
+    ST_REG  s10, isr_ctx_t_regs+cpu_regs_t_s10(t0)
     .cfi_offset s10, isr_ctx_t_regs+cpu_regs_t_s10
-    sw s11, isr_ctx_t_regs+cpu_regs_t_s11(t0)
+    ST_REG  s11, isr_ctx_t_regs+cpu_regs_t_s11(t0)
     .cfi_offset s11, isr_ctx_t_regs+cpu_regs_t_s11
-    sw t4,  isr_ctx_t_regs+cpu_regs_t_t4(t0)
+    ST_REG  t4,  isr_ctx_t_regs+cpu_regs_t_t4(t0)
     .cfi_offset t4, isr_ctx_t_regs+cpu_regs_t_t4
-    sw t5,  isr_ctx_t_regs+cpu_regs_t_t5(t0)
+    ST_REG  t5,  isr_ctx_t_regs+cpu_regs_t_t5(t0)
     .cfi_offset t5, isr_ctx_t_regs+cpu_regs_t_t5
-    sw t6,  isr_ctx_t_regs+cpu_regs_t_t6(t0)
+    ST_REG  t6,  isr_ctx_t_regs+cpu_regs_t_t6(t0)
     .cfi_offset t6, isr_ctx_t_regs+cpu_regs_t_t6
 #pragma endregion
     .endm
@@ -153,29 +161,29 @@
     # Assumes valid `isr_ctx_t *` in t0.
     .macro restore_all_regs
 #pragma region
-    lw s0,  isr_ctx_t_regs+cpu_regs_t_s0(t0)
-    lw s1,  isr_ctx_t_regs+cpu_regs_t_s1(t0)
-    lw a0,  isr_ctx_t_regs+cpu_regs_t_a0(t0)
-    lw a1,  isr_ctx_t_regs+cpu_regs_t_a1(t0)
-    lw a2,  isr_ctx_t_regs+cpu_regs_t_a2(t0)
-    lw a3,  isr_ctx_t_regs+cpu_regs_t_a3(t0)
-    lw a4,  isr_ctx_t_regs+cpu_regs_t_a4(t0)
-    lw a5,  isr_ctx_t_regs+cpu_regs_t_a5(t0)
-    lw a6,  isr_ctx_t_regs+cpu_regs_t_a6(t0)
-    lw a7,  isr_ctx_t_regs+cpu_regs_t_a7(t0)
-    lw s2,  isr_ctx_t_regs+cpu_regs_t_s2(t0)
-    lw s3,  isr_ctx_t_regs+cpu_regs_t_s3(t0)
-    lw s4,  isr_ctx_t_regs+cpu_regs_t_s4(t0)
-    lw s5,  isr_ctx_t_regs+cpu_regs_t_s5(t0)
-    lw s6,  isr_ctx_t_regs+cpu_regs_t_s6(t0)
-    lw s7,  isr_ctx_t_regs+cpu_regs_t_s7(t0)
-    lw s8,  isr_ctx_t_regs+cpu_regs_t_s8(t0)
-    lw s9,  isr_ctx_t_regs+cpu_regs_t_s9(t0)
-    lw s10, isr_ctx_t_regs+cpu_regs_t_s10(t0)
-    lw s11, isr_ctx_t_regs+cpu_regs_t_s11(t0)
-    lw t4,  isr_ctx_t_regs+cpu_regs_t_t4(t0)
-    lw t5,  isr_ctx_t_regs+cpu_regs_t_t5(t0)
-    lw t6,  isr_ctx_t_regs+cpu_regs_t_t6(t0)
+    LD_REG  s0,  isr_ctx_t_regs+cpu_regs_t_s0(t0)
+    LD_REG  s1,  isr_ctx_t_regs+cpu_regs_t_s1(t0)
+    LD_REG  a0,  isr_ctx_t_regs+cpu_regs_t_a0(t0)
+    LD_REG  a1,  isr_ctx_t_regs+cpu_regs_t_a1(t0)
+    LD_REG  a2,  isr_ctx_t_regs+cpu_regs_t_a2(t0)
+    LD_REG  a3,  isr_ctx_t_regs+cpu_regs_t_a3(t0)
+    LD_REG  a4,  isr_ctx_t_regs+cpu_regs_t_a4(t0)
+    LD_REG  a5,  isr_ctx_t_regs+cpu_regs_t_a5(t0)
+    LD_REG  a6,  isr_ctx_t_regs+cpu_regs_t_a6(t0)
+    LD_REG  a7,  isr_ctx_t_regs+cpu_regs_t_a7(t0)
+    LD_REG  s2,  isr_ctx_t_regs+cpu_regs_t_s2(t0)
+    LD_REG  s3,  isr_ctx_t_regs+cpu_regs_t_s3(t0)
+    LD_REG  s4,  isr_ctx_t_regs+cpu_regs_t_s4(t0)
+    LD_REG  s5,  isr_ctx_t_regs+cpu_regs_t_s5(t0)
+    LD_REG  s6,  isr_ctx_t_regs+cpu_regs_t_s6(t0)
+    LD_REG  s7,  isr_ctx_t_regs+cpu_regs_t_s7(t0)
+    LD_REG  s8,  isr_ctx_t_regs+cpu_regs_t_s8(t0)
+    LD_REG  s9,  isr_ctx_t_regs+cpu_regs_t_s9(t0)
+    LD_REG  s10, isr_ctx_t_regs+cpu_regs_t_s10(t0)
+    LD_REG  s11, isr_ctx_t_regs+cpu_regs_t_s11(t0)
+    LD_REG  t4,  isr_ctx_t_regs+cpu_regs_t_t4(t0)
+    LD_REG  t5,  isr_ctx_t_regs+cpu_regs_t_t5(t0)
+    LD_REG  t6,  isr_ctx_t_regs+cpu_regs_t_t6(t0)
 #pragma endregion
     .endm
 
@@ -193,55 +201,56 @@
     .cfi_startproc
 isr_context_switch:
     # Check for context switch required.
-    .cfi_def_cfa mscratch, 0
-    csrr t0, mscratch
-    lw t1, isr_ctx_t_ctxswitch(t0)
-    bnez t1, .isr_context_switch_do_switch
+    .cfi_def_cfa CSR_SCRATCH, 0
+    csrr    t0, CSR_SCRATCH
+    LD_REG  t1, isr_ctx_t_ctxswitch(t0)
+    bnez    t1, .isr_context_switch_do_switch
     
     # Re-enable interrupts.
-    li t1, 1 << RISCV_STATUS_MIE_BIT
-    csrs mstatus, t1
+    li      t1, 1 << CSR_STATUS_IE_BIT
+    csrs    CSR_STATUS, t1
     ret
     
 .isr_context_switch_do_switch:
     # Re-enable interrupts on exit.
-    li t1, (1 << RISCV_STATUS_MPIE_BIT)
-    csrs mstatus, t1
+    li      t1, 1 << CSR_STATUS_PIE_BIT
+    csrs    CSR_STATUS, t1
     
     # Do the context switching things.
     # Save SP/GP/TP and PC.
-    sw ra, isr_ctx_t_regs+cpu_regs_t_pc(t0)
-    sw ra, isr_ctx_t_regs+cpu_regs_t_ra(t0)
-    sw sp, isr_ctx_t_regs+cpu_regs_t_sp(t0)
-    sw gp, isr_ctx_t_regs+cpu_regs_t_gp(t0)
-    sw tp, isr_ctx_t_regs+cpu_regs_t_tp(t0)
+    ST_REG  ra, isr_ctx_t_regs+cpu_regs_t_pc(t0)
+    ST_REG  ra, isr_ctx_t_regs+cpu_regs_t_ra(t0)
+    ST_REG  sp, isr_ctx_t_regs+cpu_regs_t_sp(t0)
+    ST_REG  gp, isr_ctx_t_regs+cpu_regs_t_gp(t0)
+    ST_REG  tp, isr_ctx_t_regs+cpu_regs_t_tp(t0)
     save_all_regs
     
     # Switch context and set new privilege.
-    lw t0, isr_ctx_t_ctxswitch(t0)
-    csrw mscratch, t0
+    LD_REG  t0, isr_ctx_t_ctxswitch(t0)
+    csrw    CSR_SCRATCH, t0
     
     # Swap memory protection.
-    jal  memprotect_swap_from_isr
-    csrr t0, mscratch
-    lw t1, isr_ctx_t_is_kernel_thread(t0)
-    li t2, (3 << RISCV_STATUS_MPP_BASE_BIT)
-    bnez t1, .isr_context_switch_do_m
+    jal     memprotect_swap_from_isr
+    csrr    t0, CSR_SCRATCH
+    LD_REG  t1, isr_ctx_t_flags(t0)
+    andi    t1, t1, ISR_CTX_FLAG_KERNEL
+    li      t2, CSR_STATUS_PP_MASK << CSR_STATUS_PP_BASE_BIT
+    bnez    t1, .isr_context_switch_do_k
     
-    # To U-mode.
-    csrc mstatus, t2
-    j .isr_context_switch_ret
+    # To user mode.
+    csrc    CSR_STATUS, t2
+    j       .isr_context_switch_ret
     
-.isr_context_switch_do_m:
-    # To M-mode.
-    csrs mstatus, t2
+.isr_context_switch_do_k:
+    # To kernel mode.
+    csrs    CSR_STATUS, t2
     
 .isr_context_switch_ret:
     # Return to new context.
     restore_all_regs
     isr_exit
 #pragma endregion
-    mret
+    RISCV_TRAP_RET
     .cfi_endproc
 
 
@@ -258,54 +267,60 @@ __trap_asm:
     save_all_regs
     
     # Construct fake stack frame.
-    csrr ra, mepc
-    addi sp, sp, -16
-    sw   ra, 12(sp)
-    sw   s0, 8(sp)
-    addi s0, sp, 16
-    sw   s0, isr_ctx_t_frameptr(t0)
+    csrr    ra, CSR_EPC
+    addi    sp, sp, -16
+#if __riscv_xlen == 64
+    sd      ra, 8(sp)
+    sd      s0, 0(sp)
+#else
+    sw      ra, 12(sp)
+    sw      s0, 8(sp)
+#endif
+    addi    s0, sp, 16
+    ST_REG  s0, isr_ctx_t_frameptr(t0)
     .cfi_def_cfa s0, 0
     .cfi_val_offset s0, -8
     .cfi_val_offset ra, -4
     
     # Most of the trap handler is implemented in C.
-    jal  riscv_trap_handler
-    csrr t0, mscratch
+    jal     riscv_trap_handler
+    csrr    t0, CSR_SCRATCH
     
     # Discard fake stack frame.
-    addi sp, sp, 16
+    addi    sp, sp, 16
     
-    .cfi_def_cfa mstatus, 0
+    .cfi_def_cfa CSR_STATUS, 0
     .cfi_val_offset s0, isr_ctx_t_regs+cpu_regs_t_s0
     .cfi_val_offset ra, isr_ctx_t_regs+cpu_regs_t_ra
     
     # Check for outstanding context switch.
     # If nonnull, context will be switched.
-    lw   t1, isr_ctx_t_ctxswitch(t0)
-    beq  t1, x0, .__trap_asm_exit
+    LD_REG  t1, isr_ctx_t_ctxswitch(t0)
+    beq     t1, x0, .__trap_asm_exit
     # Swap out the context pointer.
-    csrr t0, mscratch
-    lw   t0, isr_ctx_t_ctxswitch(t0)
-    csrw mscratch, t0
+    csrr    t0, CSR_SCRATCH
+    LD_REG  t0, isr_ctx_t_ctxswitch(t0)
+    csrw    CSR_SCRATCH, t0
     # Swap memory protection.
-    jal  memprotect_swap_from_isr
-    csrr t0, mscratch
+    jal     memprotect_swap_from_isr
+    csrr    t0, CSR_SCRATCH
     # Set privilege level.
-    lw   t2, isr_ctx_t_is_kernel_thread(t0)
-    li   t3, 3 << RISCV_STATUS_MPP_BASE_BIT
-    bnez t2, .__trap_asm_priv_m
-    # Zero; user thread; clear MPP.
-    csrc mstatus, t3
-    j .__trap_asm_exit
-.__trap_asm_priv_m:
-    # Nonzero; kernel thread; set MPP.
-    csrs mstatus, t3
+    LD_REG  t2, isr_ctx_t_flags(t0)
+    andi    t2, t2, ISR_CTX_FLAG_KERNEL
+    li      t3, CSR_STATUS_PP_MASK << CSR_STATUS_PP_BASE_BIT
+    bnez    t2, .__trap_asm_priv_k
+    # Zero; user thread; clear xPP.
+    csrc    CSR_STATUS, t3
+    j       .__trap_asm_exit
+.__trap_asm_priv_k:
+    # Nonzero; kernel thread; set xPP.
+    csrs    CSR_STATUS, t3
     
 .__trap_asm_exit:
     restore_all_regs
     isr_exit
 #pragma endregion
-    mret
+    RISCV_TRAP_RET
     .cfi_endproc
 
 
@@ -323,50 +338,56 @@ __isr_asm:
     save_all_regs
     
     # Construct fake stack frame.
-    csrr ra, mepc
-    addi sp, sp, -16
-    sw   ra, 12(sp)
-    sw   s0, 8(sp)
-    addi s0, sp, 16
-    sw   s0, isr_ctx_t_frameptr(t0)
+    csrr    ra, CSR_EPC
+    addi    sp, sp, -16
+#if __riscv_xlen == 64
+    sd      ra, 8(sp)
+    sd      s0, 0(sp)
+#else
+    sw      ra, 12(sp)
+    sw      s0, 8(sp)
+#endif
+    addi    s0, sp, 16
+    ST_REG  s0, isr_ctx_t_frameptr(t0)
     .cfi_def_cfa s0, 0
     .cfi_val_offset s0, -8
     .cfi_val_offset ra, -4
     
     # Most of the interrupt handler is implemented in C.
-    jal riscv_interrupt_handler
-    csrr t0, mscratch
+    jal     riscv_interrupt_handler
+    csrr    t0, CSR_SCRATCH
     
     # Discard fake stack frame.
-    addi sp, sp, 16
+    addi    sp, sp, 16
     
     # Check for outstanding context switch.
     # If nonnull, context will be switched.
-    lw   t1, isr_ctx_t_ctxswitch(t0)
-    beq  t1, x0, .__isr_asm_exit
+    LD_REG  t1, isr_ctx_t_ctxswitch(t0)
+    beq     t1, x0, .__isr_asm_exit
     # Swap out the context pointer.
-    csrr t0, mscratch
-    lw   t0, isr_ctx_t_ctxswitch(t0)
-    csrw mscratch, t0
+    csrr    t0, CSR_SCRATCH
+    LD_REG  t0, isr_ctx_t_ctxswitch(t0)
+    csrw    CSR_SCRATCH, t0
     # Swap memory protection.
-    jal  memprotect_swap_from_isr
-    csrr t0, mscratch
+    jal     memprotect_swap_from_isr
+    csrr    t0, CSR_SCRATCH
     # Set privilege level.
-    lw   t2, isr_ctx_t_is_kernel_thread(t0)
-    li   t3, 3 << RISCV_STATUS_MPP_BASE_BIT
-    bnez t2, .__isr_asm_priv_m
-    # Zero; user thread; clear MPP.
-    csrc mstatus, t3
-    j .__isr_asm_exit
-.__isr_asm_priv_m:
-    # Nonzero; kernel thread; set MPP.
-    csrs mstatus, t3
+    LD_REG  t2, isr_ctx_t_flags(t0)
+    andi    t2, t2, ISR_CTX_FLAG_KERNEL
+    li      t3, CSR_STATUS_PP_MASK << CSR_STATUS_PP_BASE_BIT
+    bnez    t2, .__isr_asm_priv_k
+    # Zero; user thread; clear xPP.
+    csrc    CSR_STATUS, t3
+    j       .__isr_asm_exit
+.__isr_asm_priv_k:
+    # Nonzero; kernel thread; set xPP.
+    csrs    CSR_STATUS, t3
     
 .__isr_asm_exit:
     # This is an interrupt; restoring all registers is mandatory.
     restore_all_regs
     isr_exit
-    mret
+    RISCV_TRAP_RET
     .cfi_endproc
 
 
@@ -374,7 +395,7 @@ __isr_asm:
 
 
     # Interrupt and trap handler stack.
-    .section ".bss"
+    .bss
     .align 4
 __interrupt_stack_lo:
     .skip ISR_STACK_DEPTH*4
@@ -386,7 +407,8 @@ __interrupt_stack_hi:
 
     # Interrupt vector table for the CPU.
     # This must be aligned to a 256-byte boundary, so it is in a special section.
-    .section ".interrupt_vector_table"
+    .section ".interrupt_vector_table", "ax", @progbits
+    .global riscv_interrupt_vector_table
 riscv_interrupt_vector_table:
     .option push
     .option norvc

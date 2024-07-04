@@ -23,7 +23,7 @@ void sched_raise_from_isr(sched_thread_t *thread, bool syscall, void *entry_poin
     thread->flags |= THREAD_PRIVILEGED;
 
     // Set kernel thread entrypoint.
-    thread->kernel_isr_ctx.regs.pc = (uint32_t)entry_point;
+    thread->kernel_isr_ctx.regs.pc = (size_t)entry_point;
     thread->kernel_isr_ctx.regs.sp = thread->kernel_stack_top;
     thread->kernel_isr_ctx.regs.s0 = 0;
     thread->kernel_isr_ctx.regs.ra = 0;
@@ -54,7 +54,7 @@ void sched_lower_from_isr() {
 
     // Set context switch target to user thread.
     isr_ctx_switch_set(&thread->user_isr_ctx);
-    assert_dev_drop(!thread->user_isr_ctx.is_kernel_thread);
+    assert_dev_drop(!(thread->user_isr_ctx.flags & ISR_CTX_FLAG_KERNEL));
 
     if (atomic_load(&process->flags) & PROC_EXITING) {
         // Request a context switch to a different thread.
@@ -77,7 +77,7 @@ bool sched_signal_enter(size_t handler_vaddr, size_t return_vaddr, int signum) {
 
     // Ensure the user has enough stack.
     size_t usp   = thread->user_isr_ctx.regs.sp;
-    size_t usize = sizeof(uint32_t) * 20;
+    size_t usize = sizeof(size_t) * 20;
     if ((proc_map_contains_raw(thread->process, usp - usize, usize) & MEMPROTECT_FLAG_RW) != MEMPROTECT_FLAG_RW) {
         // Not enough stack that the process owns.
         return false;
@@ -86,25 +86,25 @@ bool sched_signal_enter(size_t handler_vaddr, size_t return_vaddr, int signum) {
 
     // Save context to user's stack.
     // TODO: Enable SUM bit for S-mode kernel.
-    uint32_t *stackptr = (uint32_t *)thread->user_isr_ctx.regs.sp;
-    stackptr[0]        = thread->user_isr_ctx.regs.t0;
-    stackptr[1]        = thread->user_isr_ctx.regs.t1;
-    stackptr[2]        = thread->user_isr_ctx.regs.t2;
-    stackptr[3]        = thread->user_isr_ctx.regs.a0;
-    stackptr[4]        = thread->user_isr_ctx.regs.a1;
-    stackptr[5]        = thread->user_isr_ctx.regs.a2;
-    stackptr[6]        = thread->user_isr_ctx.regs.a3;
-    stackptr[7]        = thread->user_isr_ctx.regs.a4;
-    stackptr[8]        = thread->user_isr_ctx.regs.a5;
-    stackptr[9]        = thread->user_isr_ctx.regs.a6;
-    stackptr[10]       = thread->user_isr_ctx.regs.a7;
-    stackptr[11]       = thread->user_isr_ctx.regs.t3;
-    stackptr[12]       = thread->user_isr_ctx.regs.t4;
-    stackptr[13]       = thread->user_isr_ctx.regs.t5;
-    stackptr[14]       = thread->user_isr_ctx.regs.t6;
-    stackptr[17]       = thread->user_isr_ctx.regs.pc;
-    stackptr[18]       = thread->user_isr_ctx.regs.s0;
-    stackptr[19]       = thread->user_isr_ctx.regs.ra;
+    size_t *stackptr = (size_t *)thread->user_isr_ctx.regs.sp;
+    stackptr[0]      = thread->user_isr_ctx.regs.t0;
+    stackptr[1]      = thread->user_isr_ctx.regs.t1;
+    stackptr[2]      = thread->user_isr_ctx.regs.t2;
+    stackptr[3]      = thread->user_isr_ctx.regs.a0;
+    stackptr[4]      = thread->user_isr_ctx.regs.a1;
+    stackptr[5]      = thread->user_isr_ctx.regs.a2;
+    stackptr[6]      = thread->user_isr_ctx.regs.a3;
+    stackptr[7]      = thread->user_isr_ctx.regs.a4;
+    stackptr[8]      = thread->user_isr_ctx.regs.a5;
+    stackptr[9]      = thread->user_isr_ctx.regs.a6;
+    stackptr[10]     = thread->user_isr_ctx.regs.a7;
+    stackptr[11]     = thread->user_isr_ctx.regs.t3;
+    stackptr[12]     = thread->user_isr_ctx.regs.t4;
+    stackptr[13]     = thread->user_isr_ctx.regs.t5;
+    stackptr[14]     = thread->user_isr_ctx.regs.t6;
+    stackptr[17]     = thread->user_isr_ctx.regs.pc;
+    stackptr[18]     = thread->user_isr_ctx.regs.s0;
+    stackptr[19]     = thread->user_isr_ctx.regs.ra;
     // TODO: Disable SUM bit for S-mode kernel.
 
     // Set up registers for entering signal handler.
@@ -126,7 +126,7 @@ bool sched_signal_exit() {
 
     // Ensure the user still has the stack.
     size_t usp   = thread->user_isr_ctx.regs.sp;
-    size_t usize = sizeof(uint32_t) * 20;
+    size_t usize = sizeof(size_t) * 20;
     if ((proc_map_contains_raw(thread->process, usp, usize) & MEMPROTECT_FLAG_RW) != MEMPROTECT_FLAG_RW) {
         // If this happens, the process probably corrupted it's own stack.
         return false;
@@ -134,7 +134,7 @@ bool sched_signal_exit() {
 
     // Restore user's state.
     // TODO: Enable SUM bit for S-mode kernel.
-    uint32_t *stackptr           = (uint32_t *)thread->user_isr_ctx.regs.sp;
+    size_t *stackptr             = (size_t *)thread->user_isr_ctx.regs.sp;
     thread->user_isr_ctx.regs.t0 = stackptr[0];
     thread->user_isr_ctx.regs.t1 = stackptr[1];
     thread->user_isr_ctx.regs.t2 = stackptr[2];
@@ -175,10 +175,10 @@ static void sched_exit_self() {
 void sched_prepare_kernel_entry(sched_thread_t *thread, sched_entry_point_t entry_point, void *arg) {
     // Initialize registers.
     mem_set(&thread->kernel_isr_ctx.regs, 0, sizeof(thread->kernel_isr_ctx.regs));
-    thread->kernel_isr_ctx.regs.pc = (uint32_t)entry_point;
+    thread->kernel_isr_ctx.regs.pc = (size_t)entry_point;
     thread->kernel_isr_ctx.regs.sp = thread->kernel_stack_top;
-    thread->kernel_isr_ctx.regs.a0 = (uint32_t)arg;
-    thread->kernel_isr_ctx.regs.ra = (uint32_t)sched_exit_self;
+    thread->kernel_isr_ctx.regs.a0 = (size_t)arg;
+    thread->kernel_isr_ctx.regs.ra = (size_t)sched_exit_self;
     asm("sw gp, %0" ::"m"(thread->kernel_isr_ctx.regs.gp));
 }
 
@@ -192,6 +192,6 @@ void sched_prepare_user_entry(sched_thread_t *thread, sched_entry_point_t entry_
 
     // Initialize userland registers.
     mem_set(&thread->user_isr_ctx.regs, 0, sizeof(thread->user_isr_ctx.regs));
-    thread->user_isr_ctx.regs.pc = (uint32_t)entry_point;
-    thread->user_isr_ctx.regs.a0 = (uint32_t)arg;
+    thread->user_isr_ctx.regs.pc = (size_t)entry_point;
+    thread->user_isr_ctx.regs.a0 = (size_t)arg;
 }

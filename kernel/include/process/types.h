@@ -6,9 +6,9 @@
 #include "filesystem.h"
 #include "kbelf.h"
 #include "list.h"
-#include "memprotect.h"
 #include "mutex.h"
 #include "port/hardware_allocation.h"
+#include "port/memprotect.h"
 #include "scheduler/scheduler.h"
 #include "signal.h"
 

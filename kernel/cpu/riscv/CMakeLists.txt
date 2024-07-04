@@ -14,7 +14,6 @@ set(cpu_src
     ${CMAKE_CURRENT_LIST_DIR}/src/isr.c
     ${CMAKE_CURRENT_LIST_DIR}/src/isr_ctx.c
     ${CMAKE_CURRENT_LIST_DIR}/src/panic.c
-    ${CMAKE_CURRENT_LIST_DIR}/src/riscv_pmp.c
     ${CMAKE_CURRENT_LIST_DIR}/src/scheduler.c
     ${CMAKE_CURRENT_LIST_DIR}/src/usercopy.c
 )
@@ -23,6 +22,12 @@ if(DEFINED cpu_riscv_enable_riscv_intc)
 endif()
 if(DEFINED cpu_riscv_enable_sifive_plic)
     set(cpu_src ${cpu_src} ${CMAKE_CURRENT_LIST_DIR}/src/interrupt/sifive_plic.c)
+endif()
+if(DEFINED cpu_riscv_enable_pmp)
+    set(cpu_src ${cpu_src} ${CMAKE_CURRENT_LIST_DIR}/src/memprotect/riscv_pmp.c)
+endif()
+if(DEFINED cpu_riscv_enable_mmu)
+    set(cpu_src ${cpu_src} ${CMAKE_CURRENT_LIST_DIR}/src/memprotect/riscv_mmu.c)
 endif()
 set(cpu_include ${CMAKE_CURRENT_LIST_DIR}/include)
 set(cpu_link)

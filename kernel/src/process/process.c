@@ -4,6 +4,7 @@
 #include "process/process.h"
 
 #include "arrays.h"
+#include "assertions.h"
 #include "badge_strings.h"
 #include "cpu/panic.h"
 #include "housekeeping.h"
@@ -399,7 +400,7 @@ size_t proc_map_raw(badge_err_t *ec, process_t *proc, size_t vaddr_req, size_t m
     proc_memmap_sort_raw(map);
 
     // Update memory protection.
-    if (!memprotect(map, &map->mpu_ctx, (size_t)base, (size_t)base, size, flags & MEMPROTECT_FLAG_RWX)) {
+    if (!memprotect_u(map, &map->mpu_ctx, (size_t)base, (size_t)base, size, flags & MEMPROTECT_FLAG_RWX)) {
         for (size_t i = 0; i < map->regions_len; i++) {
             if (map->regions[i].base == (size_t)base) {
                 array_remove(&map->regions[0], sizeof(map->regions[0]), map->regions_len, NULL, i);
@@ -426,7 +427,7 @@ void proc_unmap_raw(badge_err_t *ec, process_t *proc, size_t base) {
             proc_memmap_ent_t region = map->regions[i];
             array_remove(&map->regions[0], sizeof(map->regions[0]), map->regions_len, NULL, i);
             map->regions_len--;
-            assert_dev_keep(memprotect(map, &map->mpu_ctx, base, base, region.size, 0));
+            assert_dev_keep(memprotect_u(map, &map->mpu_ctx, base, base, region.size, 0));
             memprotect_commit(&map->mpu_ctx);
             buddy_deallocate((void *)base);
             badge_err_set_ok(ec);

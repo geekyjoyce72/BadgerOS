@@ -8,6 +8,7 @@ set(target_abi "lp64")
 
 set(cpu_riscv_enable_riscv_intc true)
 set(cpu_riscv_enable_sifive_plic true)
+set(cpu_riscv_enable_mmu true)
 
 set(port_src
     ${CMAKE_CURRENT_LIST_DIR}/src/hal/gpio.c
@@ -15,7 +16,6 @@ set(port_src
     ${CMAKE_CURRENT_LIST_DIR}/src/hal/spi.c
     ${CMAKE_CURRENT_LIST_DIR}/src/hal/time.c
     ${CMAKE_CURRENT_LIST_DIR}/src/interrupt.c
-    ${CMAKE_CURRENT_LIST_DIR}/src/memprotect.c
     ${CMAKE_CURRENT_LIST_DIR}/src/port.c
 )
 set(port_include

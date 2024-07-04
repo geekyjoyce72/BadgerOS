@@ -49,7 +49,15 @@ bool copy_from_user_raw(process_t *process, void *kernel_vaddr, size_t user_vadd
     if (!proc_map_contains_raw(process, user_vaddr, len)) {
         return false;
     }
+    bool pie = irq_enable(false);
+#if RISCV_M_MODE_KERNEL
     mem_copy(kernel_vaddr, (void const *)user_vaddr, len);
+#else
+    asm("csrs sstatus, %0" ::"r"(1 << RISCV_STATUS_SUM_BIT));
+    mem_copy(kernel_vaddr, (void const *)user_vaddr, len);
+    asm("csrc sstatus, %0" ::"r"(1 << RISCV_STATUS_SUM_BIT));
+#endif
+    irq_enable(pie);
     return true;
 }
 
@@ -60,6 +68,14 @@ bool copy_to_user_raw(process_t *process, size_t user_vaddr, void *kernel_vaddr,
     if (!proc_map_contains_raw(process, user_vaddr, len)) {
         return false;
     }
+    bool pie = irq_enable(false);
+#if RISCV_M_MODE_KERNEL
     mem_copy((void *)user_vaddr, kernel_vaddr, len);
+#else
+    asm("csrs sstatus, %0" ::"r"(1 << RISCV_STATUS_SUM_BIT));
+    mem_copy((void *)user_vaddr, kernel_vaddr, len);
+    asm("csrc sstatus, %0" ::"r"(1 << RISCV_STATUS_SUM_BIT));
+#endif
+    irq_enable(pie);
     return true;
 }

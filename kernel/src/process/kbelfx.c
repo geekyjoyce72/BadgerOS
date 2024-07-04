@@ -5,6 +5,7 @@
 #include "badge_strings.h"
 #include "filesystem.h"
 #include "malloc.h"
+#include "memprotect.h"
 #include "process/internal.h"
 #include "process/process.h"
 #include "process/types.h"

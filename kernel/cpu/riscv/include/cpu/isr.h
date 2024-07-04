@@ -29,15 +29,15 @@
 // clang-format on
 #else
 // Interrupt vector table implemented in ASM.
-extern uint32_t riscv_interrupt_vector_table[32];
+extern uint32_t const riscv_interrupt_vector_table[32];
 // Callback from ASM to platform-specific interrupt handler.
-extern void     riscv_interrupt_handler();
+extern void           riscv_interrupt_handler();
 // ASM system call wrapper function.
-extern void     riscv_syscall_wrapper();
+extern void           riscv_syscall_wrapper();
 // Callback from ASM on non-syscall trap.
-extern void     riscv_trap_handler();
+extern void           riscv_trap_handler();
 // Return a value from the syscall handler.
-extern void     syscall_return(long long value) __attribute__((noreturn));
+extern void           syscall_return(long long value) __attribute__((noreturn));
 
 // Disable interrupts and return whether they were enabled.
 static inline bool isr_global_disable() {

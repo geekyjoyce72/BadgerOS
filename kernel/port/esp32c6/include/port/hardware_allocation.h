@@ -7,6 +7,8 @@
 
 /* ==== Interrupts ==== */
 
+// Kernel runs in M-mode instead of S-mode.
+#define RISCV_M_MODE_KERNEL        1
 // Interrupt channel used for timer alarms.
 #define INT_CHANNEL_TIMER_ALARM    16
 // Interrupt channel used for watchdog alarms.

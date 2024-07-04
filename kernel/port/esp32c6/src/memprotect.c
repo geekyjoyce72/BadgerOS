@@ -93,9 +93,14 @@ void memprotect_destroy(mpu_ctx_t *ctx) {
     (void)ctx;
 }
 
-// Add a memory protection region.
-bool memprotect(proc_memmap_t *new_mm, mpu_ctx_t *ctx, size_t vaddr, size_t paddr, size_t length, uint32_t flags) {
+// Add a memory protection region for user memory.
+bool memprotect_u(proc_memmap_t *new_mm, mpu_ctx_t *ctx, size_t vaddr, size_t paddr, size_t length, uint32_t flags) {
     return vaddr == paddr && riscv_pmp_memprotect(new_mm, ctx, vaddr, length, flags);
+}
+
+// Add a memory protection region for kernel memory.
+bool memprotect_k(size_t vaddr, size_t paddr, size_t length, uint32_t flags) {
+    return vaddr == paddr;
 }
 
 // Commit pending memory protections, if any.

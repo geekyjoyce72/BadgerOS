@@ -14,10 +14,12 @@ PHDRS
 SECTIONS
 {
     . = 0xffffffff80000000;
+    __start_badgeros_kernel = .;
 
     .text : {
         *(.text .text.*)
     } :text
+    . = ALIGN(256);
     .interrupt_vector_table : {
         *(.interrupt_vector_table)
     } :text
@@ -54,6 +56,8 @@ SECTIONS
         *(.bss .bss.*)
         *(COMMON)
     } :data
+
+    __stop_badgeros_kernel = .;
 
     /* Discard useless sections. */
     /DISCARD/ : {

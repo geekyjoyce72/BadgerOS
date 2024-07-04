@@ -7,9 +7,7 @@
 
 /* ==== RISC-V MSTATUS DEFINITION ==== */
 
-// S-mode interrupt enable.
 #define RISCV_STATUS_SIE_BIT      1
-// M-mode interrupt enable.
 #define RISCV_STATUS_MIE_BIT      3
 #define RISCV_STATUS_SPIE_BIT     5
 #define RISCV_STATUS_UBE_BIT      6

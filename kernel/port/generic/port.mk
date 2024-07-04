@@ -55,9 +55,10 @@ $(BUILDDIR)/cache/OVMF.fd:
 .PHONY: qemu
 qemu: $(BUILDDIR)/cache/OVMF.fd image
 	qemu-system-riscv64 -s \
-		-M virt -cpu rv64 -m 2G \
+		-M virt -cpu rv64 -m 9G \
 		-device ramfb -device qemu-xhci -device usb-kbd \
 		-drive if=pflash,unit=0,format=raw,file=$(BUILDDIR)/cache/OVMF.fd \
 		-device virtio-scsi-pci,id=scsi -device scsi-hd,drive=hd0 \
 		-drive id=hd0,format=raw,file=$(BUILDDIR)/image.hdd \
-		-serial mon:stdio
+		-serial mon:stdio -nographic \
+	| ../tools/address-filter.py -L -A $(CROSS_COMPILE)addr2line $(OUTPUT)/badger-os.elf

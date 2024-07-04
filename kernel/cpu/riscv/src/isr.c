@@ -6,6 +6,7 @@
 #include "backtrace.h"
 #include "cpu/isr_ctx.h"
 #include "cpu/panic.h"
+#include "cpu/regs.h"
 #include "interrupt.h"
 #include "log.h"
 #include "port/hardware.h"
@@ -56,24 +57,30 @@ void riscv_trap_handler() {
     // TODO: Per-CPU double trap detection.
     static int trap_depth = 0;
 
-    long mcause, mstatus, mtval, mepc;
-    asm volatile("csrr %0, mcause" : "=r"(mcause));
-    long trapno = mcause & RISCV_VT_ICAUSE_MASK;
-    if (mcause < 0) {
+    long cause, status, mtval, epc;
+    asm volatile("csrr %0, " CSR_CAUSE_STR : "=r"(cause));
+    long trapno = cause & RISCV_VT_ICAUSE_MASK;
+    if (cause < 0) {
         riscv_interrupt_handler();
         return;
     }
-    asm volatile("csrr %0, mstatus" : "=r"(mstatus));
+    asm volatile("csrr %0, " CSR_STATUS_STR : "=r"(status));
 
     trap_depth++;
     isr_ctx_t recurse_ctx;
-    recurse_ctx.mpu_ctx          = NULL;
-    recurse_ctx.is_kernel_thread = true;
-    recurse_ctx.use_sp           = true;
-    isr_ctx_t *kctx              = isr_ctx_swap(&recurse_ctx);
-    recurse_ctx.thread           = kctx->thread;
+    recurse_ctx.mpu_ctx = NULL;
+    recurse_ctx.flags   = ISR_CTX_FLAG_USE_SP | ISR_CTX_FLAG_KERNEL;
+    isr_ctx_t *kctx     = isr_ctx_swap(&recurse_ctx);
+    recurse_ctx.thread  = kctx->thread;
 
-    if (!kctx->is_kernel_thread) {
+    // Check for custom trap handler.
+    if ((kctx->flags & ISR_CTX_FLAG_NOEXC) && kctx->noexc_cb(kctx, kctx->noexc_cookie)) {
+        isr_ctx_swap(kctx);
+        trap_depth--;
+        return;
+    }
+
+    if (!(kctx->flags & ISR_CTX_FLAG_KERNEL)) {
         switch (trapno) {
             default: break;
 
@@ -126,16 +133,16 @@ void riscv_trap_handler() {
         rawprint(trapnames[trapno]);
     } else {
         rawprint("Trap 0x");
-        rawprinthex(mcause, 8);
+        rawprinthex(cause, 8);
     }
 
     // Print PC.
-    asm volatile("csrr %0, mepc" : "=r"(mepc));
+    asm volatile("csrr %0, " CSR_EPC_STR : "=r"(epc));
     rawprint(" at PC 0x");
-    rawprinthex(mepc, 8);
+    rawprinthex(epc, sizeof(size_t) * 2);
 
     // Print trap value.
-    asm volatile("csrr %0, mtval" : "=r"(mtval));
+    asm volatile("csrr %0, " CSR_TVAL_STR : "=r"(mtval));
     if (mtval && ((1 << trapno) & MEM_ADDR_TRAPS)) {
         rawprint(" while accessing 0x");
         rawprinthex(mtval, 8);
@@ -149,14 +156,14 @@ void riscv_trap_handler() {
 
     // Print privilige mode.
     if (trap_depth == 1) {
-        if (mstatus & (3 << RISCV_STATUS_MPP_BASE_BIT)) {
+        if (status & (CSR_STATUS_PP_MASK << CSR_STATUS_PP_BASE_BIT)) {
             rawprint("Running in kernel mode");
-            if (!kctx->is_kernel_thread) {
+            if (!(kctx->flags & ISR_CTX_FLAG_KERNEL)) {
                 rawprint(" (despite is_kernel_thread=0)");
             }
         } else {
             rawprint("Running in user mode");
-            if (kctx->is_kernel_thread) {
+            if (kctx->flags & ISR_CTX_FLAG_KERNEL) {
                 rawprint(" (despite is_kernel_thread=1)");
             }
         }
@@ -172,7 +179,7 @@ void riscv_trap_handler() {
 
     isr_ctx_dump(kctx);
 
-    if (mstatus & (3 << RISCV_STATUS_MPP_BASE_BIT) || trap_depth > 1) {
+    if (status & (CSR_STATUS_PP_MASK << CSR_STATUS_PP_BASE_BIT) || trap_depth > 1) {
         // When the kernel traps it's a bad time.
         panic_poweroff();
     } else {

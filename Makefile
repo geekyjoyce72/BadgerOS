@@ -28,6 +28,7 @@ gdb:
 	$(MAKE) -C kernel gdb
 
 qemu:
+	$(MAKE) -C files build
 	$(MAKE) -C kernel qemu
 
 flash:

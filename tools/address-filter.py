@@ -1,72 +1,61 @@
 #!/usr/bin/env python3
+
 # SPDX-License-Identifier: MIT
 
-import sys, re, subprocess, io, time
+import sys, subprocess, io
+from argparse import *
 
-file_name = "build/badger-os.elf"
+assert __name__ == "__main__"
 
-if len(sys.argv) > 1:
-    file_name = sys.argv[1]
+parser = ArgumentParser(description="Reads stdin for kernel addresses and injects their linenumbers")
+parser.add_argument("-L", "--long", "--64bit", action="store_true", help="Use 64-bit addresses")
+parser.add_argument("-A", "--addr2line", action="store", help="addr2line program")
+parser.add_argument("file", action="store", help="Executable file to read symbols from")
+args = parser.parse_args()
 
-matcher = re.compile("(0x[0-9A-Fa-f]{8})")
+hextab = "0123456789abcdef"
+buf    = ''
+hexits = 16 if args.long else 8
 
+state = -2
 
-def runAndCapture(cmd):
+def addr2line():
+    global buf
+    cmd = [
+        args.addr2line, '-e', args.file, buf
+    ]
     process = subprocess.Popen(cmd, stdout=subprocess.PIPE)
-
-    result = process.stdout.read()
-
+    result  = process.stdout.read()
     process.wait()
+    string  = result.decode().strip()
+    if process.returncode: return
+    if string == '??:0': return
+    if string.endswith('?'): return
+    sys.stdout.write(" (")
+    sys.stdout.write(string)
+    sys.stdout.write(")")
 
-    string = result.decode().strip()
-
-    if process.returncode == 0 and string != "??:0":
-        return string
-    else:
-        return None
-
-
-def addr2line(x):
-    global file_name
-
-    addr = int(x.group(1), 16)
-
-    addr_string = "0x{:0>8x}".format(addr)
-
-    try:
-        result = runAndCapture(
-            ["riscv32-unknown-linux-gnu-addr2line", "-e", file_name, addr_string]
-        )
-    except:
-        try:
-            result = runAndCapture(
-                ["riscv32-linux-gnu-addr2line", "-e", file_name, addr_string]
-            )
-        except:
-            try:
-                result = runAndCapture(
-                    ["riscv64-unknown-linux-gnu-addr2line", "-e", file_name, addr_string]
-                )
-            except:
-                pass
-                try:
-                    result = runAndCapture(
-                        ["riscv64-linux-gnu-addr2line", "-e", file_name, addr_string]
-                    )
-                except:
-                    result = None
-
-    if result != None:
-        return f"{addr_string} ({result})"
-    else:
-        return addr_string
-
-
-# https://stackoverflow.com/questions/73335410/how-to-read-sys-stdin-containing-binary-data-in-python-ignore-errors
-sys.stdin = io.TextIOWrapper(sys.stdin.buffer, errors="ignore")
-
-for line in sys.stdin:
-    line = matcher.sub(addr2line, line.rstrip())
-    sys.stdout.write(line + "\r\n")
-
-sys.stdout.write("\n")
+while True:
+    msg = sys.stdin.read(1)
+    if not len(msg): break
+    for char in msg:
+        if state == -2 and char == '0':
+            state = -1
+            sys.stdout.write(char)
+        elif state == -1 and char in 'xX':
+            state = 0
+            buf   = ''
+            sys.stdout.write(char)
+        elif state == hexits:
+            if char.lower() not in hextab:
+                addr2line()
+            sys.stdout.write(char)
+            state = -2
+        elif char.lower() in hextab:
+            buf   += char
+            state += 1
+            sys.stdout.write(char)
+        else:
+            state = -2
+            sys.stdout.write(char)
+    sys.stdout.flush()
