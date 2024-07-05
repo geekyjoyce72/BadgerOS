@@ -10,6 +10,4 @@
 typedef struct {
     // Page table root physical page number.
     size_t root_ppn;
-    // Page table root virtual address.
-    void  *root_vaddr;
 } mpu_ctx_t;

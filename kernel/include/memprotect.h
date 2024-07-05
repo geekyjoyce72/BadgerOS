@@ -7,13 +7,17 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define MEMPROTECT_FLAG_R   0x00000001
-#define MEMPROTECT_FLAG_W   0x00000002
-#define MEMPROTECT_FLAG_RW  0x00000003
-#define MEMPROTECT_FLAG_X   0x00000004
-#define MEMPROTECT_FLAG_RX  0x00000005
-#define MEMPROTECT_FLAG_WX  0x00000006
-#define MEMPROTECT_FLAG_RWX 0x00000007
+#define MEMPROTECT_FLAG_R      0x00000001
+#define MEMPROTECT_FLAG_W      0x00000002
+#define MEMPROTECT_FLAG_RW     0x00000003
+#define MEMPROTECT_FLAG_X      0x00000004
+#define MEMPROTECT_FLAG_RX     0x00000005
+#define MEMPROTECT_FLAG_WX     0x00000006
+#define MEMPROTECT_FLAG_RWX    0x00000007
+// Global mapping; visible in all address spaces.
+#define MEMPROTECT_FLAG_GLOBAL 0x00000010
+// Kernel mapping; accessible to kernel mode instead of user mode.
+#define MEMPROTECT_FLAG_KERNEL 0x00000020
 
 #include "port/memprotect.h"
 #include "process/types.h"

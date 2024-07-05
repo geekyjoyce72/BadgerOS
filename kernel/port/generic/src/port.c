@@ -5,7 +5,6 @@
 
 #include "assertions.h"
 #include "cpu/panic.h"
-#include "cpu/riscv_mmu.h"
 #include "interrupt.h"
 #include "limine.h"
 #include "malloc.h"

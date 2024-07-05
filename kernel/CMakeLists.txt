@@ -95,6 +95,7 @@ add_executable(${target}
     ${CMAKE_CURRENT_LIST_DIR}/src/scheduler/syscall_impl.c
     ${CMAKE_CURRENT_LIST_DIR}/src/housekeeping.c
     ${CMAKE_CURRENT_LIST_DIR}/src/main.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/page_alloc.c
     ${CMAKE_CURRENT_LIST_DIR}/src/syscall.c
     ${cpu_src}
     ${port_src}

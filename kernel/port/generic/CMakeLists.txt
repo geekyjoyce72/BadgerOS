@@ -16,6 +16,7 @@ set(port_src
     ${CMAKE_CURRENT_LIST_DIR}/src/hal/spi.c
     ${CMAKE_CURRENT_LIST_DIR}/src/hal/time.c
     ${CMAKE_CURRENT_LIST_DIR}/src/interrupt.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/memprotect.c
     ${CMAKE_CURRENT_LIST_DIR}/src/port.c
 )
 set(port_include

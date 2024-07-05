@@ -41,14 +41,14 @@ extern void           syscall_return(long long value) __attribute__((noreturn));
 
 // Disable interrupts and return whether they were enabled.
 static inline bool isr_global_disable() {
-    uint32_t mstatus;
-    asm volatile("csrr %0, mstatus" : "=r"(mstatus));
-    asm volatile("csrc mstatus, %0" ::"r"((1U << RISCV_STATUS_MIE_BIT)));
-    return mstatus & (1U << RISCV_STATUS_MIE_BIT);
+    uint32_t status;
+    asm volatile("csrr %0, " CSR_STATUS_STR : "=r"(status));
+    asm volatile("csrc " CSR_STATUS_STR ", %0" ::"r"((1U << CSR_STATUS_IE_BIT)));
+    return status & (1U << CSR_STATUS_IE_BIT);
 }
 // Enable interrupts.
 static inline void isr_global_enable() {
-    asm volatile("csrs mstatus, %0" ::"r"((1U << RISCV_STATUS_MIE_BIT)));
+    asm volatile("csrs " CSR_STATUS_STR ", %0" ::"r"((1U << CSR_STATUS_IE_BIT)));
 }
 // Explicit context switch from M-mode.
 // Interrupts must be disabled on entry and will be re-enabled on exit.
