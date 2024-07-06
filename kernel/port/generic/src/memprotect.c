@@ -298,7 +298,7 @@ void memprotect_init() {
     pt_map(
         mpu_global_ctx.root_ppn,
         mmu_levels - 1,
-        mmu_high_vpn,
+        mmu_hhdm_vaddr / MMU_PAGE_SIZE,
         0,
         memprotect_hhdm_pages,
         MEMPROTECT_FLAG_RW | MEMPROTECT_FLAG_GLOBAL | MEMPROTECT_FLAG_KERNEL
@@ -353,7 +353,6 @@ void memprotect_init() {
     logkf_from_isr(LOG_DEBUG, "BadgerOS root PPN %{size;x}", mpu_global_ctx.root_ppn);
     atomic_thread_fence(memory_order_release);
     memprotect_swap_from_isr();
-    mmu_hhdm_vaddr = mmu_high_vaddr;
 
     // Tell port to add other available memory to the pools.
     port_post_memprotect_init();

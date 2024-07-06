@@ -103,7 +103,7 @@ typedef struct {
 
 
 
-// Virtual address offset currently used for HHDM.
+// Virtual address offset used for HHDM.
 extern size_t mmu_hhdm_vaddr;
 // Virtual address offset of the higher half.
 extern size_t mmu_high_vaddr;
@@ -113,6 +113,8 @@ extern size_t mmu_half_size;
 extern size_t mmu_hhdm_size;
 // Number of page table levels.
 extern int    mmu_levels;
+// Virtual page number offset used for HHDM.
+#define mmu_hhdm_vpn   (mmu_hhdm_vaddr / MMU_PAGE_SIZE)
 // Virtual page number of the higher half.
 #define mmu_high_vpn   (mmu_high_vaddr / MMU_PAGE_SIZE)
 // Virtual page size of a "half".

@@ -111,11 +111,6 @@ void port_early_init() {
         }
     }
 
-    // Add biggest already available region to allocator.
-    early_alloc_index                      = biggest_pool_index;
-    struct limine_memmap_entry *early_pool = mem->entries[biggest_pool_index];
-    init_pool((void *)early_pool->base, (void *)early_pool->base + early_pool->length, 0);
-
     // Pass info to memory protection.
     mmu_hhdm_vaddr        = hhdm_req.response->offset;
     memprotect_hhdm_pages = (mmu_hhdm_size - 1) / MMU_PAGE_SIZE + 1;
@@ -126,6 +121,15 @@ void port_early_init() {
         panic_poweroff();
     }
     memprotect_kernel_pages = (kernel_len - 1) / MMU_PAGE_SIZE + 1;
+
+    // Add biggest already available region to allocator.
+    early_alloc_index                      = biggest_pool_index;
+    struct limine_memmap_entry *early_pool = mem->entries[biggest_pool_index];
+    init_pool(
+        (void *)(early_pool->base + mmu_hhdm_vaddr),
+        (void *)(early_pool->base + early_pool->length + mmu_hhdm_vaddr),
+        0
+    );
 }
 
 // Tell port to add other available memory to the pools.
