@@ -19,10 +19,15 @@
 // Kernel mapping; accessible to kernel mode instead of user mode.
 #define MEMPROTECT_FLAG_KERNEL 0x00000020
 
+#include "port/hardware_allocation.h"
 #include "port/memprotect.h"
 #include "process/types.h"
 
 
+#if MEMMAP_VMEM
+// For systems with VMEM: global MMU context.
+extern mpu_ctx_t mpu_global_ctx;
+#endif
 
 // Initialise memory protection driver.
 void memprotect_init();

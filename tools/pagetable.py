@@ -100,7 +100,8 @@ class Page:
         self.paddr  = paddr
         self.length = length
         assert self.vaddr % self.length == 0
-        assert self.paddr % self.length == 0
+        if self.paddr % self.length != 0 and self.paddr % 4096 == 0:
+            print(f"WARNING: Superpage 0x{self.paddr:x} misaligned (0x{self.length:x})")
         assert type(self.length) == int
     
     def __repr__(self) -> str:
@@ -134,7 +135,11 @@ class PageTable(Page):
         def get_word(index):
             n = 0
             for byte in range(8):
-                n |= (memory[self.paddr+index*8+byte] & 255) << (8*byte)
+                try:
+                    n |= (memory[self.paddr+index*8+byte] & 255) << (8*byte)
+                except IndexError:
+                    print(f"Index 0x{self.paddr+index*8+byte:x} out of range (0x{len(memory):x})")
+                    return 0
             return n
         self.entries = [PTE(get_word(i)) for i in range(512)]
         for i in range(512):

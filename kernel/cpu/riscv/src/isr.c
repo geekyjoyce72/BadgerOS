@@ -145,7 +145,7 @@ void riscv_trap_handler() {
     asm volatile("csrr %0, " CSR_TVAL_STR : "=r"(mtval));
     if (mtval && ((1 << trapno) & MEM_ADDR_TRAPS)) {
         rawprint(" while accessing 0x");
-        rawprinthex(mtval, 8);
+        rawprinthex(mtval, sizeof(size_t) * 2);
     } else if (mtval && trapno == RISCV_TRAP_IILLEGAL) {
         rawprint(" while decoding 0x");
         rawprinthex(mtval, 8);

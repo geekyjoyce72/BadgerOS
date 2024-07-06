@@ -16,6 +16,7 @@ SECTIONS
     . = 0xffffffff80000000;
     __start_badgeros_kernel = .;
 
+    __start_text = .;
     .text : {
         *(.text .text.*)
     } :text
@@ -23,23 +24,23 @@ SECTIONS
     .interrupt_vector_table : {
         *(.interrupt_vector_table)
     } :text
-
     . = ALIGN(4096);
+    __stop_text = .;
 
+    __start_rodata = .;
     .rodata : {
         *(.rodata .rodata.* .srodata .srodata.*)
     } :rodata
     .dynstr : { *(.dynstr) } :rodata
     .dynsym : { *(.dynsym) } :rodata
     .rela.dyn : { *(.rela.dyn) } :rodata
-
     . = ALIGN(4096);
+    __stop_rodata = .;
 
+    __start_data = .;
     .dynamic : { *(.dynamic) } :data :dynamic
-
     .got : { *(.got) } :data
     .got.plt : { *(.got.plt) } :data
-
     .data : {
         /* Limine requests. */
         KEEP(*(.requests_start))
@@ -56,6 +57,8 @@ SECTIONS
         *(.bss .bss.*)
         *(COMMON)
     } :data
+    . = ALIGN(4096);
+    __stop_data = .;
 
     __stop_badgeros_kernel = .;
 

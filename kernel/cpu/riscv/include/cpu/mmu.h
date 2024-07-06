@@ -10,11 +10,9 @@
 #include <stdint.h>
 
 
-#define MMU_PAGE_SIZE     0x1000LLU
-#define MMU_MEGAPAGE_SIZE (MMU_PAGE_SIZE << 9)
-#define MMU_GIGAPAGE_SIZE (MMU_PAGE_SIZE << 18)
-#define MMU_TERAPAGE_SIZE (MMU_PAGE_SIZE << 27)
-#define MMU_PETAPAGE_SIZE (MMU_PAGE_SIZE << 36)
+#define MMU_BITS_PER_LEVEL     9
+#define MMU_PAGE_SIZE          0x1000LLU
+#define MMU_SUPPORT_SUPERPAGES 1
 
 // PBMT modes.
 typedef enum {
@@ -68,6 +66,11 @@ typedef union {
         // NAPOT page table entry.
         size_t n    : 1;
     };
+    struct {
+        size_t     : 1;
+        // Combined RWX flags.
+        size_t rwx : 3;
+    };
     size_t val;
 } mmu_pte_t;
 
@@ -100,10 +103,14 @@ typedef struct {
 
 
 
+// Virtual address offset currently used for HHDM.
+extern size_t mmu_hhdm_vaddr;
 // Virtual address offset of the higher half.
 extern size_t mmu_high_vaddr;
 // Size of a "half".
 extern size_t mmu_half_size;
+// How large to make the HHDM, rounded up to pages.
+extern size_t mmu_hhdm_size;
 // Number of page table levels.
 extern int    mmu_levels;
 // Virtual page number of the higher half.
@@ -114,26 +121,58 @@ extern int    mmu_levels;
 
 
 // MMU-specific init code.
-void       mmu_init();
-// Garbage-collect unused page table pages.
-void       mmu_gc(size_t pt_ppn);
-// Walk a page table; vaddr to paddr or return where the page table ends.
-mmu_walk_t mmu_walk(size_t pt_ppn, size_t vpn, size_t ppn);
-// Map a single page.
-bool       mmu_map_1(size_t pt_ppn, size_t vpn, uint32_t flags);
-// Unmap a single page.
-void       mmu_unmap_1(size_t pt_ppn, size_t vpn);
+void mmu_init();
 
-static inline void set_satp(riscv_satp_t value) {
-    asm("csrw satp, %0" ::"r"(value));
+// Get the index from the VPN for a given page table level.
+static inline size_t mmu_vpn_part(size_t vpn, int pt_level) {
+    return (vpn >> (9 * pt_level)) & 0x1ff;
 }
 
-static inline riscv_satp_t get_satp() {
-    riscv_satp_t res;
-    asm("csrr %0, satp" : "=r"(res));
-    return res;
+// Read a PTE from the page table.
+mmu_pte_t mmu_read_pte(size_t pte_paddr);
+// Write a PTE to the page table.
+void      mmu_write_pte(size_t pte_paddr, mmu_pte_t pte);
+
+// Create a new leaf node PTE.
+static inline mmu_pte_t mmu_pte_new_leaf(size_t ppn, uint32_t flags) {
+    mmu_pte_t pte = {0};
+    pte.v         = !!(flags & MEMPROTECT_FLAG_RWX);
+    pte.rwx       = flags;
+    pte.u         = !(flags & MEMPROTECT_FLAG_KERNEL);
+    pte.g         = flags & MEMPROTECT_FLAG_GLOBAL;
+    pte.ppn       = ppn;
+    return pte;
+}
+// Create a new internal PTE.
+static inline mmu_pte_t mmu_pte_new(size_t ppn) {
+    mmu_pte_t pte = {0};
+    pte.v         = 1;
+    pte.ppn       = ppn;
+    return pte;
+}
+// Creates a invalid PTE.
+#define MMU_PTE_NULL ((mmu_pte_t){0})
+
+// Whether a PTE's valid/present bit is set.
+static inline bool mmu_pte_is_valid(mmu_pte_t pte) {
+    return pte.v;
+}
+// Whether a PTE represents a leaf node.
+static inline bool mmu_pte_is_leaf(mmu_pte_t pte) {
+    return pte.rwx != 0;
+}
+// Get memory protection flags encoded in PTE.
+static inline uint32_t mmu_pte_get_flags(mmu_pte_t pte) {
+    return pte.rwx | (pte.g * MEMPROTECT_FLAG_GLOBAL) | (!pte.u * MEMPROTECT_FLAG_KERNEL);
+}
+// Get physical page number encoded in PTE.
+static inline size_t mmu_pte_get_ppn(mmu_pte_t pte) {
+    return pte.ppn;
 }
 
+
+
+// Notify the MMU of global mapping changes.
 static inline void mmu_vmem_fence() {
     asm("sfence.vma" ::: "memory");
 }
