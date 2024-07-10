@@ -129,6 +129,21 @@ bool isr_noexc_run(isr_noexc_t code, isr_catch_t trap_handler, void *cookie) {
 
 
 
+// Copy function implementation.
+static void isr_noexc_mem_copy_func(void *cookie) {
+    void  *dest = ((void **)cookie)[0];
+    void  *src  = ((void **)cookie)[1];
+    size_t len  = ((size_t *)cookie)[2];
+    mem_copy(dest, src, len);
+}
+
+// Try to copy memory from src to dest.
+// Returns whether an access trap occurred.
+bool isr_noexc_mem_copy(void *dest, void const *src, size_t len) {
+    size_t arr[3] = {(size_t)dest, (size_t)src, len};
+    return isr_noexc_run(isr_noexc_mem_copy_func, NULL, arr);
+}
+
 #define isr_noexc_copy_func(width)                                                                                     \
     /* Copy function implementation. */                                                                                \
     static void isr_noexc_copy_u##width##_func(void *cookie) {                                                         \

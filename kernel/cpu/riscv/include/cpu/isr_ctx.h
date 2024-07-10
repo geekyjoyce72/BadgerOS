@@ -56,7 +56,7 @@ STRUCT_FIELD_WORD(isr_ctx_t, scratch2, 2)
 STRUCT_FIELD_WORD(isr_ctx_t, scratch3, 3)
 STRUCT_FIELD_WORD(isr_ctx_t, scratch4, 4)
 STRUCT_FIELD_WORD(isr_ctx_t, scratch5, 5)
-// Pointer to memory protection information.
+// Pointer to currently active memory protection information.
 STRUCT_FIELD_PTR(isr_ctx_t, mpu_ctx_t, mpu_ctx, 6)
 // Frame pointer to use for backtraces.
 STRUCT_FIELD_PTR(isr_ctx_t, void, frameptr, 7)

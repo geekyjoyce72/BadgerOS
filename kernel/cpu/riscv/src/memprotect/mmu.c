@@ -5,6 +5,7 @@
 
 #include "assertions.h"
 #include "cpu/panic.h"
+#include "interrupt.h"
 #include "isr_ctx.h"
 #include "limine.h"
 #include "log.h"
@@ -67,15 +68,19 @@ void mmu_write_pte(size_t pte_paddr, mmu_pte_t pte) {
 
 // Swap in memory protections for the given context.
 void memprotect_swap_from_isr() {
-    memprotect_swap(isr_ctx_get()->mpu_ctx ?: &mpu_global_ctx);
+    memprotect_swap(isr_ctx_get()->mpu_ctx);
 }
 
 // Swap in memory protections for a given context.
 void memprotect_swap(mpu_ctx_t *mpu) {
+    mpu               = mpu ?: &mpu_global_ctx;
+    bool         ie   = irq_enable(false);
     riscv_satp_t satp = {
         .ppn  = mpu->root_ppn,
         .asid = 0,
         .mode = RISCV_SATP_SV39 + mmu_levels - 3,
     };
     asm("csrw satp, %0; sfence.vma" ::"r"(satp));
+    isr_ctx_get()->mpu_ctx = mpu;
+    irq_enable(ie);
 }

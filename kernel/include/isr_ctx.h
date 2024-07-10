@@ -34,6 +34,9 @@ typedef void (*isr_catch_t)(void *cookie, cpu_regs_t *regs_ptr);
 // Returns whether a trap occurred.
 bool isr_noexc_run(isr_noexc_t code, isr_catch_t trap_handler, void *cookie);
 
+// Try to copy memory from src to dest.
+// Returns whether an access trap occurred.
+bool isr_noexc_mem_copy(void *dest, void const *src, size_t len);
 // Try to copy uint8_t from src to dest.
 // Returns whether an access trap occurred.
 bool isr_noexc_copy_u8(uint8_t *dest, uint8_t const *src);

@@ -61,6 +61,18 @@
     ST_REG  t1, isr_ctx_t_regs+cpu_regs_t_pc(t0)
     .cfi_val_offset ra, isr_ctx_t_regs+cpu_regs_t_pc
     
+#if !RISCV_M_MODE_KERNEL
+    # Save SUM and MXR.
+    LD_REG  t3, isr_ctx_t_flags(t0)
+    li      t2, (1 << RISCV_STATUS_SUM_BIT) | (1 << RISCV_STATUS_MXR_BIT)
+    or      t3, t3, t2
+    csrrc   t1, sstatus, t2
+    xor     t3, t3, t2
+    and     t1, t1, t2
+    or      t3, t3, t1
+    ST_REG  t3, isr_ctx_t_flags(t0)
+#endif
+    
     # Set up special regs.
     li      tp, 0
     .option push
@@ -85,6 +97,15 @@
     LD_REG  t1, isr_ctx_t_regs+cpu_regs_t_pc(t0)
     csrw    CSR_EPC, t1
     
+#if !RISCV_M_MODE_KERNEL
+    # Restore SUM and MXR.
+    LD_REG  t1, isr_ctx_t_flags(t0)
+    li      t2, (1 << RISCV_STATUS_SUM_BIT) | (1 << RISCV_STATUS_MXR_BIT)
+    and     t1, t1, t2
+    csrs    sstatus, t1
+#endif
+    
+    # Restore special regs.
     LD_REG  ra, isr_ctx_t_regs+cpu_regs_t_ra(t0)
     LD_REG  sp, isr_ctx_t_regs+cpu_regs_t_sp(t0)
     LD_REG  gp, isr_ctx_t_regs+cpu_regs_t_gp(t0)
@@ -224,6 +245,18 @@ isr_context_switch:
     ST_REG  gp, isr_ctx_t_regs+cpu_regs_t_gp(t0)
     ST_REG  tp, isr_ctx_t_regs+cpu_regs_t_tp(t0)
     save_all_regs
+    
+    # Save SUM and MXR.
+#if !RISCV_M_MODE_KERNEL
+    LD_REG  t3, isr_ctx_t_flags(t0)
+    li      t2, (1 << RISCV_STATUS_SUM_BIT) | (1 << RISCV_STATUS_MXR_BIT)
+    or      t3, t3, t2
+    csrrc   t1, sstatus, t2
+    xor     t3, t3, t2
+    and     t1, t1, t2
+    or      t3, t3, t1
+    ST_REG  t3, isr_ctx_t_flags(t0)
+#endif
     
     # Switch context and set new privilege.
     LD_REG  t0, isr_ctx_t_ctxswitch(t0)

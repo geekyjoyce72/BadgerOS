@@ -32,6 +32,8 @@ ptrdiff_t strlen_from_user_raw(process_t *process, size_t user_vaddr, ptrdiff_t 
     }
 
     // String length loop.
+    mpu_ctx_t *old_mpu = isr_ctx_get()->mpu_ctx;
+    memprotect_swap(&process->memmap.mpu_ctx);
     asm("csrs sstatus, %0" ::"r"((1 << RISCV_STATUS_SUM_BIT) | (1 << RISCV_STATUS_MXR_BIT)));
     while (len < max_len && *(char const *)user_vaddr) {
         len++;
@@ -40,6 +42,7 @@ ptrdiff_t strlen_from_user_raw(process_t *process, size_t user_vaddr, ptrdiff_t 
             // Check further page permissions.
             asm("csrc sstatus, %0" ::"r"((1 << RISCV_STATUS_SUM_BIT) | (1 << RISCV_STATUS_MXR_BIT)));
             if (!(proc_map_contains_raw(process, user_vaddr, 1) & MEMPROTECT_FLAG_R)) {
+                memprotect_swap(old_mpu);
                 return -1;
             }
             asm("csrs sstatus, %0" ::"r"((1 << RISCV_STATUS_SUM_BIT) | (1 << RISCV_STATUS_MXR_BIT)));
@@ -47,6 +50,7 @@ ptrdiff_t strlen_from_user_raw(process_t *process, size_t user_vaddr, ptrdiff_t 
     }
     asm("csrc sstatus, %0" ::"r"((1 << RISCV_STATUS_SUM_BIT) | (1 << RISCV_STATUS_MXR_BIT)));
 
+    memprotect_swap(old_mpu);
     return len;
 }
 
@@ -60,10 +64,12 @@ bool copy_from_user_raw(process_t *process, void *kernel_vaddr, size_t user_vadd
 #if RISCV_M_MODE_KERNEL
     mem_copy(kernel_vaddr, (void const *)user_vaddr, len);
 #else
+    mpu_ctx_t *old_mpu = isr_ctx_get()->mpu_ctx;
     memprotect_swap(&process->memmap.mpu_ctx);
     asm("csrs sstatus, %0" ::"r"((1 << RISCV_STATUS_SUM_BIT) | (1 << RISCV_STATUS_MXR_BIT)));
     mem_copy(kernel_vaddr, (void *)user_vaddr, len);
     asm("csrc sstatus, %0" ::"r"((1 << RISCV_STATUS_SUM_BIT) | (1 << RISCV_STATUS_MXR_BIT)));
+    memprotect_swap(old_mpu);
 #endif
     return true;
 }

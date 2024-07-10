@@ -299,6 +299,9 @@ static void broadcast_to(size_t dest_pt_ppn, size_t src_pt_ppn) {
 
 // Lookup virtual address to physical address.
 virt2phys_t memprotect_virt2phys(mpu_ctx_t *ctx, size_t vaddr) {
+    if (!ctx) {
+        ctx = &mpu_global_ctx;
+    }
     if (vaddr >= mmu_half_size && vaddr < mmu_high_vaddr) {
         return (virt2phys_t){0};
     }
