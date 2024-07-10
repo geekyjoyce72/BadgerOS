@@ -6,7 +6,6 @@
 #include "backtrace.h"
 #include "cpu/isr_ctx.h"
 #include "cpu/panic.h"
-#include "cpu/regs.h"
 #include "interrupt.h"
 #include "log.h"
 #include "port/hardware.h"
@@ -16,6 +15,10 @@
 #include "rawprint.h"
 #include "scheduler/cpu.h"
 #include "scheduler/types.h"
+#if MEMMAP_VMEM
+#include "cpu/mmu.h"
+#include "memprotect.h"
+#endif
 
 
 
@@ -41,7 +44,7 @@ static char const *const trapnames[] = {
 enum { TRAPNAMES_LEN = sizeof(trapnames) / sizeof(trapnames[0]) };
 
 // Bitmask of traps that have associated memory addresses.
-#define MEM_ADDR_TRAPS 0x00050f0
+#define MEM_ADDR_TRAPS 0x000b0f0
 
 // Kill a process from a trap / ISR.
 static void kill_proc_on_trap() {
@@ -57,7 +60,8 @@ void riscv_trap_handler() {
     // TODO: Per-CPU double trap detection.
     static int trap_depth = 0;
 
-    long cause, status, mtval, epc;
+    long cause, status, tval, epc;
+    asm volatile("csrr %0, " CSR_TVAL_STR : "=r"(tval));
     asm volatile("csrr %0, " CSR_CAUSE_STR : "=r"(cause));
     long trapno = cause & RISCV_VT_ICAUSE_MASK;
     if (cause < 0) {
@@ -99,6 +103,7 @@ void riscv_trap_handler() {
             case RISCV_TRAP_SPAGE:
                 // Memory access faults go to the SIGSEGV handler.
                 sched_raise_from_isr(kctx->thread, true, proc_sigsegv_handler);
+                kctx->thread->kernel_isr_ctx.regs.a0 = tval;
                 isr_ctx_swap(kctx);
                 trap_depth--;
                 return;
@@ -142,17 +147,33 @@ void riscv_trap_handler() {
     rawprinthex(epc, sizeof(size_t) * 2);
 
     // Print trap value.
-    asm volatile("csrr %0, " CSR_TVAL_STR : "=r"(mtval));
-    if (mtval && ((1 << trapno) & MEM_ADDR_TRAPS)) {
+    if (tval && ((1 << trapno) & MEM_ADDR_TRAPS)) {
         rawprint(" while accessing 0x");
-        rawprinthex(mtval, sizeof(size_t) * 2);
-    } else if (mtval && trapno == RISCV_TRAP_IILLEGAL) {
+        rawprinthex(tval, sizeof(size_t) * 2);
+    } else if (tval && trapno == RISCV_TRAP_IILLEGAL) {
         rawprint(" while decoding 0x");
-        rawprinthex(mtval, 8);
+        rawprinthex(tval, 8);
     }
 
-    rawputc('\r');
     rawputc('\n');
+
+#if MEMMAP_VMEM
+    // Print what page table thinks.
+    if (tval && ((1 << trapno) & MEM_ADDR_TRAPS)) {
+        virt2phys_t info = memprotect_virt2phys(kctx->mpu_ctx, tval);
+        if (info.flags & MEMPROTECT_FLAG_RWX) {
+            rawprint("Memory at this address: ");
+            rawputc(info.flags & MEMPROTECT_FLAG_R ? 'r' : '-');
+            rawputc(info.flags & MEMPROTECT_FLAG_W ? 'w' : '-');
+            rawputc(info.flags & MEMPROTECT_FLAG_X ? 'x' : '-');
+            rawputc(info.flags & MEMPROTECT_FLAG_KERNEL ? 'k' : 'u');
+            rawputc(info.flags & MEMPROTECT_FLAG_GLOBAL ? 'g' : '-');
+            rawputc('\n');
+        } else {
+            rawprint("No memory at this address.\n");
+        }
+    }
+#endif
 
     // Print privilige mode.
     if (trap_depth == 1) {
@@ -174,7 +195,7 @@ void riscv_trap_handler() {
         rawprint(" in process ");
         rawprintdec(kctx->thread->process->pid, 1);
     }
-    rawprint("\n");
+    rawputc('\n');
     backtrace_from_ptr(kctx->frameptr);
 
     isr_ctx_dump(kctx);

@@ -16,6 +16,10 @@
 #include "sys/wait.h"
 #include "syscall_util.h"
 #include "usercopy.h"
+#if MEMMAP_VMEM
+#include "cpu/mmu.h"
+#endif
+
 
 
 // Map a new range of memory at an arbitrary virtual address.
@@ -32,7 +36,7 @@ size_t syscall_mem_size(void *address) {
     mutex_acquire_shared(NULL, &proc->mtx, TIMESTAMP_US_MAX);
     size_t res = 0;
     for (size_t i = 0; i < proc->memmap.regions_len; i++) {
-        if (proc->memmap.regions[i].base == (size_t)address) {
+        if (proc->memmap.regions[i].vaddr == (size_t)address) {
             res = proc->memmap.regions[i].size;
             break;
         }
@@ -202,6 +206,12 @@ NOASAN int syscall_proc_waitpid(int pid, int *wstatus, int options) {
 void syscall_temp_write(char const *message, size_t length) {
     sysutil_memassert_r(message, length);
     mutex_acquire(NULL, &log_mtx, TIMESTAMP_US_MAX);
+#if MEMMAP_VMEM
+    mmu_enable_sum();
+#endif
     rawprint_substr(message, length);
+#if MEMMAP_VMEM
+    mmu_disable_sum();
+#endif
     mutex_release(NULL, &log_mtx);
 }

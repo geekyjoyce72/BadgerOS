@@ -27,6 +27,12 @@ size_t phys_page_alloc(size_t page_count, bool for_user) {
 #endif
 }
 
+// Returns how large a physical allocation actually is.
+// Uses physical page numbers (paddr / MEMMAP_PAGE_SIZE).
+size_t phys_page_size(size_t ppn) {
+    return buddy_get_size((void *)(ppn * MEMMAP_PAGE_SIZE)) / MEMMAP_PAGE_SIZE;
+}
+
 // Free pages of physical memory.
 // Uses physical page numbers (paddr / MEMMAP_PAGE_SIZE).
 void phys_page_free(size_t ppn) {

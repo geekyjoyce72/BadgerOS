@@ -10,6 +10,31 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#define SYSUTIL_EC_WRAPPER_V(func, ...)                                                                                \
+    {                                                                                                                  \
+        badge_err_t ec_buf;                                                                                            \
+        func(&ec_buf, __VA_ARGS__);                                                                                    \
+        if (ec) {                                                                                                      \
+            sigsegv_assert(copy_to_user(proc_current_pid(), (size_t)ec, &ec_buf, sizeof(badge_err_t)));                \
+        }                                                                                                              \
+    }
+
+#define SYSUTIL_EC_WRAPPER(rettype, func, ...)                                                                         \
+    ({                                                                                                                 \
+        badge_err_t ec_buf;                                                                                            \
+        rettype     ec_rettmp = func(&ec_buf, __VA_ARGS__);                                                            \
+        if (ec) {                                                                                                      \
+            sigsegv_assert(copy_to_user(proc_current_pid(), (size_t)ec, &ec_buf, sizeof(badge_err_t)));                \
+        }                                                                                                              \
+        ec_rettmp;                                                                                                     \
+    })
+
+#define badge_err_userset(ec, loc, cause)                                                                              \
+    {                                                                                                                  \
+        badge_err_t ec_buf = {(loc), (cause)};                                                                         \
+        sigsegv_assert(copy_to_user(proc_current_pid(), (size_t)ec, &ec_buf, sizeof(badge_err_t)));                    \
+    }
+
 
 
 // Assert that a condition is true, or raise SIGSYS and don't return.

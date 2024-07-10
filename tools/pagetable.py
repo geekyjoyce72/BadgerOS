@@ -1,5 +1,37 @@
 #!/usr/bin/env python3
 
+import os
+from argparse import *
+from mmap import *
+from elftools.elf.elffile import ELFFile
+
+
+def read_word(mem, paddr: int) -> int:
+    if type(mem) == ELFFile:
+        for i in range(mem.num_segments()):
+            seg = mem.get_segment(i)
+            if seg.header.p_type != 'PT_LOAD': continue
+            if paddr < seg.header.p_paddr: continue
+            if paddr + 8 > seg.header.p_paddr + seg.header.p_memsz: continue
+            mem.stream.seek(paddr - seg.header.p_paddr + seg.header.p_offset)
+            tmp = mem.stream.read(8)
+            val = 0
+            for i in range(8):
+                val |= tmp[i] << (i*8)
+            return val
+        raise IndexError(f"paddr {paddr:x} out of range")
+    elif type(mem) == mmap or type(mem) == bytearray or type(mem) == bytes:
+        val = 0
+        for i in range(8):
+            val |= mem[i+paddr] << (i*8)
+        return val
+    else:
+        mem.seek(paddr, os.SEEK_SET)
+        tmp = fd.read(8)
+        val = 0
+        for i in range(8):
+            val |= tmp[i] << (i*8)
+        return val
 
 
 class Flags:
@@ -132,16 +164,14 @@ class PageTable(Page):
         assert self.vaddr % self.length == 0
         assert self.paddr % self.length == 0
         self.level = level
-        def get_word(index):
-            n = 0
-            for byte in range(8):
-                try:
-                    n |= (memory[self.paddr+index*8+byte] & 255) << (8*byte)
-                except IndexError:
-                    print(f"Index 0x{self.paddr+index*8+byte:x} out of range (0x{len(memory):x})")
-                    return 0
-            return n
-        self.entries = [PTE(get_word(i)) for i in range(512)]
+        self.entries = [PTE(0) for i in range(512)]
+        for i in range(512):
+            paddr = self.paddr + i * 8
+            try:
+                self.entries[i] = PTE(read_word(mem, paddr))
+            except IndexError as e:
+                print(f"IndexError: {', '.join(e.args)}")
+                break
         for i in range(512):
             pt_vpn = vaddr | (i << (12+9*level))
             if self.root and i & 256:
@@ -153,16 +183,6 @@ class PageTable(Page):
                 self.entries[i].page = Page(pt_vpn, pt_ppn << 12, 1 << (12+9*level))
             elif self.entries[i].v:
                 self.entries[i].page = PageTable(pt_vpn, pt_ppn << 12, level-1, memory)
-    
-    def pack(self) -> bytearray:
-        assert self.entries
-        content = bytearray(4096)
-        def set_word(index, word):
-            for byte in range(8):
-                content[index*8+byte] = word >> (8*byte)
-        for i in range(512):
-            set_word(i, self.entries[i].pack())
-        return content
     
     def __repr__(self) -> str:
         return f"PageTable(0x{self.vaddr:016x}, 0x{self.paddr:016x}, {self.level:d}, <...>)"
@@ -217,17 +237,22 @@ class Memmap:
 
 
 if __name__ == "__main__":
-    from argparse import *
-    from mmap import *
     parser = ArgumentParser()
     parser.add_argument("file",                      action="store",                help="Binary file to read page table from")
     parser.add_argument("--pt_root", "--root", "-p", action="store", required=True, help="Page table root physical page number")
     parser.add_argument("--levels", "-l",            action="store", required=True, help="Level of the page table being dumped (0-4)")
+    parser.add_argument("--raw", "-r",               action="store_true",           help="Interpret as a physical memory dump, not an ELF file")
     args = parser.parse_args()
     if args.pt_root.lower().startswith("0x"):
         args.pt_root = args.pt_root[2:]
     fd   = open(args.file, "rb")
-    mem  = mmap(fd.fileno(), 0x100000000, prot=PROT_READ, flags=MAP_PRIVATE)
+    if args.raw:
+        mem = mmap(fd.fileno(), 0x100000000, prot=PROT_READ, flags=MAP_PRIVATE)
+    else:
+        mem = ELFFile(fd)
+        for i in range(mem.num_segments()):
+            seg = mem.get_segment(i)
+            print(f"{seg.header.p_type:8}  paddr {seg.header.p_paddr:016x} len {seg.header.p_memsz:016x}")
     lvl  = int(args.levels)
     pt   = PageTable(0, int(args.pt_root, 16) << 12, lvl, mem, True)
     mm   = Memmap(pt)

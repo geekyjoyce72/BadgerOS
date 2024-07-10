@@ -79,11 +79,15 @@ STRUCT_FIELD_PTR(isr_ctx_t, void, noexc_cookie, 44)
 STRUCT_END(isr_ctx_t)
 
 // `isr_ctx_t` flag: Is a kernel thread.
-#define ISR_CTX_FLAG_KERNEL 0x00000001
+#define ISR_CTX_FLAG_KERNEL    0x00000001
 // `isr_ctx_t` flag: For not set `sp` to the ISR stack.
-#define ISR_CTX_FLAG_USE_SP 0x00000002
+#define ISR_CTX_FLAG_USE_SP    0x00000002
 // `isr_ctx_t` flag: Currently running custom trap-handling code.
-#define ISR_CTX_FLAG_NOEXC  0x00000004
+#define ISR_CTX_FLAG_NOEXC     0x00000004
+// `isr_ctx_t` flag: SUM was set.
+#define ISR_CTX_FLAG_RISCV_SUM (1 << RISCV_STATUS_SUM_BIT)
+// `isr_ctx_t` flag: MXR was set.
+#define ISR_CTX_FLAG_RISCV_MXR (1 << RISCV_STATUS_MXR_BIT)
 
 
 #ifndef __ASSEMBLER__

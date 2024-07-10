@@ -45,8 +45,8 @@
 /* ==== Memory protection regions ==== */
 
 // Kernel supports virtual memory.
-#define MEMMAP_VMEM             1
+#define MEMMAP_VMEM      1
 // Page size for memory protections.
-#define MEMMAP_PAGE_SIZE        4096
+#define MEMMAP_PAGE_SIZE 4096
 // Maximum number of mapped regions per process.
-#define PROC_MEMMAP_MAX_REGIONS 8
+// #define PROC_MEMMAP_MAX_REGIONS 8

@@ -13,6 +13,7 @@
 #include "log.h"
 #include "malloc.h"
 #include "memprotect.h"
+#include "page_alloc.h"
 #include "port/hardware_allocation.h"
 #include "port/port.h"
 #include "process/internal.h"
@@ -23,13 +24,17 @@
 #include "static-buddy.h"
 #include "usercopy.h"
 
+#if MEMMAP_VMEM
+#include "cpu/mmu.h"
+#endif
+
 #include <stdatomic.h>
 
 
 // Globally unique PID number counter.
 static pid_t       pid_counter = 1;
 // Global process lifetime mutex.
-static mutex_t     proc_mtx    = MUTEX_T_INIT_SHARED;
+mutex_t            proc_mtx    = MUTEX_T_INIT_SHARED;
 // Number of processes.
 static size_t      procs_len   = 0;
 // Capacity for processes.
@@ -52,14 +57,14 @@ static bool proc_setargs_raw_unsafe(badge_err_t *ec, process_t *process, int arg
 static void clean_up_from_housekeeping(int taskno, void *arg) {
     (void)taskno;
     mutex_acquire_shared(NULL, &proc_mtx, TIMESTAMP_US_MAX);
-    process_t *proc = proc_get_unsafe((int)arg);
+    process_t *proc = proc_get_unsafe((size_t)arg);
 
     // Delete run-time resources.
     proc_delete_runtime_raw(proc);
     if (!proc->parent) {
         // Init process during shutdown; delete right away.
         mutex_release_shared(NULL, &proc_mtx);
-        proc_delete((int)arg);
+        proc_delete((size_t)arg);
         return;
     }
 
@@ -71,7 +76,7 @@ static void clean_up_from_housekeeping(int taskno, void *arg) {
     if (ignored) {
         // Parent process ignores SIGCHLD; delete right away.
         mutex_release_shared(NULL, &proc_mtx);
-        proc_delete((int)arg);
+        proc_delete((size_t)arg);
     } else {
         // Signal parent process.
         atomic_fetch_or(&proc->flags, PROC_STATECHG);
@@ -91,7 +96,7 @@ void proc_exit_self(int code) {
     mutex_release(NULL, &process->mtx);
 
     // Add deleting runtime to the housekeeping list.
-    assert_always(hk_add_once(0, clean_up_from_housekeeping, (void *)process->pid) != -1);
+    assert_always(hk_add_once(0, clean_up_from_housekeeping, (void *)(long)process->pid) != -1);
 }
 
 
@@ -137,6 +142,10 @@ process_t *proc_create_raw(badge_err_t *ec, pid_t parentpid, char const *binary,
         .memmap =
             {
                 .regions_len = 0,
+#if MEMMAP_VMEM
+                .regions_cap = 0,
+                .regions     = NULL,
+#endif
             },
         .mtx        = MUTEX_T_INIT_SHARED,
         .flags      = PROC_PRESTART,
@@ -210,6 +219,11 @@ process_t *proc_current() {
     return sched_get_current_thread()->process;
 }
 
+// Get the PID of the current process, if any.
+pid_t proc_current_pid() {
+    process_t *proc = proc_current();
+    return proc ? proc->pid : 0;
+}
 
 // Set arguments for a process.
 // If omitted, argc will be 0 and argv will be NULL.
@@ -349,133 +363,6 @@ void proc_delete_thread_raw_unsafe(badge_err_t *ec, process_t *process, sched_th
     (void)process;
     (void)thread;
     __builtin_trap();
-}
-
-// Memory map address comparator.
-static int prog_memmap_cmp(void const *a, void const *b) {
-    proc_memmap_ent_t const *a_ptr = a;
-    proc_memmap_ent_t const *b_ptr = b;
-    if (a_ptr->base < b_ptr->base)
-        return -1;
-    if (a_ptr->base < b_ptr->base)
-        return 1;
-    return 0;
-}
-
-// Sort the memory map by ascending address.
-static inline void proc_memmap_sort_raw(proc_memmap_t *memmap) {
-    array_sort(&memmap->regions[0], sizeof(memmap->regions[0]), memmap->regions_len, prog_memmap_cmp);
-}
-
-// Allocate more memory to a process.
-size_t proc_map_raw(badge_err_t *ec, process_t *proc, size_t vaddr_req, size_t min_size, size_t min_align, int flags) {
-    (void)min_align;
-    (void)vaddr_req;
-
-    proc_memmap_t *map = &proc->memmap;
-    if (map->regions_len >= PROC_MEMMAP_MAX_REGIONS) {
-        logk(LOG_WARN, "Out of regions");
-        badge_err_set(ec, ELOC_PROCESS, ECAUSE_NOMEM);
-        return 0;
-    }
-
-    // Allocate memory to the process.
-    void *base = buddy_allocate(min_size, BLOCK_TYPE_USER, 0);
-    if (!base) {
-        logk(LOG_WARN, "Out of vmem");
-        badge_err_set(ec, ELOC_PROCESS, ECAUSE_NOMEM);
-        return 0;
-    }
-    size_t size = buddy_get_size(base);
-    mem_set(base, 0, size);
-
-    // Account the process's memory.
-    map->regions[map->regions_len] = (proc_memmap_ent_t){
-        .base  = (size_t)base,
-        .size  = size,
-        .write = true,
-        .exec  = true,
-    };
-    map->regions_len++;
-    proc_memmap_sort_raw(map);
-
-    // Update memory protection.
-    if (!memprotect_u(map, &map->mpu_ctx, (size_t)base, (size_t)base, size, flags & MEMPROTECT_FLAG_RWX)) {
-        for (size_t i = 0; i < map->regions_len; i++) {
-            if (map->regions[i].base == (size_t)base) {
-                array_remove(&map->regions[0], sizeof(map->regions[0]), map->regions_len, NULL, i);
-                break;
-            }
-        }
-        map->regions_len--;
-        buddy_deallocate(base);
-        badge_err_set(ec, ELOC_PROCESS, ECAUSE_NOMEM);
-        return 0;
-    }
-    memprotect_commit(&map->mpu_ctx);
-
-    logkf(LOG_INFO, "Mapped %{size;d} bytes at %{size;x} to process %{d}", size, base, proc->pid);
-    badge_err_set_ok(ec);
-    return (size_t)base;
-}
-
-// Release memory allocated to a process.
-void proc_unmap_raw(badge_err_t *ec, process_t *proc, size_t base) {
-    proc_memmap_t *map = &proc->memmap;
-    for (size_t i = 0; i < map->regions_len; i++) {
-        if (map->regions[i].base == base) {
-            proc_memmap_ent_t region = map->regions[i];
-            array_remove(&map->regions[0], sizeof(map->regions[0]), map->regions_len, NULL, i);
-            map->regions_len--;
-            assert_dev_keep(memprotect_u(map, &map->mpu_ctx, base, base, region.size, 0));
-            memprotect_commit(&map->mpu_ctx);
-            buddy_deallocate((void *)base);
-            badge_err_set_ok(ec);
-            logkf(LOG_INFO, "Unmapped %{size;d} bytes at %{size;x} from process %{d}", region.size, base, proc->pid);
-            return;
-        }
-    }
-    badge_err_set(ec, ELOC_PROCESS, ECAUSE_NOTFOUND);
-}
-
-// Whether the process owns this range of memory.
-// Returns the lowest common denominator of the access bits bitwise or 8.
-int proc_map_contains_raw(process_t *proc, size_t base, size_t size) {
-    // Align to whole pages.
-    if (base % MEMMAP_PAGE_SIZE) {
-        size += base % MEMMAP_PAGE_SIZE;
-        base -= base % MEMMAP_PAGE_SIZE;
-    }
-    if (size % MEMMAP_PAGE_SIZE) {
-        size += MEMMAP_PAGE_SIZE - size % MEMMAP_PAGE_SIZE;
-    }
-
-    mutex_acquire_shared(NULL, &proc->mtx, TIMESTAMP_US_MAX);
-    int access = 7;
-    while (size) {
-        size_t i;
-        for (i = 0; i < proc->memmap.regions_len; i++) {
-            if (base >= proc->memmap.regions[i].base &&
-                base < proc->memmap.regions[i].base + proc->memmap.regions[i].size) {
-                goto found;
-            }
-        }
-
-        // This page is not in the region map.
-        mutex_release_shared(NULL, &proc->mtx);
-        return 0;
-
-    found:
-        // This page is in the region map.
-        if (proc->memmap.regions[i].size > size) {
-            // All pages found.
-            break;
-        }
-        base += proc->memmap.regions[i].size;
-        size += proc->memmap.regions[i].size;
-    }
-    mutex_release_shared(NULL, &proc->mtx);
-    return access | 8;
 }
 
 // Add a file to the process file handle list.
@@ -629,7 +516,7 @@ void proc_delete_runtime_raw(process_t *process) {
 
     // Unmap all memory regions.
     while (process->memmap.regions_len) {
-        proc_unmap_raw(NULL, process, process->memmap.regions[0].base);
+        proc_unmap_raw(NULL, process, process->memmap.regions[0].vaddr);
     }
 
     // TODO: Close pipes and files.
@@ -727,50 +614,6 @@ void proc_start(badge_err_t *ec, pid_t pid) {
     mutex_release_shared(NULL, &proc_mtx);
 }
 
-
-// Allocate more memory to a process.
-// Returns actual virtual address on success, 0 on failure.
-size_t proc_map(badge_err_t *ec, pid_t pid, size_t vaddr_req, size_t min_size, size_t min_align, int flags) {
-    mutex_acquire_shared(NULL, &proc_mtx, TIMESTAMP_US_MAX);
-    process_t *proc = proc_get(pid);
-    size_t     res  = 0;
-    if (proc) {
-        res = proc_map_raw(ec, proc, vaddr_req, min_size, min_align, flags);
-    } else {
-        badge_err_set(ec, ELOC_PROCESS, ECAUSE_NOTFOUND);
-    }
-    mutex_release_shared(NULL, &proc_mtx);
-    return res;
-}
-
-// Release memory allocated to a process.
-void proc_unmap(badge_err_t *ec, pid_t pid, size_t base) {
-    mutex_acquire_shared(NULL, &proc_mtx, TIMESTAMP_US_MAX);
-    process_t *proc = proc_get(pid);
-    if (proc) {
-        proc_unmap_raw(ec, proc, base);
-    } else {
-        badge_err_set(ec, ELOC_PROCESS, ECAUSE_NOTFOUND);
-    }
-    mutex_release_shared(NULL, &proc_mtx);
-}
-
-// Whether the process owns this range of memory.
-// Returns the lowest common denominator of the access bits bitwise or 8.
-int proc_map_contains(badge_err_t *ec, pid_t pid, size_t base, size_t size) {
-    mutex_acquire_shared(NULL, &proc_mtx, TIMESTAMP_US_MAX);
-    process_t *proc = proc_get(pid);
-    int        ret  = 0;
-    if (proc) {
-        ret = proc_map_contains_raw(proc, base, size);
-        badge_err_set_ok(ec);
-    } else {
-        badge_err_set(ec, ELOC_PROCESS, ECAUSE_NOTFOUND);
-    }
-    mutex_release_shared(NULL, &proc_mtx);
-    return ret;
-}
-
 // Check whether a process is a parent to another.
 bool proc_is_parent(pid_t parent, pid_t child) {
     mutex_acquire_shared(NULL, &proc_mtx, TIMESTAMP_US_MAX);
@@ -780,7 +623,6 @@ bool proc_is_parent(pid_t parent, pid_t child) {
     mutex_release_shared(NULL, &proc_mtx);
     return eq;
 }
-
 
 // Raise a signal to a process' main thread, while suspending it's other threads.
 void proc_raise_signal(badge_err_t *ec, pid_t pid, int signum) {
@@ -818,7 +660,7 @@ bool copy_from_user(pid_t pid, void *kernel_vaddr, size_t user_vaddr, size_t len
 // Copy from kernel to user.
 // Returns whether the user has access to all of these bytes.
 // If the user doesn't have access, no copy is performed.
-bool copy_to_user(pid_t pid, size_t user_vaddr, void *kernel_vaddr, size_t len) {
+bool copy_to_user(pid_t pid, size_t user_vaddr, void *const kernel_vaddr, size_t len) {
     mutex_acquire_shared(NULL, &proc_mtx, TIMESTAMP_US_MAX);
     bool res = copy_to_user_raw(proc_get_unsafe(pid), user_vaddr, kernel_vaddr, len);
     mutex_release_shared(NULL, &proc_mtx);

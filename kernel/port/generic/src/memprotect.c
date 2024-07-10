@@ -64,7 +64,7 @@ static pt_walk_t pt_walk(size_t pt_ppn, size_t vpn) {
     // Walk the page table.
     for (int i = 0; i < mmu_levels; i++) {
         int level  = mmu_levels - i - 1;
-        pte_addr   = pt_ppn * MMU_PAGE_SIZE + mmu_vpn_part(vpn, i) * sizeof(mmu_pte_t);
+        pte_addr   = pt_ppn * MMU_PAGE_SIZE + mmu_vpn_part(vpn, level) * sizeof(mmu_pte_t);
         pte        = mmu_read_pte(pte_addr);
         size_t ppn = mmu_pte_get_ppn(pte);
 
@@ -235,12 +235,14 @@ static bool pt_unmap_1(size_t pt_ppn, int pt_level, size_t vpn, int pte_level) {
 
 // Calculate the biggest superpage level that will fit a range.
 static int pt_calc_superpage(int max_level, size_t vpn, size_t ppn, size_t max_len) {
+#if MMU_SUPPORT_SUPERPAGES
     for (int i = max_level; i > 0; i--) {
         size_t super_len = 1LLU << (MMU_BITS_PER_LEVEL * i);
         if ((vpn & (super_len - 1)) == 0 && (ppn & (super_len - 1)) == 0 && max_len >= super_len) {
             return i;
         }
     }
+#endif
     return 0;
 }
 
@@ -248,6 +250,16 @@ static int pt_calc_superpage(int max_level, size_t vpn, size_t ppn, size_t max_l
 // Returns true if the top level of the page table was edited.
 static bool pt_map(size_t pt_ppn, int pt_level, size_t vpn, size_t ppn, size_t pages, uint32_t flags) {
     bool top_edit = false;
+    logkf_from_isr(
+        LOG_DEBUG,
+        "pt_map(0x%{size;x}, %{d}, 0x%{size;x}, 0x%{size;x}, 0x%{size;x}, 0x%{size;x}, 0x%{u32;x})",
+        pt_ppn,
+        pt_level,
+        vpn,
+        ppn,
+        pages,
+        flags
+    );
     while (pages) {
         int pte_level     = pt_calc_superpage(pt_level, vpn, ppn, pages);
         top_edit         |= pt_map_1(pt_ppn, pt_level, vpn, ppn, pte_level, flags);
@@ -281,6 +293,28 @@ static void broadcast_to(size_t dest_pt_ppn, size_t src_pt_ppn) {
             mmu_write_pte(dest_pt_ppn * MMU_PAGE_SIZE + i * sizeof(mmu_pte_t), pte);
         }
     }
+}
+
+
+
+// Lookup virtual address to physical address.
+virt2phys_t memprotect_virt2phys(mpu_ctx_t *ctx, size_t vaddr) {
+    if (vaddr >= mmu_half_size && vaddr < mmu_high_vaddr) {
+        return (virt2phys_t){0};
+    }
+    pt_walk_t walk = pt_walk(ctx->root_ppn, vaddr / MMU_PAGE_SIZE);
+    if (walk.found) {
+        size_t page_size  = MMU_PAGE_SIZE << (MMU_BITS_PER_LEVEL * walk.level);
+        size_t page_paddr = mmu_pte_get_ppn(walk.pte) * MMU_PAGE_SIZE;
+        return (virt2phys_t){
+            mmu_pte_get_flags(walk.pte),
+            page_paddr + (vaddr & (page_size - 1)),
+            vaddr & ~(page_size - 1),
+            page_paddr,
+            page_size,
+        };
+    }
+    return (virt2phys_t){0};
 }
 
 
@@ -353,6 +387,7 @@ void memprotect_init() {
     logkf_from_isr(LOG_DEBUG, "BadgerOS root PPN %{size;x}", mpu_global_ctx.root_ppn);
     atomic_thread_fence(memory_order_release);
     memprotect_swap_from_isr();
+    logk_from_isr(LOG_DEBUG, "Switch successful");
 
     // Tell port to add other available memory to the pools.
     port_post_memprotect_init();
@@ -378,6 +413,11 @@ void memprotect_destroy(mpu_ctx_t *ctx) {
 // Add a memory protection region.
 void memprotect_impl(mpu_ctx_t *ctx, size_t vpn, size_t ppn, size_t pages, uint32_t flags) {
     bool top_mod = false;
+
+    // Add R if W is set.
+    if (flags & MEMPROTECT_FLAG_W) {
+        flags |= MEMPROTECT_FLAG_R;
+    }
 
     // Apply change.
     if (flags & MEMPROTECT_FLAG_RWX) {

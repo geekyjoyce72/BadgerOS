@@ -58,6 +58,8 @@ void isr_ctx_dump(isr_ctx_t const *ctx) {
     DUMP_CSR("  PMPADDR5  ", "pmpaddr5")
     DUMP_CSR("  PMPADDR6  ", "pmpaddr6")
     DUMP_CSR("  PMPADDR7  ", "pmpaddr7")
+#else
+    DUMP_CSR("  SATP      ", "satp")
 #endif
 }
 

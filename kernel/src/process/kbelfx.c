@@ -4,11 +4,16 @@
 #include "assertions.h"
 #include "badge_strings.h"
 #include "filesystem.h"
+#include "interrupt.h"
 #include "malloc.h"
 #include "memprotect.h"
 #include "process/internal.h"
 #include "process/process.h"
 #include "process/types.h"
+#include "usercopy.h"
+#if MEMMAP_VMEM
+#include "cpu/mmu.h"
+#endif
 
 #include <kbelf.h>
 
@@ -128,13 +133,13 @@ void *kbelfx_open(char const *path) {
     if (fd == -1)
         return NULL;
     else
-        return (void *)(fd + 1);
+        return (void *)(long)(fd + 1);
 }
 
 // Close a file.
 // User-defined.
 void kbelfx_close(void *fd) {
-    fs_close(NULL, (int)fd - 1);
+    fs_close(NULL, (long)fd - 1);
 }
 
 // Reads a single byte from a file.
@@ -142,24 +147,68 @@ void kbelfx_close(void *fd) {
 // User-defined.
 int kbelfx_getc(void *fd) {
     char      buf;
-    fileoff_t len = fs_read(NULL, (int)fd - 1, &buf, 1);
+    fileoff_t len = fs_read(NULL, (long)fd - 1, &buf, 1);
     return len > 0 ? buf : -1;
 }
 
 // Reads a number of bytes from a file.
 // Returns the number of bytes read, or less than that on error.
 // User-defined.
-int kbelfx_read(void *fd, void *buf, int buf_len) {
-    return fs_read(NULL, (int)fd - 1, buf, buf_len);
+long kbelfx_read(void *fd, void *buf, long buf_len) {
+    return fs_read(NULL, (long)fd - 1, buf, buf_len);
+}
+
+// Reads a number of bytes from a file to a virtual address in the program.
+// Returns the number of bytes read, or less than that on error.
+// User-defined.
+long kbelfx_load(kbelf_inst inst, void *fd, kbelf_laddr laddr, long len) {
+    if (len < 0)
+        return -1;
+    process_t *proc    = proc_get_unsafe(kbelf_inst_getpid(inst));
+    long       tmp_cap = MEMMAP_VMEM ? 2097152 : 16384;
+    tmp_cap            = tmp_cap < len ? tmp_cap : len;
+    void *tmp          = malloc(tmp_cap);
+    long  total        = 0;
+    while (len > tmp_cap) {
+        total += fs_read(NULL, (long)fd - 1, tmp, tmp_cap);
+        copy_to_user_raw(proc, laddr, tmp, tmp_cap);
+        laddr += tmp_cap;
+        len   -= tmp_cap;
+    }
+    total += fs_read(NULL, (long)fd - 1, tmp, len);
+    copy_to_user_raw(proc, laddr, tmp, len);
+    free(tmp);
+    return total;
 }
 
 // Sets the absolute offset in the file.
 // Returns 0 on success, -1 on error.
 // User-defined.
 int kbelfx_seek(void *fd, long pos) {
-    fileoff_t q = fs_seek(NULL, (int)fd - 1, pos, SEEK_ABS);
+    fileoff_t q = fs_seek(NULL, (long)fd - 1, pos, SEEK_ABS);
     return pos == q ? 0 : -1;
 }
+
+
+
+// Read bytes from a load address in the program.
+bool kbelfx_copy_from_user(kbelf_inst inst, void *buf, kbelf_laddr laddr, size_t len) {
+    process_t *proc = proc_get_unsafe(kbelf_inst_getpid(inst));
+    return copy_from_user_raw(proc, buf, laddr, len);
+}
+
+// Write bytes to a load address in the program.
+bool kbelfx_copy_to_user(kbelf_inst inst, kbelf_laddr laddr, void *buf, size_t len) {
+    process_t *proc = proc_get_unsafe(kbelf_inst_getpid(inst));
+    return copy_to_user_raw(proc, laddr, buf, len);
+}
+
+// Get string length from a load address in the program.
+ptrdiff_t kbelfx_strlen_from_user(kbelf_inst inst, kbelf_laddr laddr) {
+    process_t *proc = proc_get_unsafe(kbelf_inst_getpid(inst));
+    return strlen_from_user_raw(proc, laddr, SIZE_MAX);
+}
+
 
 
 // Find and open a dynamic library file.
@@ -172,19 +221,9 @@ kbelf_file kbelfx_find_lib(char const *needed) {
 
 
 
-// A built-in library function test.
-static void exit_impl(int code) {
-    (void)code;
-    __builtin_trap();
-}
-
-kbelf_builtin_sym const my_syms[] = {{"exit", (size_t)&exit_impl, (size_t)&exit_impl, 0}};
-
-kbelf_builtin_lib const my_libs[] = {{"userlandlib.so", 1, my_syms, 0}};
-
 // Number of built-in libraries.
 // Optional user-defined.
-size_t                   kbelfx_builtin_libs_len = 1;
+size_t                   kbelfx_builtin_libs_len = 0;
 // Array of built-in libraries.
 // Optional user-defined.
-kbelf_builtin_lib const *kbelfx_builtin_libs     = my_libs;
+kbelf_builtin_lib const *kbelfx_builtin_libs     = NULL;

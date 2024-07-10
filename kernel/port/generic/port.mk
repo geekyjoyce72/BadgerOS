@@ -46,7 +46,7 @@ image: build port/generic/limine.cfg $(OPENSBI) lib/u-boot/u-boot.itb
 	echo Copy data onto partitions
 	dd if=lib/u-boot/spl/u-boot-spl.bin bs=512 seek=34   of=$(BUILDDIR)/image.hdd conv=notrunc
 	dd if=lib/u-boot/u-boot.itb         bs=512 seek=2082 of=$(BUILDDIR)/image.hdd conv=notrunc
-	dd if=$(BUILDDIR)/image_bootfs.bin             bs=512 seek=4096 of=$(BUILDDIR)/image.hdd conv=notrunc
+	dd if=$(BUILDDIR)/image_bootfs.bin  bs=512 seek=4096 of=$(BUILDDIR)/image.hdd conv=notrunc
 
 $(BUILDDIR)/cache/OVMF.fd:
 	mkdir -p $(BUILDDIR)/cache
@@ -55,7 +55,7 @@ $(BUILDDIR)/cache/OVMF.fd:
 .PHONY: qemu
 qemu: $(BUILDDIR)/cache/OVMF.fd image
 	qemu-system-riscv64 -s \
-		-M virt -cpu rv64 -m 2G \
+		-M virt -cpu rv64,sv48=false -m 16G \
 		-device ramfb -device qemu-xhci -device usb-kbd \
 		-drive if=pflash,unit=0,format=raw,file=$(BUILDDIR)/cache/OVMF.fd \
 		-device virtio-scsi-pci,id=scsi -device scsi-hd,drive=hd0 \

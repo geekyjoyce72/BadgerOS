@@ -27,6 +27,21 @@
 #if MEMMAP_VMEM
 // For systems with VMEM: global MMU context.
 extern mpu_ctx_t mpu_global_ctx;
+// Virtual to physical lookup results.
+typedef struct {
+    // Memory protection flags.
+    uint32_t flags;
+    // Physical address.
+    size_t   paddr;
+    // Page base vaddr.
+    size_t   page_vaddr;
+    // Page base paddr.
+    size_t   page_paddr;
+    // Page size.
+    size_t   page_size;
+} virt2phys_t;
+// Lookup virtual address to physical address.
+virt2phys_t memprotect_virt2phys(mpu_ctx_t *ctx, size_t vaddr);
 #endif
 
 // Initialise memory protection driver.
@@ -43,3 +58,5 @@ bool memprotect_k(size_t vaddr, size_t paddr, size_t length, uint32_t flags);
 void memprotect_commit(mpu_ctx_t *ctx);
 // Swap in memory protections for the current thread.
 void memprotect_swap_from_isr();
+// Swap in memory protections for a given context.
+void memprotect_swap(mpu_ctx_t *ctx);

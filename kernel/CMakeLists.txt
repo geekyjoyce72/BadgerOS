@@ -87,6 +87,7 @@ add_executable(${target}
     ${CMAKE_CURRENT_LIST_DIR}/src/malloc/static-buddy.c
     ${CMAKE_CURRENT_LIST_DIR}/src/malloc/slab-alloc.c
     ${CMAKE_CURRENT_LIST_DIR}/src/process/kbelfx.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/process/proc_memmap.c
     ${CMAKE_CURRENT_LIST_DIR}/src/process/process.c
     ${CMAKE_CURRENT_LIST_DIR}/src/process/sighandler.c
     ${CMAKE_CURRENT_LIST_DIR}/src/process/syscall_impl.c

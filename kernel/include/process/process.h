@@ -35,6 +35,8 @@ bool     proc_delete_prestart(pid_t pid);
 void     proc_delete(pid_t pid);
 // Get the process' flags.
 uint32_t proc_getflags(badge_err_t *ec, pid_t pid);
+// Get the PID of the current process, if any.
+pid_t    proc_current_pid();
 // Load an executable and start a prepared process.
 void     proc_start(badge_err_t *ec, pid_t pid);
 

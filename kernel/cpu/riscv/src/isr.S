@@ -419,6 +419,8 @@ riscv_interrupt_vector_table:
     j __isr_asm
     .endr
     # Padding.
+#if RISCV_VT_PADDING
     .skip RISCV_VT_PADDING*4
+#endif
     .option pop
 #pragma endregion

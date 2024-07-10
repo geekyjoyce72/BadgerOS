@@ -67,10 +67,11 @@ void mmu_write_pte(size_t pte_paddr, mmu_pte_t pte) {
 
 // Swap in memory protections for the given context.
 void memprotect_swap_from_isr() {
-    mpu_ctx_t *mpu = isr_ctx_get()->mpu_ctx;
-    if (!mpu) {
-        mpu = &mpu_global_ctx;
-    }
+    memprotect_swap(isr_ctx_get()->mpu_ctx ?: &mpu_global_ctx);
+}
+
+// Swap in memory protections for a given context.
+void memprotect_swap(mpu_ctx_t *mpu) {
     riscv_satp_t satp = {
         .ppn  = mpu->root_ppn,
         .asid = 0,

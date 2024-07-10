@@ -4,6 +4,7 @@
 #pragma once
 
 #include "memprotect.h"
+#include "riscv.h"
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -139,9 +140,11 @@ void      mmu_write_pte(size_t pte_paddr, mmu_pte_t pte);
 static inline mmu_pte_t mmu_pte_new_leaf(size_t ppn, uint32_t flags) {
     mmu_pte_t pte = {0};
     pte.v         = !!(flags & MEMPROTECT_FLAG_RWX);
-    pte.rwx       = flags;
+    pte.rwx       = flags & MEMPROTECT_FLAG_RWX;
     pte.u         = !(flags & MEMPROTECT_FLAG_KERNEL);
-    pte.g         = flags & MEMPROTECT_FLAG_GLOBAL;
+    pte.g         = !!(flags & MEMPROTECT_FLAG_GLOBAL);
+    pte.a         = 1;
+    pte.d         = 1;
     pte.ppn       = ppn;
     return pte;
 }
@@ -170,6 +173,15 @@ static inline uint32_t mmu_pte_get_flags(mmu_pte_t pte) {
 // Get physical page number encoded in PTE.
 static inline size_t mmu_pte_get_ppn(mmu_pte_t pte) {
     return pte.ppn;
+}
+
+// Enable supervisor access to user memory.
+static inline void mmu_enable_sum() {
+    asm("csrs sstatus, %0" ::"r"((1 << RISCV_STATUS_SUM_BIT) | (1 << RISCV_STATUS_MXR_BIT)));
+}
+// Disable supervisor access to user memory.
+static inline void mmu_disable_sum() {
+    asm("csrc sstatus, %0" ::"r"((1 << RISCV_STATUS_SUM_BIT) | (1 << RISCV_STATUS_MXR_BIT)));
 }
 
 

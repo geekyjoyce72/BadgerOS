@@ -9,6 +9,7 @@
 #include "limine.h"
 #include "memprotect.h"
 #include "port/hardware_allocation.h"
+#include "rawprint.h"
 
 #include <stdbool.h>
 
@@ -51,6 +52,8 @@ static size_t early_alloc_index;
 
 // Early hardware initialization.
 void port_early_init() {
+    rawprint("\033[0m\033[2J");
+
     // Verify needed requests have been answered.
     if (!mm_req.response) {
         logk_from_isr(LOG_FATAL, "Limine memmap response missing");

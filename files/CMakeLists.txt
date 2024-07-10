@@ -7,8 +7,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS true)
 include(../common/compiler.cmake)
 
 if("${BADGEROS_PORT}" STREQUAL "generic")
-    set(target_arch rv32imafdc_zicsr_zifencei)
-    set(target_abi ilp32)
+    set(target_arch rv64imafdc_zicsr_zifencei)
+    set(target_abi lp64)
 elseif("${BADGEROS_PORT}" STREQUAL "esp32c6")
     set(target_arch rv32imac_zicsr_zifencei)
     set(target_abi ilp32)
@@ -34,6 +34,7 @@ set(badge_cflags
     -fno-omit-frame-pointer            # Always use frame pointer
     -fno-stack-protector
     -fno-exceptions
+    -ggdb
 )
 
 project(root C ASM)
