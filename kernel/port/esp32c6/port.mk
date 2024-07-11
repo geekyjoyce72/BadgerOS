@@ -7,7 +7,7 @@ openocd:
 
 .PHONY: gdb
 gdb:
-	riscv32-unknown-elf-gdb -x port/$(BADGEROS_PORT)/gdbinit build/badger-os.elf
+	$(CROSS_COMPILE)gdb -x port/$(CONFIG_TARGET)/gdbinit build/badger-os.elf
 
 .PHONY: flash
 flash: build

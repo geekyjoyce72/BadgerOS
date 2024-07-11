@@ -12,7 +12,7 @@
 #include "soc/lp_wdt_struct.h"
 #include "soc/timer_group_struct.h"
 
-#ifdef BADGEROS_PORT_esp32c6
+#ifdef CONFIG_TARGET_esp32c6
 #include "soc/ext_irq.h"
 #include "soc/pcr_struct.h"
 #endif
@@ -35,7 +35,7 @@ static void timer_isr_timer_alarm() {
 
 // Initialise timer and watchdog subsystem.
 void time_init() {
-#ifdef BADGEROS_PORT_esp32c6
+#ifdef CONFIG_TARGET_esp32c6
     // Power up timers.
     PCR.timergroup0_conf.tg0_rst_en                  = false;
     PCR.timergroup0_conf.tg0_clk_en                  = true;
@@ -56,10 +56,10 @@ void time_init() {
     TIMERG1.wdtconfig0.val  = 0;
 
     // Configure interrupts.
-#ifdef BADGEROS_PORT_esp32c6
+#ifdef CONFIG_TARGET_esp32c6
     irq_ch_route(EXT_IRQ_TG0_T0_INTR, INT_CHANNEL_TIMER_ALARM);
 #endif
-#ifdef BADGEROS_PORT_esp32p4
+#ifdef CONFIG_TARGET_esp32p4
     irq_ch_route(ETS_TG0_T0_INTR_SOURCE, INT_CHANNEL_TIMER_ALARM);
 #endif
     irq_ch_set_isr(INT_CHANNEL_TIMER_ALARM, timer_isr_timer_alarm);
@@ -85,11 +85,11 @@ void time_set_next_task_switch(timestamp_us_t timestamp) {
 void timer_set_freq(int timerno, frequency_hz_t freq) {
     GET_TIMER_INFO(timerno)
     frequency_hz_t base_freq;
-#ifdef BADGEROS_PORT_esp32p4
+#ifdef CONFIG_TARGET_esp32p4
     // TODO: Determine what selects timer clock source.
     base_freq = 40000000;
 #endif
-#ifdef BADGEROS_PORT_esp32c6
+#ifdef CONFIG_TARGET_esp32c6
     uint32_t clksrc;
     if (timerno) {
         clksrc = PCR.timergroup1_timer_clk_conf.tg1_timer_clk_sel;

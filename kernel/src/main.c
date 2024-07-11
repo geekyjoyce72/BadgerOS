@@ -17,6 +17,8 @@
 
 #include <stdatomic.h>
 
+#include <config.h>
+
 
 
 // The initial kernel stack.
@@ -91,7 +93,7 @@ void basic_runtime_init() {
     time_init();
 
     // Announce that we're alive.
-    logk(LOG_INFO, "BadgerOS " BADGEROS_PORT " starting...");
+    logk(LOG_INFO, "BadgerOS " CONFIG_TARGET " starting...");
 
     // Memory protection initialization.
     memprotect_init();

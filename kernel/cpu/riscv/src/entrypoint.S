@@ -1,6 +1,8 @@
 
 # SPDX-License-Identifier: MIT
 
+#include <config.h>
+
 	# This is the C entrypoint, which will be called when basic CRT is set up.
 	.global basic_runtime_init
 	# The global pointer is used for relaxation of `.data` accesses.
@@ -43,7 +45,7 @@ _start:
 	la   sp, __stack_top
 	
 	# Zero out .bss section.
-#ifndef BADGEROS_PORT_generic
+#ifndef CONFIG_TARGET_generic
 	la   a0, __start_bss
 	la   a1, __stop_bss
 	beq  a0, a1, .bssinit_skip

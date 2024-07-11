@@ -1,27 +1,30 @@
 
 # SPDX-License-Identifier: MIT
 
+CONFIG_PATH       ?= ../.config/config.mk
+include $(CONFIG_PATH)
+
 MAKEFLAGS         += --silent
 IDF_PATH          ?= $(shell pwd)/../esp-idf
 SHELL             := /usr/bin/env bash
 OUTPUT            ?= $(shell pwd)/firmware
 BUILDDIR          ?= build
 BADGER_RAMFS_ROOT ?= ../files/root
-BADGEROS_PORT     ?= esp32c6
-CROSS_COMPILE     ?= riscv64-linux-gnu-
+CROSS_COMPILE      = $(CONFIG_TC_PREFIX)
 GDB               ?= $(CROSS_COMPILE)gdb
 
-include port/$(BADGEROS_PORT)/port.mk
+include port/$(CONFIG_TARGET)/port.mk
 
 .PHONY: configure
 configure:
 	mkdir -p '$(BUILDDIR)'
-	touch '$(BUILDDIR)/fs_root.c'
 	cmake -B '$(BUILDDIR)' "-DCMAKE_BUILD_TYPE=$${CMAKE_BUILD_TYPE:-Debug}"
 
-.PHONY: build
-build: configure
+$(BUILDDIR)/fs_root.c: $(shell find '$(BADGER_RAMFS_ROOT)')
 	../tools/ramfs-gen.py '$(BADGER_RAMFS_ROOT)' '$(BUILDDIR)/fs_root.c' init_ramfs
+
+.PHONY: build
+build: configure $(BUILDDIR)/fs_root.c
 	cmake --build '$(BUILDDIR)'
 	cmake --install '$(BUILDDIR)' --prefix '$(OUTPUT)'
 
@@ -45,4 +48,4 @@ clang-tidy-check: configure
 
 .PHONY: gdb
 gdb:
-	$(GDB) -x port/$(BADGEROS_PORT)/gdbinit build/badger-os.elf
+	$(GDB) -x port/$(CONFIG_TARGET)/gdbinit build/badger-os.elf

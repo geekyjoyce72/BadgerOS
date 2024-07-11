@@ -52,6 +52,12 @@ $(BUILDDIR)/cache/OVMF.fd:
 	mkdir -p $(BUILDDIR)/cache
 	cd $(BUILDDIR)/cache && curl -o OVMF.fd https://retrage.github.io/edk2-nightly/bin/RELEASERISCV64_VIRT_CODE.fd && dd if=/dev/zero of=OVMF.fd bs=1 count=0 seek=33554432
 
+.PHONY: clean-image
+clean-image:
+	$(MAKE) -C lib/limine clean
+	$(MAKE) -C lib/opensbi clean
+	$(MAKE) -C lib/u-boot clean
+
 .PHONY: qemu
 qemu: $(BUILDDIR)/cache/OVMF.fd image
 	qemu-system-riscv64 -s \

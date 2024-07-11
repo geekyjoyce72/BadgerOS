@@ -13,6 +13,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include <config.h>
+
 #ifdef BADGEROS_KERNEL
 // NOLINTBEGIN
 extern char __start_free_sram[];
@@ -61,7 +63,7 @@ void kernel_heap_init();
 
 void kernel_heap_init() {
 #ifdef BADGEROS_KERNEL
-#ifndef BADGEROS_PORT_generic
+#ifndef CONFIG_TARGET_generic
     init_pool(__start_free_sram, __stop_free_sram, 0);
 #endif
     init_kernel_slabs();

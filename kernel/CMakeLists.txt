@@ -13,12 +13,13 @@ if(NOT DEFINED BADGER_RAMFS_ROOT)
     set(BADGER_RAMFS_ROOT ${CMAKE_CURRENT_LIST_DIR}/root)
 endif()
 
-# Set the C compiler
+# Include the config.
+include(../.config/config.cmake)
 include(../common/compiler.cmake)
 
 # Include port-specific.
-include(port/${BADGEROS_PORT}/CMakeLists.txt)
-include(cpu/riscv/CMakeLists.txt)
+include(port/${CONFIG_TARGET}/CMakeLists.txt)
+include(cpu/${CONFIG_CPU}/CMakeLists.txt)
 
 set(common_compiler_flags
     -ffreestanding                     # We do not compile against an OS.
@@ -32,8 +33,6 @@ set(common_compiler_flags
     -Wall -Wextra                      # Ramp up warning level.
     -std=gnu11                         # We use the C11 standard
     -DBADGEROS_KERNEL                  # Tell the code we're building for the kernel
-    -DBADGEROS_PORT_${BADGEROS_PORT}
-    -DBADGEROS_PORT="${BADGEROS_PORT}"
     -DBADGEROS_MALLOC_DEBUG_LEVEL=3    # Malloc debug level set to WARN
     -DSOFTBIT                          # Turn on our emulated bit operations
     -fno-omit-frame-pointer            # Always use frame pointer
@@ -56,7 +55,7 @@ add_compile_options(${common_compiler_flags} ${cpu_flags} ${port_flags})
 add_link_options(
     ${common_compiler_flags} ${cpu_flags} ${port_flags}
     ${cpu_link} ${port_link}
-    -Wl,--gc-sections -nodefaultlibs -nostartfiles
+    -Wl,--gc-sections -Wl,--build-id=none -nodefaultlibs -nostartfiles
 )
 
 project(badgeros C ASM)
@@ -107,6 +106,7 @@ target_include_directories(${target} PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/include/badgelib
     ${CMAKE_CURRENT_LIST_DIR}/../common/include
     ${CMAKE_CURRENT_LIST_DIR}/../common/badgelib
+    ${CMAKE_CURRENT_LIST_DIR}/../.config
     ${cpu_include}
     ${port_include}
 )
@@ -121,6 +121,7 @@ target_include_directories(kbelf PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/include/badgelib
     ${CMAKE_CURRENT_LIST_DIR}/../common/include
     ${CMAKE_CURRENT_LIST_DIR}/../common/badgelib
+    ${CMAKE_CURRENT_LIST_DIR}/../.config
     ${cpu_include}
     ${port_include}
 )

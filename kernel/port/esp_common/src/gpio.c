@@ -3,7 +3,7 @@
 
 #include "hal/gpio.h"
 
-#ifdef BADGEROS_PORT_esp32c6
+#ifdef CONFIG_TARGET_esp32c6
 #include "soc/io_mux_struct.h"
 #endif
 
@@ -112,10 +112,10 @@ io_pull_t io_getpull(badge_err_t *ec, int pin) {
         return IO_PULL_NONE;
     }
     badge_err_set_ok(ec);
-#ifdef BADGEROS_PORT_esp32c6
+#ifdef CONFIG_TARGET_esp32c6
     io_mux_gpio_t tmp = IO_MUX.gpio[pin];
 #endif
-#ifdef BADGEROS_PORT_esp32p4
+#ifdef CONFIG_TARGET_esp32p4
     iomux_gpio_reg_t tmp = IOMUX.gpio[pin];
 #endif
     if (tmp.mcu_wpu) {

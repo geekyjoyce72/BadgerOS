@@ -52,7 +52,7 @@ int main() {
     i2c_master_init(&ec, 0, SDA_PIN, SCL_PIN, 100000);
     i2c_master_write_to(&ec, 0, CH32_ADDR, "\x00", 1);
     i2c_master_write_to(&ec, 0, CH32_ADDR, "\x00", 1);
-    uint8_t tmp;
+    // uint8_t tmp;
     // i2c_master_read_from(&ec, 0, CH32_ADDR, &tmp, 1);
     // i2c_master_read_from(&ec, 0, CH32_ADDR, &tmp, 1);
     // i2c_master_read_from(&ec, 0, CH32_ADDR, &tmp, 1);
