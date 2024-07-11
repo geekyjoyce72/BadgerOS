@@ -76,6 +76,7 @@ parser.add_argument("--vec-spec", "--vector-spec", "--vec", "--vector",
         help="Vector type to enable")
 
 args = parser.parse_args()
+use_default = args.use_default
 
 
 def option_select(prompt: str, options: list, prefer=0):
@@ -131,7 +132,6 @@ def handle_option_arg(arg: str|None, id: str, name: str) -> str:
 
 
 target = args.target or option_select("target", list(targets.keys()))
-use_default = args.use_default
 config = {}
 target_options = default_options.copy()
 for opt in targets[target]["options"]:

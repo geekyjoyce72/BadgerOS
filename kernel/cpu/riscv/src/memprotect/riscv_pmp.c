@@ -4,6 +4,7 @@
 #include "cpu/riscv_pmp.h"
 
 #include "cpu/panic.h"
+#include "isr_ctx.h"
 #include "log.h"
 #include "memprotect.h"
 #include "port/hardware_allocation.h"
@@ -314,7 +315,7 @@ bool riscv_pmp_memprotect(proc_memmap_t *new_mm, riscv_pmp_ctx_t *ctx, size_t ad
     for (size_t i = 0; i < new_mm->regions_len; i++) {
         proc_memmap_ent_t *region = &new_mm->regions[i];
 
-        if ((region->base | region->size) & (grain - 1)) {
+        if ((region->paddr | region->size) & (grain - 1)) {
             // Misaligned region.
             return false;
         }
@@ -324,7 +325,7 @@ bool riscv_pmp_memprotect(proc_memmap_t *new_mm, riscv_pmp_ctx_t *ctx, size_t ad
         }
 
         // Count amount of PMPs required.
-        if (region->base != prev_addr && region->size == 4) {
+        if (region->paddr != prev_addr && region->size == 4) {
             // NA4 region.
             tmp.pmpcfg[pmp] = (riscv_pmpcfg_t){
                 .read            = true,
@@ -333,9 +334,9 @@ bool riscv_pmp_memprotect(proc_memmap_t *new_mm, riscv_pmp_ctx_t *ctx, size_t ad
                 .addr_match_mode = RISCV_PMPCFG_NA4,
                 .lock            = false,
             };
-            tmp.pmpaddr[pmp] = region->base >> 2;
+            tmp.pmpaddr[pmp] = region->paddr >> 2;
 
-        } else if (region->base != prev_addr && riscv_pmpaddr_is_napot(region->base, region->size)) {
+        } else if (region->paddr != prev_addr && riscv_pmpaddr_is_napot(region->paddr, region->size)) {
             // NAPOT region.
             tmp.pmpcfg[pmp] = (riscv_pmpcfg_t){
                 .read            = true,
@@ -344,17 +345,17 @@ bool riscv_pmp_memprotect(proc_memmap_t *new_mm, riscv_pmp_ctx_t *ctx, size_t ad
                 .addr_match_mode = RISCV_PMPCFG_NAPOT,
                 .lock            = false,
             };
-            tmp.pmpaddr[pmp] = riscv_pmpaddr_calc_napot(region->base, region->size);
+            tmp.pmpaddr[pmp] = riscv_pmpaddr_calc_napot(region->paddr, region->size);
 
         } else {
-            if (region->base != prev_addr) {
+            if (region->paddr != prev_addr) {
                 // Base address.
                 if (pmp > PROC_RISCV_PMP_COUNT - 2) {
                     // Out of PMPs.
                     return false;
                 }
                 tmp.pmpcfg[pmp].value = 0;
-                tmp.pmpaddr[pmp]      = region->base >> 2;
+                tmp.pmpaddr[pmp]      = region->paddr >> 2;
                 pmp++;
             }
 
@@ -366,9 +367,9 @@ bool riscv_pmp_memprotect(proc_memmap_t *new_mm, riscv_pmp_ctx_t *ctx, size_t ad
                 .addr_match_mode = RISCV_PMPCFG_TOR,
                 .lock            = false,
             };
-            tmp.pmpaddr[pmp] = (region->base + region->size) >> 2;
+            tmp.pmpaddr[pmp] = (region->paddr + region->size) >> 2;
         }
-        prev_addr = region->base + region->size;
+        prev_addr = region->paddr + region->size;
         pmp++;
     }
 
@@ -525,4 +526,18 @@ void riscv_pmp_memprotect_swap(riscv_pmp_ctx_t *ctx) {
     PMP_ADDR_SWAP(ctx, 62)
     PMP_ADDR_SWAP(ctx, 63)
 #endif
+}
+
+// Swap in memory protections for the given context.
+void memprotect_swap_from_isr() {
+    isr_ctx_t *ctx = isr_ctx_get();
+    if (!(ctx->flags & ISR_CTX_FLAG_KERNEL)) {
+        assert_dev_drop(ctx->mpu_ctx);
+        riscv_pmp_memprotect_swap(ctx->mpu_ctx);
+    }
+}
+
+// Swap in memory protections for a given context.
+void memprotect_swap(mpu_ctx_t *mpu) {
+    (void)mpu;
 }

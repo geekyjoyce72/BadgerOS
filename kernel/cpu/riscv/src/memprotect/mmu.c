@@ -13,7 +13,7 @@
 #include "page_alloc.h"
 #include "port/hardware_allocation.h"
 
-_Static_assert(MEMMAP_PAGE_SIZE == MMU_PAGE_SIZE);
+_Static_assert(MEMMAP_PAGE_SIZE == MMU_PAGE_SIZE, "MEMMAP_PAGE_SIZE must equal MMU_PAGE_SIZE");
 
 // Virtual address offset currently used for HHDM.
 size_t mmu_hhdm_vaddr;

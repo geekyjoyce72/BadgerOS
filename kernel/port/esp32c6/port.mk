@@ -5,10 +5,6 @@ PORT              ?= /dev/ttyACM0
 openocd:
 	openocd -c 'set ESP_RTOS "none"' -f board/esp32c6-builtin.cfg
 
-.PHONY: gdb
-gdb:
-	$(CROSS_COMPILE)gdb -x port/$(CONFIG_TARGET)/gdbinit build/badger-os.elf
-
 .PHONY: flash
 flash: build
 	../.venv/bin/python -m esptool -b 921600 --port "$(PORT)" \

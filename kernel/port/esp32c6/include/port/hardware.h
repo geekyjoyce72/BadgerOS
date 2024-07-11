@@ -12,6 +12,8 @@
 
 /* ==== CPU INFO ==== */
 
+// Kernel runs in M-mode instead of S-mode.
+#define RISCV_M_MODE_KERNEL    1
 // Number of PMP regions supported by the CPU.
 #define RISCV_PMP_REGION_COUNT 16
 

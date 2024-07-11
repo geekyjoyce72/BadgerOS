@@ -16,7 +16,7 @@
 #include "soc/pmu_struct.h"
 
 // Temporary interrupt context before scheduler.
-static isr_ctx_t tmp_ctx = {.is_kernel_thread = true};
+static isr_ctx_t tmp_ctx = {.flags = ISR_CTX_FLAG_KERNEL};
 
 // Interrupt service routine table.
 static isr_t isr_table[48];

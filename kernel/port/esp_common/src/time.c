@@ -12,6 +12,8 @@
 #include "soc/lp_wdt_struct.h"
 #include "soc/timer_group_struct.h"
 
+#include <config.h>
+
 #ifdef CONFIG_TARGET_esp32c6
 #include "soc/ext_irq.h"
 #include "soc/pcr_struct.h"

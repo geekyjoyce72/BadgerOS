@@ -100,19 +100,12 @@ bool memprotect_u(proc_memmap_t *new_mm, mpu_ctx_t *ctx, size_t vaddr, size_t pa
 
 // Add a memory protection region for kernel memory.
 bool memprotect_k(size_t vaddr, size_t paddr, size_t length, uint32_t flags) {
+    (void)length;
+    (void)flags;
     return vaddr == paddr;
 }
 
 // Commit pending memory protections, if any.
 void memprotect_commit(mpu_ctx_t *ctx) {
     (void)ctx;
-}
-
-// Swap in memory protections for the given context.
-void memprotect_swap_from_isr() {
-    isr_ctx_t *ctx = isr_ctx_get();
-    if (!ctx->is_kernel_thread) {
-        assert_dev_drop(ctx->mpu_ctx);
-        riscv_pmp_memprotect_swap(ctx->mpu_ctx);
-    }
 }

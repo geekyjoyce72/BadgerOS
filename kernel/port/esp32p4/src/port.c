@@ -3,10 +3,12 @@
 
 #include "port/port.h"
 
+#include "interrupt.h"
 #include "log.h"
 #include "port/pmu_init.h"
 #include "rom/cache.h"
 #include "soc/hp_sys_clkrst_struct.h"
+#include "soc/interrupts.h"
 #include "soc/uart_struct.h"
 
 
@@ -20,7 +22,7 @@ void port_early_init() {
 // Full hardware initialization.
 void port_init() {
     extern void esp_i2c_isr();
-    irq_ch_route(EXT_IRQ_I2C_EXT0_INTR, INT_CHANNEL_I2C);
+    irq_ch_route(ETS_I2C0_INTR_SOURCE, INT_CHANNEL_I2C);
     irq_ch_set_isr(INT_CHANNEL_I2C, esp_i2c_isr);
     irq_ch_enable(INT_CHANNEL_I2C, true);
 }

@@ -36,10 +36,17 @@ size_t syscall_mem_size(void *address) {
     mutex_acquire_shared(NULL, &proc->mtx, TIMESTAMP_US_MAX);
     size_t res = 0;
     for (size_t i = 0; i < proc->memmap.regions_len; i++) {
+#if MEMMAP_VMEM
         if (proc->memmap.regions[i].vaddr == (size_t)address) {
             res = proc->memmap.regions[i].size;
             break;
         }
+#else
+        if (proc->memmap.regions[i].paddr == (size_t)address) {
+            res = proc->memmap.regions[i].size;
+            break;
+        }
+#endif
     }
     mutex_release_shared(NULL, &proc->mtx);
     return res;
@@ -73,7 +80,7 @@ size_t syscall_proc_getargs(size_t cap, void *memory) {
     size_t required = proc->argv_size;
     if (cap >= required) {
         // Buffer fits; copy to user.
-        sigsegv_assert(copy_to_user_raw(proc, (size_t)memory, proc->argv, required));
+        sigsegv_assert(copy_to_user_raw(proc, (size_t)memory, proc->argv, required), (size_t)memory);
     }
 
     mutex_release_shared(NULL, &proc->mtx);
@@ -85,18 +92,19 @@ size_t syscall_proc_getargs(size_t cap, void *memory) {
 // Returns process ID of new child on success, or a (negative) errno on failure.
 int syscall_proc_pcreate(char const *binary, int argc, char const *const *argv) {
     process_t *const proc = proc_current();
+    // TODO: Copy these strings.
 
     // Verify validity of pointers.
     if (strlen_from_user_raw(proc, (size_t)binary, PTRDIFF_MAX) < 0) {
-        proc_sigsegv_handler();
+        proc_sigsegv_handler((size_t)binary);
     }
     sigsys_assert(argc >= 0);
     if (!proc_map_contains_raw(proc, (size_t)argv, argc * sizeof(char const *))) {
-        proc_sigsegv_handler();
+        proc_sigsegv_handler((size_t)argv);
     }
     for (int i = 0; i < argc; i++) {
         if (strlen_from_user_raw(proc, (size_t)argv[i], PTRDIFF_MAX) < 0) {
-            proc_sigsegv_handler();
+            proc_sigsegv_handler((size_t)argv[i]);
         }
     }
 
@@ -139,7 +147,7 @@ void *syscall_proc_sighandler(int signum, void *newhandler) {
 // Return from a signal handler.
 void syscall_proc_sigret() {
     sigsys_assert(sched_is_sighandler());
-    sigsegv_assert(sched_signal_exit());
+    sigsegv_assert(sched_signal_exit(), 0);
     irq_enable(false);
     sched_lower_from_isr();
     isr_context_switch();

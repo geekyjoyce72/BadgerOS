@@ -24,6 +24,9 @@
 #include "soc/gpio_sig_map.h"
 #pragma GCC diagnostic pop
 
+#include <config.h>
+static int __DECLARE_RCC_ATOMIC_ENV __attribute__((unused));
+
 #define I2C_ACK  0
 #define I2C_NACK 1
 
@@ -88,19 +91,27 @@ static i2c_dev_t *const i2c_dev[] = {
 
 // I²C sig table.
 static i2c_sigtab_t const i2c_sigtab[] = {
+#ifdef CONFIG_TARGET_esp32c6
     {
         I2CEXT0_SDA_IN_IDX,
         I2CEXT0_SCL_IN_IDX,
         I2CEXT0_SDA_OUT_IDX,
         I2CEXT0_SCL_OUT_IDX,
     },
-#if SOC_I2C_NUM > 1
+#endif
+#ifdef CONFIG_TARGET_esp32p4
     {
-        I2CEXT1_SDA_IN_IDX,
-        I2CEXT1_SCL_IN_IDX,
-        I2CEXT1_SDA_OUT_IDX,
-        I2CEXT1_SCL_OUT_IDX,
+        I2C0_SCL_PAD_IN_IDX,
+        I2C0_SCL_PAD_OUT_IDX,
+        I2C0_SCL_PAD_IN_IDX,
+        I2C0_SCL_PAD_OUT_IDX,
     },
+    {
+        I2C1_SCL_PAD_IN_IDX,
+        I2C1_SCL_PAD_OUT_IDX,
+        I2C1_SCL_PAD_IN_IDX,
+        I2C1_SCL_PAD_OUT_IDX,
+    }
 #endif
 };
 

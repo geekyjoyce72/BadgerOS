@@ -36,8 +36,9 @@ def addr2line():
     sys.stdout.write(")")
 
 while True:
-    msg = sys.stdin.read(1)
-    if not len(msg): break
+    msg_raw = sys.stdin.buffer.read(1)
+    if not len(msg_raw): break
+    msg = chr(msg_raw[0])
     for char in msg:
         if state == -2 and char == '0':
             state = -1

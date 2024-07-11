@@ -45,9 +45,9 @@
 #define CSR_STATUS_PP_MASK     3
 
 // Scratch CSR.
-#define CSR_SCRATCH     sscratch
+#define CSR_SCRATCH     mscratch
 // Scratch CSR.
-#define CSR_SCRATCH_STR "sscratch"
+#define CSR_SCRATCH_STR "mscratch"
 
 // Interrupt pending CSR.
 #define CSR_IP     mip

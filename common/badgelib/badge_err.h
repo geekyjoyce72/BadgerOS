@@ -10,7 +10,8 @@
 typedef struct {
     uint32_t cause;
     uint32_t location;
-    uint32_t padding[2];
+    uint32_t : 32;
+    uint32_t : 32;
 } badge_err_t;
 
 typedef enum {

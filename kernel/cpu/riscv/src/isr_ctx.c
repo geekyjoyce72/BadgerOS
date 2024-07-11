@@ -78,8 +78,8 @@ typedef struct {
 } isr_noexc_cookie_t;
 
 // Trap handler wrapper for `isr_noexc_run`.
-static bool isr_noexc_wrapper(isr_ctx_t *kctx, void *_cookie) {
-    isr_noexc_cookie_t *cookie = _cookie;
+static bool isr_noexc_wrapper(isr_ctx_t *kctx, void *cookie0) {
+    isr_noexc_cookie_t *cookie = cookie0;
     cookie->had_trap           = true;
     if (cookie->trap_handler) {
         cookie->trap_handler(cookie->cookie, &cookie->regfile);
@@ -88,7 +88,7 @@ static bool isr_noexc_wrapper(isr_ctx_t *kctx, void *_cookie) {
     return true;
 }
 
-// Calls the actual trapping code in `isr_noexc_run`.
+// NOLINTNEXTLINE
 extern void _isr_noexc_run_int(void *cookie, cpu_regs_t *regs, isr_noexc_t code);
 
 // Run a restricted function and catch exceptions.

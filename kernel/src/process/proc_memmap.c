@@ -198,6 +198,7 @@ size_t proc_map_raw(
 #endif
 
     // Allocate memory to the process.
+    min_size    = min_size ? (min_size - 1) / MEMMAP_PAGE_SIZE + 1 : 1;
     size_t base = phys_page_alloc(min_size, true) * MEMMAP_PAGE_SIZE;
     if (!base) {
         logk(LOG_WARN, "Out of memory");
@@ -210,13 +211,13 @@ size_t proc_map_raw(
 
     // Account the process's memory.
     proc_memmap_ent_t new_ent = {
-        .paddr = (size_t)base,
+        .paddr = base,
         .size  = size,
         .write = true,
         .exec  = true,
     };
 #ifdef PROC_MEMMAP_MAX_REGIONS
-    array_sorted_insert(map->regions, sizeof(proc_memmap_t), map->regions_len, &new_ent, proc_memmap_cmp);
+    array_sorted_insert(map->regions, sizeof(proc_memmap_ent_t), map->regions_len, &new_ent, proc_memmap_cmp);
     map->regions_len++;
 #else
     array_lencap_sorted_insert(
@@ -238,7 +239,7 @@ size_t proc_map_raw(
             }
         }
         map->regions_len--;
-        buddy_deallocate(base);
+        phys_page_free(base / MEMMAP_PAGE_SIZE);
         badge_err_set(ec, ELOC_PROCESS, ECAUSE_NOMEM);
         return 0;
     }
@@ -259,7 +260,7 @@ void proc_unmap_raw(badge_err_t *ec, process_t *proc, size_t base) {
             map->regions_len--;
             assert_dev_keep(memprotect_u(map, &map->mpu_ctx, base, base, region.size, 0));
             memprotect_commit(&map->mpu_ctx);
-            buddy_deallocate((void *)base);
+            phys_page_free(base / MEMMAP_PAGE_SIZE);
             badge_err_set_ok(ec);
             logkf(LOG_INFO, "Unmapped %{size;d} bytes at %{size;x} from process %{d}", region.size, base, proc->pid);
             return;
@@ -284,17 +285,10 @@ uint32_t proc_map_contains_raw(process_t *proc, size_t vaddr, size_t size) {
     while (size) {
         size_t i;
         for (i = 0; i < proc->memmap.regions_len; i++) {
-#if MEMMAP_VMEM
-            if (vaddr >= proc->memmap.regions[i].vaddr &&
-                vaddr < proc->memmap.regions[i].vaddr + proc->memmap.regions[i].size) {
-                goto found;
-            }
-#else
             if (vaddr >= proc->memmap.regions[i].paddr &&
                 vaddr < proc->memmap.regions[i].paddr + proc->memmap.regions[i].size) {
                 goto found;
             }
-#endif
         }
 
         // This page is not in the region map.

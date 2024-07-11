@@ -4,10 +4,13 @@
 #include "hal/gpio.h"
 #include "hal/i2c.h"
 #include "hal/spi.h"
+#include "malloc.h"
 #include "process/process.h"
 #include "process/sighandler.h"
 #include "syscall_util.h"
 #include "usercopy.h"
+
+#include <config.h>
 
 
 
@@ -76,7 +79,7 @@ size_t syscall_i2c_master_read_from(badge_err_t *ec, int i2c_num, int slave_id, 
     size_t rv      = SYSUTIL_EC_WRAPPER(size_t, i2c_master_write_to, i2c_num, slave_id, tmp, len);
     bool   copy_ok = copy_to_user(proc_current_pid(), (size_t)buf, tmp, len);
     free(tmp);
-    sigsegv_assert(copy_ok);
+    sigsegv_assert(copy_ok, (size_t)buf);
     return rv;
 }
 // Writes len bytes from buffer buf to I²C slave with ID slave_id.
@@ -89,7 +92,7 @@ size_t syscall_i2c_master_write_to(badge_err_t *ec, int i2c_num, int slave_id, v
     bool copy_ok = copy_from_user(proc_current_pid(), tmp, (size_t)buf, len);
     if (!copy_ok) {
         free(tmp);
-        proc_sigsegv_handler();
+        proc_sigsegv_handler((size_t)buf);
     }
     size_t rv = SYSUTIL_EC_WRAPPER(size_t, i2c_master_write_to, i2c_num, slave_id, tmp, len);
     free(tmp);
@@ -189,7 +192,7 @@ void syscall_spi_deinit(badge_err_t *ec, int spi_num) {
     (void)spi_num;
     badge_err_t ec_buf = {0};
     if (ec) {
-        sigsegv_assert(copy_to_user(proc_current_pid(), (size_t)ec, &ec_buf, sizeof(badge_err_t)));
+        sigsegv_assert(copy_to_user(proc_current_pid(), (size_t)ec, &ec_buf, sizeof(badge_err_t)), (size_t)ec);
     }
     // TODO: spi_deinit is unimplemented.
 }

@@ -30,9 +30,10 @@ typedef unsigned int uti_t __attribute__((mode(TI)));
         u##type result;                                                                                                \
     } divmod_##name##_t;                                                                                               \
     static divmod_##name##_t divmod_##name(u##type remainder, u##type divisor) {                                       \
-        u##type const msb    = (type)1 << (sizeof(type) * 8 - 1);                                                      \
-        u##type       result = 0;                                                                                      \
-        unsigned int  shift  = 0;                                                                                      \
+        u##type msb           = 1;                                                                                     \
+        msb                 <<= (sizeof(type) * 8 - 1);                                                                \
+        u##type      result   = 0;                                                                                     \
+        unsigned int shift    = 0;                                                                                     \
         while (!(divisor & msb)) {                                                                                     \
             divisor <<= 1;                                                                                             \
             shift++;                                                                                                   \

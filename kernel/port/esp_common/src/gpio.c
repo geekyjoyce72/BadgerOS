@@ -3,10 +3,6 @@
 
 #include "hal/gpio.h"
 
-#ifdef CONFIG_TARGET_esp32c6
-#include "soc/io_mux_struct.h"
-#endif
-
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 // NOLINTBEGIN
@@ -17,6 +13,14 @@
 #include "hal/gpio_ll.h"
 #include "soc/gpio_sig_map.h"
 #pragma GCC diagnostic pop
+
+#include <config.h>
+
+#ifdef CONFIG_TARGET_esp32c6
+#include "soc/io_mux_struct.h"
+#endif
+
+
 
 // Unsafe check if a pin has a function assigned.
 static inline bool io_has_function(int pin) {

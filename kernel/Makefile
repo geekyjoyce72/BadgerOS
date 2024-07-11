@@ -16,15 +16,16 @@ GDB               ?= $(CROSS_COMPILE)gdb
 include port/$(CONFIG_TARGET)/port.mk
 
 .PHONY: configure
-configure:
+configure:  $(BUILDDIR)/fs_root.c
 	mkdir -p '$(BUILDDIR)'
 	cmake -B '$(BUILDDIR)' "-DCMAKE_BUILD_TYPE=$${CMAKE_BUILD_TYPE:-Debug}"
 
-$(BUILDDIR)/fs_root.c: $(shell find '$(BADGER_RAMFS_ROOT)')
+$(BUILDDIR)/fs_root.c: $(shell find '$(BADGER_RAMFS_ROOT)' 2>/dev/null)
+	mkdir -p '$(BUILDDIR)'
 	../tools/ramfs-gen.py '$(BADGER_RAMFS_ROOT)' '$(BUILDDIR)/fs_root.c' init_ramfs
 
 .PHONY: build
-build: configure $(BUILDDIR)/fs_root.c
+build: configure
 	cmake --build '$(BUILDDIR)'
 	cmake --install '$(BUILDDIR)' --prefix '$(OUTPUT)'
 
