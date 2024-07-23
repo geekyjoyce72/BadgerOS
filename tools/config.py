@@ -160,6 +160,8 @@ if not cc_re:
 config["tc_prefix"] = cc_re.group(1)
 
 
+os.makedirs(".config", exist_ok=True)
+
 with open(".config/config.mk", "w") as fd:
     fd.write(f'# WARNING: This is a generated file, do not edit it!\n')
     for opt in config:
