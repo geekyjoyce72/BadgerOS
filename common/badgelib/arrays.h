@@ -105,7 +105,7 @@ static inline bool array_len_insert_n(
 ) {
     void **array_ptr = _array_ptr;
     if (array_len_resize(array_ptr, ent_size, ent_count_ptr, *ent_count_ptr + insert_count)) {
-        array_insert_n(*array_ptr, ent_size, *ent_count_ptr, insert, index, insert_count);
+        array_insert_n(*array_ptr, ent_size, *ent_count_ptr - insert_count, insert, index, insert_count);
         return true;
     }
     return false;
@@ -125,7 +125,7 @@ static inline bool
     array_len_insert(void *_array_ptr, size_t ent_size, size_t *ent_count_ptr, void const *insert, size_t index) {
     void **array_ptr = _array_ptr;
     if (array_len_resize(array_ptr, ent_size, ent_count_ptr, *ent_count_ptr + 1)) {
-        array_insert(*array_ptr, ent_size, *ent_count_ptr, insert, index);
+        array_insert(*array_ptr, ent_size, *ent_count_ptr - 1, insert, index);
         return true;
     }
     return false;
