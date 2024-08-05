@@ -9,7 +9,7 @@ include(../common/compiler.cmake)
 
 set(badge_cflags
     -ffreestanding
-    -fpie
+    -fpie -pie
     -march=${target_arch}              # Selects the target CPU.
     -mabi=${target_abi}                # Selects target ABI
     -nodefaultlibs -nostdlib           # Do not link any default libraries like libgcc or libc.
