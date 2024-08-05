@@ -170,10 +170,6 @@ static void idle_thread_function(void *arg) {
 
 // Returns the current thread without using a critical section.
 sched_thread_t *sched_get_current_thread_unsafe() {
-    if (!scheduler_enabled) {
-        return NULL;
-    }
-
     return isr_ctx_get()->thread;
 }
 
@@ -191,10 +187,7 @@ static void destroy_thread(sched_thread_t *thread) {
 }
 
 sched_thread_t *sched_get_current_thread(void) {
-    enter_critical_section();
-    sched_thread_t *const thread = sched_get_current_thread_unsafe();
-    leave_critical_section();
-    return thread;
+    return isr_ctx_get()->thread;
 }
 
 #include "rawprint.h"

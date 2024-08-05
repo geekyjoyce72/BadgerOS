@@ -102,7 +102,7 @@ def option_select(prompt: str, options: list, prefer=0):
 def find_compilers():
     global target
     candidates  = []
-    prefer_idx  = None
+    prefer_idx  = 0
     prefer_prio = 99999999
     for path in os.getenv("PATH").split(":"):
         path = os.path.abspath(path)
@@ -153,7 +153,7 @@ config["fp_spec"]  = handle_option_arg(args.fp_spec,  "float_spec", "float spec"
 config["vec_spec"] = handle_option_arg(args.vec_spec, "vec_spec",   "vector spec")
 
 config["target"]    = target
-cc_re = re.match("^(.+?)\w+$", config["compiler"])
+cc_re = re.match("^(.+?)\\w+$", config["compiler"])
 if not cc_re:
     print("ERROR: Cannot determine toolchain prefix")
     exit(1)
@@ -178,5 +178,5 @@ with open(".config/config.h", "w") as fd:
     fd.write(f'#pragma once\n')
     for opt in config:
         fd.write(f'#define CONFIG_{opt.upper()} "{config[opt]}"\n')
-        if re.match('^\w+$', config[opt]):
+        if re.match('^\\w+$', config[opt]):
             fd.write(f'#define CONFIG_{opt.upper()}_{config[opt]}\n')

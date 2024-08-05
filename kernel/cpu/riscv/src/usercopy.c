@@ -34,21 +34,29 @@ ptrdiff_t strlen_from_user_raw(process_t *process, size_t user_vaddr, ptrdiff_t 
     // String length loop.
     mpu_ctx_t *old_mpu = isr_ctx_get()->mpu_ctx;
     memprotect_swap(&process->memmap.mpu_ctx);
+#if !RISCV_M_MODE_KERNEL
     asm("csrs sstatus, %0" ::"r"((1 << RISCV_STATUS_SUM_BIT) | (1 << RISCV_STATUS_MXR_BIT)));
+#endif
     while (len < max_len && *(char const *)user_vaddr) {
         len++;
         user_vaddr++;
         if (user_vaddr % MEMMAP_PAGE_SIZE == 0) {
             // Check further page permissions.
+#if !RISCV_M_MODE_KERNEL
             asm("csrc sstatus, %0" ::"r"((1 << RISCV_STATUS_SUM_BIT) | (1 << RISCV_STATUS_MXR_BIT)));
+#endif
             if (!(proc_map_contains_raw(process, user_vaddr, 1) & MEMPROTECT_FLAG_R)) {
                 memprotect_swap(old_mpu);
                 return -1;
             }
+#if !RISCV_M_MODE_KERNEL
             asm("csrs sstatus, %0" ::"r"((1 << RISCV_STATUS_SUM_BIT) | (1 << RISCV_STATUS_MXR_BIT)));
+#endif
         }
     }
+#if !RISCV_M_MODE_KERNEL
     asm("csrc sstatus, %0" ::"r"((1 << RISCV_STATUS_SUM_BIT) | (1 << RISCV_STATUS_MXR_BIT)));
+#endif
 
     memprotect_swap(old_mpu);
     return len;

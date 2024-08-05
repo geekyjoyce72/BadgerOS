@@ -28,11 +28,11 @@ set(badge_cflags
 project(root C ASM)
 
 set(badge_include
+    ${CMAKE_CURRENT_LIST_DIR}/../common/badgelib/include
     ${CMAKE_CURRENT_LIST_DIR}/../common/include
-    ${CMAKE_CURRENT_LIST_DIR}/../common/badgelib
     ${CMAKE_CURRENT_LIST_DIR}/../.config
 )
-set(badge_libs crt)
+set(badge_libs crt badgelib)
 macro(badgeros_executable exec installdir)
     add_executable(${exec})
     target_compile_options(${exec} PRIVATE ${badge_cflags} -ffunction-sections)
@@ -42,5 +42,6 @@ macro(badgeros_executable exec installdir)
     install(TARGETS ${exec} RUNTIME DESTINATION ${installdir})
 endmacro()
 
+add_subdirectory(../common/badgelib badgelib)
 add_subdirectory(lib)
 add_subdirectory(sbin)

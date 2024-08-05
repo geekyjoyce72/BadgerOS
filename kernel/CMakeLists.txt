@@ -1,7 +1,8 @@
 
 # SPDX-License-Identifier: MIT
 
-cmake_minimum_required(VERSION 3.10.0)
+cmake_minimum_required(VERSION 3.13.0)
+cmake_policy(VERSION 3.13.0)
 
 # For IDE users.
 set(CMAKE_EXPORT_COMPILE_COMMANDS true)
@@ -64,12 +65,7 @@ project(badgeros C ASM)
 set(target badger-os.elf)
 add_executable(${target}
     ${CMAKE_CURRENT_LIST_DIR}/build/fs_root.c
-    ${CMAKE_CURRENT_LIST_DIR}/src/badgelib/arrays.c
-    ${CMAKE_CURRENT_LIST_DIR}/src/badgelib/badge_err.c
     ${CMAKE_CURRENT_LIST_DIR}/src/badgelib/badge_format_str.c
-    ${CMAKE_CURRENT_LIST_DIR}/src/badgelib/badge_strings.c
-    ${CMAKE_CURRENT_LIST_DIR}/src/badgelib/int_routines.c
-    ${CMAKE_CURRENT_LIST_DIR}/src/badgelib/list.c
     ${CMAKE_CURRENT_LIST_DIR}/src/badgelib/log.c
     ${CMAKE_CURRENT_LIST_DIR}/src/badgelib/mutex.c
     ${CMAKE_CURRENT_LIST_DIR}/src/badgelib/num_to_str.c
@@ -81,6 +77,8 @@ add_executable(${target}
     # ${CMAKE_CURRENT_LIST_DIR}/src/filesystem/vfs_fat.c
     ${CMAKE_CURRENT_LIST_DIR}/src/filesystem/vfs_ramfs.c
     ${CMAKE_CURRENT_LIST_DIR}/src/filesystem/vfs_internal.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/freestanding/int_routines.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/freestanding/string.c
     ${CMAKE_CURRENT_LIST_DIR}/src/hal/syscall_impl.c
     ${CMAKE_CURRENT_LIST_DIR}/src/malloc/malloc.c
     ${CMAKE_CURRENT_LIST_DIR}/src/malloc/static-buddy.c
@@ -100,7 +98,7 @@ add_executable(${target}
     ${cpu_src}
     ${port_src}
 )
-target_include_directories(${target} PRIVATE
+include_directories(
     ${CMAKE_CURRENT_LIST_DIR}/include
     ${CMAKE_CURRENT_LIST_DIR}/src/malloc
     ${CMAKE_CURRENT_LIST_DIR}/include/badgelib
@@ -112,20 +110,13 @@ target_include_directories(${target} PRIVATE
 )
 
 # Add libraries.
+add_subdirectory(../common/badgelib badgelib)
 add_subdirectory(lib/kbelf)
 target_compile_options(kbelf PRIVATE
     -include ${CMAKE_CURRENT_LIST_DIR}/include/loading/kbelf_pre.h
 )
-target_include_directories(kbelf PRIVATE
-    ${CMAKE_CURRENT_LIST_DIR}/include
-    ${CMAKE_CURRENT_LIST_DIR}/include/badgelib
-    ${CMAKE_CURRENT_LIST_DIR}/../common/include
-    ${CMAKE_CURRENT_LIST_DIR}/../common/badgelib
-    ${CMAKE_CURRENT_LIST_DIR}/../.config
-    ${cpu_include}
-    ${port_include}
-)
-target_link_libraries(${target} PRIVATE kbelf)
+target_link_libraries(kbelf PRIVATE badgelib)
+target_link_libraries(${target} PRIVATE kbelf badgelib)
 
 
 # Copy the BadgerOS binary to the output directory.

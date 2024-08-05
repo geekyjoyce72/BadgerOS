@@ -179,7 +179,7 @@ void sched_prepare_kernel_entry(sched_thread_t *thread, sched_entry_point_t entr
     thread->kernel_isr_ctx.regs.sp = thread->kernel_stack_top;
     thread->kernel_isr_ctx.regs.a0 = (size_t)arg;
     thread->kernel_isr_ctx.regs.ra = (size_t)sched_exit_self;
-    asm("sw gp, %0" ::"m"(thread->kernel_isr_ctx.regs.gp));
+    asm("mv %0, gp" : "=r"(thread->kernel_isr_ctx.regs.gp));
 }
 
 // Prepares a pair of contexts to be invoked as a userland thread.
@@ -188,7 +188,7 @@ void sched_prepare_user_entry(sched_thread_t *thread, sched_entry_point_t entry_
     // Initialize kernel registers.
     mem_set(&thread->kernel_isr_ctx.regs, 0, sizeof(thread->kernel_isr_ctx.regs));
     thread->kernel_isr_ctx.regs.sp = thread->kernel_stack_top;
-    asm("sw gp, %0" ::"m"(thread->kernel_isr_ctx.regs.gp));
+    asm("mv %0, gp" : "=r"(thread->kernel_isr_ctx.regs.gp));
 
     // Initialize userland registers.
     mem_set(&thread->user_isr_ctx.regs, 0, sizeof(thread->user_isr_ctx.regs));
