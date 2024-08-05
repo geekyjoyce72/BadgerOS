@@ -150,14 +150,14 @@ void proc_unmap_raw(badge_err_t *ec, process_t *proc, size_t base) {
 
 // Whether the process owns this range of virtual memory.
 // Returns the lowest common denominator of the access bits.
-uint32_t proc_map_contains_raw(process_t *proc, size_t vaddr, size_t size) {
+int proc_map_contains_raw(process_t *proc, size_t vaddr, size_t size) {
     if (vaddr >= mmu_high_vaddr || vaddr + size > mmu_high_vaddr) {
         return 0;
     }
-    uint32_t flags = MEMPROTECT_FLAG_RWX;
+    int flags = MEMPROTECT_FLAG_RWX;
     while (true) {
         virt2phys_t info  = memprotect_virt2phys(&proc->memmap.mpu_ctx, vaddr);
-        flags            &= info.flags;
+        flags            &= (int)info.flags;
         if (!flags) {
             return 0;
         }
@@ -271,7 +271,7 @@ void proc_unmap_raw(badge_err_t *ec, process_t *proc, size_t base) {
 
 // Whether the process owns this range of virtual memory.
 // Returns the lowest common denominator of the access bits.
-uint32_t proc_map_contains_raw(process_t *proc, size_t vaddr, size_t size) {
+int proc_map_contains_raw(process_t *proc, size_t vaddr, size_t size) {
     // Align to whole pages.
     if (vaddr % MEMMAP_PAGE_SIZE) {
         size  += vaddr % MEMMAP_PAGE_SIZE;
@@ -281,7 +281,7 @@ uint32_t proc_map_contains_raw(process_t *proc, size_t vaddr, size_t size) {
         size += MEMMAP_PAGE_SIZE - size % MEMMAP_PAGE_SIZE;
     }
 
-    uint32_t access = 7;
+    int access = 7;
     while (size) {
         size_t i;
         for (i = 0; i < proc->memmap.regions_len; i++) {

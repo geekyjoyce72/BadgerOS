@@ -82,7 +82,10 @@ use_default = args.use_default
 def option_select(prompt: str, options: list, prefer=0):
     global use_default
     prefer += 1
-    if len(options) == 1:
+    if len(options) == 0:
+        print(f"Error: No valid {prompt}s found")
+        exit(1)
+    elif len(options) == 1:
         return options[0]
     elif use_default:
         return options[prefer-1]
@@ -102,7 +105,7 @@ def option_select(prompt: str, options: list, prefer=0):
 def find_compilers():
     global target
     candidates  = []
-    prefer_idx  = 0
+    prefer_idx  = 1
     prefer_prio = 99999999
     for path in os.getenv("PATH").split(":"):
         path = os.path.abspath(path)
