@@ -102,6 +102,12 @@ bool kbelfx_seg_alloc(kbelf_inst inst, size_t segs_len, kbelf_segment *segs) {
     if (!vaddr_real)
         return false;
 
+    if (!kbelf_inst_is_pie(inst) && vaddr_real != min_addr) {
+        logkf(LOG_ERROR, "Unable to satify virtual address request for non-PIE executable");
+        proc_unmap_raw(NULL, proc, vaddr_real);
+        return false;
+    }
+
     for (size_t i = 0; i < segs_len; i++) {
         segs[i].vaddr_real   = segs[i].vaddr_req - min_addr + vaddr_real;
         segs[i].paddr        = segs[i].vaddr_real;
