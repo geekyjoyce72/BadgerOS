@@ -26,12 +26,20 @@ After that, see [Project structure](./docs/project_structure.md) for reference a
 
 
 # Prerequisites
+All of:
 - `git`
 - `build-essential`
 - `cmake`
-- `gcc-riscv64-linux-gnu`
+- A RISC-V toolchain, one of:
+    - [BadgerOS buildroot](https://github.com/badgeteam/mch2025-badgeros-buildroot), preferably riscv64
+    - `gcc-riscv64-linux-gnu` (ubuntu) / `riscv64-gnu-toolchain-glibc-bin` (arch)
 - `python3`
 - `picocom`
+## For RISC-V PC port
+If you don't know what this is, you don't need this. All of:
+- `mtools`
+- `swig`
+- `gptfdisk`
 
 
 
@@ -39,11 +47,11 @@ After that, see [Project structure](./docs/project_structure.md) for reference a
 The build system is based on Makefiles and CMake.
 The following commands can be used to perform relevant actions:
 
-To select target chip, choose one of:
-- `export BADGEROS_PORT=esp32p4`
-- `export BADGEROS_PORT=esp32c6` (default)
-
-Before building, first run: `make prepare`
+To select target platform, choose one of:
+- `make config` (manual configuration)
+- `make hh24_defconfig` (HackerHotel 2024 badge)
+- `make why2025_defconfig` (WHY2025 badge)
+- `make unmatched_defconfig` (RISC-V PC port)
 
 To build: `make build`
 
@@ -58,19 +66,3 @@ To build, flash and open picocom: `make` or `make all`
 To check code style: `make clang-format-check` (code formatting) and `make clang-tidy-check` (programming guidelines)
 
 Build artifacts will be put into the `kernel/firmware` folder once the project was successfully built.
-
-
-
-# Credits
-Contributors
-| Nickname       | Name                  | Components
-| :------------- | :-------------------- | :---------
-| RobotMan2412   | Julian Scheffers      | CPU low-level, peripheral low-level
-| TMM2K          | Hein-Pieter van Braam | Memory management
-| Quantumcatgirl | Joyce Ng Rui Lin      | Filesystems
-
-Ex-contributors
-| Nickname     | Name                  | Components
-| :----------- | :-------------------- | :---------
-| Ronaksm      | Ronak S. Manani       | SPI research
-| ikskuh       | Felix queißner        | Continuous integration, temporary scheduler
