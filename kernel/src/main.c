@@ -21,9 +21,6 @@
 
 
 
-// The initial kernel stack.
-extern char          stack_bottom[] asm("__stack_bottom");
-extern char          stack_top[] asm("__stack_top");
 // When set, a shutdown is initiated.
 // 0: Do nothing.
 // 1: Shut down (default).
@@ -100,21 +97,16 @@ void basic_runtime_init() {
     // Kernel memory allocator initialization.
     kernel_heap_init();
 
-    // Scheduler initialization.
+    // Global scheduler initialization.
     sched_init();
+
     // Housekeeping thread initialization.
     hk_init();
     // Add the remainder of the kernel lifetime as a new thread.
-    sched_thread_t *thread = sched_create_kernel_thread(
-        &ec,
-        kernel_lifetime_func,
-        NULL,
-        stack_bottom,
-        stack_top - stack_bottom,
-        SCHED_PRIO_NORMAL
-    );
+    tid_t thread = thread_new_kernel(&ec, "main", (void *)kernel_lifetime_func, NULL, SCHED_PRIO_NORMAL);
     badge_err_assert_always(&ec);
-    sched_resume_thread(&ec, thread);
+    thread_resume(&ec, thread);
+    thread_resume(&ec, thread);
     badge_err_assert_always(&ec);
 
     // Start the scheduler and enter the next phase in the kernel's lifetime.
