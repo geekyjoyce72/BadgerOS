@@ -439,10 +439,12 @@ void *buddy_allocate(size_t size, enum block_type type, uint32_t flags) {
             break;
         }
 
-        // NOLINTNEXTLINE
-        if (size > (1 << allocation_order) - pool->max_order_waste) {
-            BADGEROS_MALLOC_MSG_WARN("buddy_allocate(" FMT_ZI ") = NULL (Allocation too large)", size);
-            continue;
+        if (allocation_order == pool->max_order) {
+            // NOLINTNEXTLINE
+            if (size > (1 << allocation_order) - pool->max_order_waste) {
+                BADGEROS_MALLOC_MSG_WARN("buddy_allocate(" FMT_ZI ") = NULL (Allocation too large)", size);
+                continue;
+            }
         }
 
         block = pool_find_block(pool, allocation_order, pages);
