@@ -5,19 +5,16 @@
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
-// NOLINTBEGIN
-#define STDLIB_H
-#define _STDLIB_H
-#define __STDLIB_H
-// NOLINTEND
 #include "hal/gpio_ll.h"
 #include "soc/gpio_sig_map.h"
 #pragma GCC diagnostic pop
 
+#include "soc/io_mux_struct.h"
+
 #include <config.h>
 
 #ifdef CONFIG_TARGET_esp32c6
-#include "soc/io_mux_struct.h"
+#define io_mux_gpio_reg_t io_mux_gpio_t
 #endif
 
 
@@ -116,12 +113,7 @@ io_pull_t io_getpull(badge_err_t *ec, int pin) {
         return IO_PULL_NONE;
     }
     badge_err_set_ok(ec);
-#ifdef CONFIG_TARGET_esp32c6
-    io_mux_gpio_t tmp = IO_MUX.gpio[pin];
-#endif
-#ifdef CONFIG_TARGET_esp32p4
-    iomux_gpio_reg_t tmp = IOMUX.gpio[pin];
-#endif
+    io_mux_gpio_reg_t tmp = IO_MUX.gpio[pin];
     if (tmp.mcu_wpu) {
         return IO_PULL_UP;
     } else if (tmp.mcu_wpd) {

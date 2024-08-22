@@ -27,14 +27,16 @@ set(common_compiler_flags
     -march=${target_arch}              # Selects the target CPU.
     -mabi=${target_abi}                # Selects target ABI
     -nodefaultlibs                     # Do not link any default libraries like libgcc or libc.
-    -O2                                # Optimize the code.
+    -O0                                # Optimize the code.
     -ggdb                              # Generate debug information in default extended format.
     -Werror=return-type                # Error when a function doesn't return a value, but declares to do so.
     -Werror=implicit-fallthrough
+    -Werror=int-conversion
     -Wall -Wextra                      # Ramp up warning level.
+    -Wno-missing-braces
     -std=gnu11                         # We use the C11 standard
     -DBADGEROS_KERNEL                  # Tell the code we're building for the kernel
-    -DBADGEROS_MALLOC_DEBUG_LEVEL=3    # Malloc debug level set to WARN
+    -DBADGEROS_MALLOC_DEBUG_LEVEL=2    # Malloc debug level set to WARN
     -DSOFTBIT                          # Turn on our emulated bit operations
     -fno-omit-frame-pointer            # Always use frame pointer
     -ffunction-sections
@@ -45,10 +47,6 @@ if("${CMAKE_BUILD_TYPE}" MATCHES "Release")
 message("Building in release mode")
 else()
 message("Building in debug mode")
-set(common_compiler_flags ${common_compiler_flags}
-    -fsanitize=undefined               # Adds sanitizer for undefined behaviour.
-    -fsanitize-undefined-trap-on-error
-)
 endif()
 
 # we must pass the same options to GCC and LD when using LTO, as the linker will actually do the codegen
@@ -70,8 +68,10 @@ add_executable(${target}
     ${CMAKE_CURRENT_LIST_DIR}/src/badgelib/mutex.c
     ${CMAKE_CURRENT_LIST_DIR}/src/badgelib/num_to_str.c
     ${CMAKE_CURRENT_LIST_DIR}/src/badgelib/rawprint.c
+    
     ${CMAKE_CURRENT_LIST_DIR}/src/blockdevice/blkdev_ram.c
     ${CMAKE_CURRENT_LIST_DIR}/src/blockdevice/blockdevice.c
+    
     ${CMAKE_CURRENT_LIST_DIR}/src/filesystem/filesystem.c
     ${CMAKE_CURRENT_LIST_DIR}/src/filesystem/syscall_impl.c
     # ${CMAKE_CURRENT_LIST_DIR}/src/filesystem/vfs_fat.c
@@ -80,21 +80,26 @@ add_executable(${target}
     ${CMAKE_CURRENT_LIST_DIR}/src/freestanding/int_routines.c
     ${CMAKE_CURRENT_LIST_DIR}/src/freestanding/string.c
     ${CMAKE_CURRENT_LIST_DIR}/src/hal/syscall_impl.c
+    
     ${CMAKE_CURRENT_LIST_DIR}/src/malloc/malloc.c
     ${CMAKE_CURRENT_LIST_DIR}/src/malloc/static-buddy.c
     ${CMAKE_CURRENT_LIST_DIR}/src/malloc/slab-alloc.c
+    
     ${CMAKE_CURRENT_LIST_DIR}/src/process/kbelfx.c
     ${CMAKE_CURRENT_LIST_DIR}/src/process/proc_memmap.c
     ${CMAKE_CURRENT_LIST_DIR}/src/process/process.c
     ${CMAKE_CURRENT_LIST_DIR}/src/process/sighandler.c
     ${CMAKE_CURRENT_LIST_DIR}/src/process/syscall_impl.c
     ${CMAKE_CURRENT_LIST_DIR}/src/process/syscall_util.c
+    
     ${CMAKE_CURRENT_LIST_DIR}/src/scheduler/scheduler.c
     ${CMAKE_CURRENT_LIST_DIR}/src/scheduler/syscall_impl.c
+    
     ${CMAKE_CURRENT_LIST_DIR}/src/housekeeping.c
     ${CMAKE_CURRENT_LIST_DIR}/src/main.c
     ${CMAKE_CURRENT_LIST_DIR}/src/page_alloc.c
     ${CMAKE_CURRENT_LIST_DIR}/src/syscall.c
+    
     ${cpu_src}
     ${port_src}
 )
@@ -108,6 +113,7 @@ include_directories(
     ${cpu_include}
     ${port_include}
 )
+include_directories(SYSTEM ${port_system_include})
 
 # Add libraries.
 add_subdirectory(../common/badgelib badgelib)

@@ -4,6 +4,7 @@
 #include "cpu/mmu.h"
 
 #include "assertions.h"
+#include "badge_strings.h"
 #include "cpu/panic.h"
 #include "interrupt.h"
 #include "isr_ctx.h"
@@ -25,6 +26,8 @@ size_t mmu_half_size;
 size_t mmu_hhdm_size;
 // Number of page table levels.
 int    mmu_levels;
+// Whether RISC-V Svpbmt is supported.
+bool   mmu_svpbmt;
 
 
 
@@ -42,16 +45,47 @@ static inline void pmem_store(size_t paddr, size_t data) {
 
 
 
+// Whether a certain DTB MMU type is supported.
+bool mmu_dtb_supported(char const *type) {
+    if (cstr_equals(type, "riscv,sv39")) {
+        return mmu_levels <= 3;
+    } else if (cstr_equals(type, "riscv,sv48")) {
+        return mmu_levels <= 4;
+    } else if (cstr_equals(type, "riscv,sv57")) {
+        return mmu_levels <= 5;
+    } else {
+        return false;
+    }
+}
+
 // MMU-specific init code.
-void mmu_init() {
+void mmu_early_init() {
     // Read paging mode from SATP.
     riscv_satp_t satp;
     asm("csrr %0, satp" : "=r"(satp));
     mmu_levels     = satp.mode - RISCV_SATP_SV39 + 3;
     mmu_half_size  = 1LLU << (11 + 9 * mmu_levels);
     mmu_high_vaddr = -mmu_half_size;
-    logkf_from_isr(LOG_DEBUG, "Paging levels:    %{d}", mmu_levels);
-    logkf_from_isr(LOG_DEBUG, "Higher half addr: %{size;x}", mmu_high_vaddr);
+}
+
+// MMU-specific init code.
+void mmu_init() {
+    // Get a dummy page to do testing on.
+    size_t va = memprotect_alloc_vaddr(MMU_PAGE_SIZE);
+    size_t pa = memprotect_kernel_vpn * MMU_PAGE_SIZE;
+    assert_always(va);
+
+    // Check for Svpbmt.
+    mmu_svpbmt = true;
+    assert_always(memprotect_k(va, pa, MMU_PAGE_SIZE, MEMPROTECT_FLAG_R | MEMPROTECT_FLAG_IO));
+    uint8_t dummy;
+    mmu_svpbmt = isr_noexc_copy_u8(&dummy, (uint8_t const *)pa);
+    assert_always(memprotect_k(va, pa, MMU_PAGE_SIZE, 0));
+    if (mmu_svpbmt) {
+        logkf(LOG_INFO, "MMU supports Svpbmt");
+    }
+
+    memprotect_free_vaddr(va);
 }
 
 // Read a PTE from the page table.
@@ -74,13 +108,13 @@ void memprotect_swap_from_isr() {
 // Swap in memory protections for a given context.
 void memprotect_swap(mpu_ctx_t *mpu) {
     mpu               = mpu ?: &mpu_global_ctx;
-    bool         ie   = irq_enable(false);
+    bool         ie   = irq_disable();
     riscv_satp_t satp = {
         .ppn  = mpu->root_ppn,
         .asid = 0,
         .mode = RISCV_SATP_SV39 + mmu_levels - 3,
     };
-    asm("csrw satp, %0; sfence.vma" ::"r"(satp));
+    asm volatile("csrw satp, %0; sfence.vma" ::"r"(satp) : "memory");
     isr_ctx_get()->mpu_ctx = mpu;
-    irq_enable(ie);
+    irq_enable_if(ie);
 }

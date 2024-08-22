@@ -7,16 +7,14 @@ set(target_arch "rv32imafc_zicsr_zifencei")
 set(target_abi "ilp32")
 
 set(cpu_riscv_enable_pmp true)
+set(cpu_multicore true)
 
 set(port_src
-    # ${CMAKE_CURRENT_LIST_DIR}/src/hal/gpio.c
-    # ${CMAKE_CURRENT_LIST_DIR}/src/hal/i2c.c
-    
-    # ${CMAKE_CURRENT_LIST_DIR}/src/clkconfig.c
     ${CMAKE_CURRENT_LIST_DIR}/src/interrupt.c
     ${CMAKE_CURRENT_LIST_DIR}/src/memprotect.c
     ${CMAKE_CURRENT_LIST_DIR}/src/pmu_init.c
     ${CMAKE_CURRENT_LIST_DIR}/src/port.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/smp.c
 )
 set(port_include
     ${CMAKE_CURRENT_LIST_DIR}/include
@@ -31,3 +29,4 @@ set(port_flags
 )
 
 include(port/esp_common/CMakeLists.txt)
+set_target_properties(${target} PROPERTIES LINK_DEPENDS ${CMAKE_CURRENT_LIST_DIR}/linker.ld)

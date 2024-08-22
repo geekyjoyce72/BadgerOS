@@ -53,7 +53,7 @@ static void run_sighandler(int signum, uint64_t cause) {
     sched_thread_t  *thread = sched_current_thread_unsafe();
     process_t *const proc   = thread->process;
     // Check for signal handler.
-    if (proc->sighandlers[signum] == SIG_DFL) {
+    if (signum == SIGKILL || proc->sighandlers[signum] == SIG_DFL) {
         if ((SIG_DFL_KILL_MASK >> signum) & 1) {
             // Process didn't catch a signal that kills it.
             mutex_acquire(NULL, &log_mtx, TIMESTAMP_US_MAX);
@@ -80,7 +80,7 @@ static void run_sighandler(int signum, uint64_t cause) {
 }
 
 // Kernel side of the signal handler.
-// Called in the kernel side of a used thread when a signal might be queued.
+// Called in the kernel side of a user thread when a signal might be queued.
 void proc_signal_handler() {
     process_t *const proc = proc_current();
     mutex_acquire(NULL, &proc->mtx, TIMESTAMP_US_MAX);
@@ -93,7 +93,7 @@ void proc_signal_handler() {
     } else {
         mutex_release(NULL, &proc->mtx);
     }
-    irq_enable(false);
+    irq_disable();
     sched_lower_from_isr();
     isr_context_switch();
     __builtin_unreachable();
@@ -140,7 +140,7 @@ static void trap_signal_handler(int signum, uint64_t cause) {
         // If the thread isn't running a signal handler, run the appropriate one.
         run_sighandler(signum, cause);
     }
-    irq_enable(false);
+    irq_disable();
     sched_lower_from_isr();
     isr_context_switch();
     __builtin_unreachable();

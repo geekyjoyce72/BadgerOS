@@ -161,6 +161,31 @@ FAKE_OPER(di_t, __muldi3, *)
 FAKE_OPER(ti_t, __multi3, *)
 #endif
 
+
+#define BSWP_FUNC(type, name)                                                                                          \
+    type name(type a) {                                                                                                \
+        union {                                                                                                        \
+            type packed;                                                                                               \
+            char arr[sizeof(type)];                                                                                    \
+        } in;                                                                                                          \
+        union {                                                                                                        \
+            type packed;                                                                                               \
+            char arr[sizeof(type)];                                                                                    \
+        } out;                                                                                                         \
+        in.packed = a;                                                                                                 \
+        for (unsigned i = 0; i < sizeof(type); i++) {                                                                  \
+            out.arr[sizeof(type) - i - 1] = in.arr[i];                                                                 \
+        }                                                                                                              \
+        return out.packed;                                                                                             \
+    }
+
+BSWP_FUNC(si_t, __bswapsi2)
+BSWP_FUNC(di_t, __bswapdi2)
+#ifdef do_ti_math
+BSWP_FUNC(ti_t, __bswapti2)
+#endif
+
+
 // The `__clz*` count leading zero functions count how many zeroes are present, starting at the MSB.
 // They first convert a number into a bitmask where only bit above the most significant set bit is set.
 // This is then multiplied with a de Bruijn sequence to get a unique index in the most significant bits.

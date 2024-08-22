@@ -45,6 +45,9 @@ void kernel_reg_dump_arr(size_t const *arr) {
 // Print a register dump given isr_ctx_t.
 void isr_ctx_dump(isr_ctx_t const *ctx) {
     kernel_reg_dump_arr((size_t const *)&ctx->regs);
+    rawprint("  HARTID    ");
+    rawprinthex(ctx->cpulocal->cpuid, sizeof(size_t) * 2);
+    rawputc('\n');
     DUMP_CSR("  STATUS    ", CSR_STATUS_STR)
     DUMP_CSR("  CAUSE     ", CSR_CAUSE_STR)
 #if RISCV_M_MODE_KERNEL
@@ -104,7 +107,7 @@ bool isr_noexc_run(isr_noexc_t code, isr_catch_t trap_handler, void *cookie) {
     };
 
     // Set up for custom trap handler.
-    bool       ie       = irq_enable(false);
+    bool       ie       = irq_disable();
     isr_ctx_t *kctx     = isr_ctx_get();
     kctx->noexc_cb      = isr_noexc_wrapper;
     kctx->noexc_cookie  = &data;
@@ -123,7 +126,7 @@ bool isr_noexc_run(isr_noexc_t code, isr_catch_t trap_handler, void *cookie) {
 
     kctx->flags &= ~ISR_CTX_FLAG_NOEXC;
 
-    irq_enable(ie);
+    irq_enable_if(ie);
     return data.had_trap;
 }
 

@@ -32,6 +32,10 @@ typedef struct sched_cpulocal_t sched_cpulocal_t;
 
 // Global scheduler initialization.
 void sched_init();
+// Power on and start scheduler on secondary CPUs.
+void sched_start_altcpus();
+// Power on and start scheduler on another CPU.
+bool sched_start_on(int cpu);
 // Start executing the scheduler on this CPU.
 void sched_exec() NORETURN;
 // Exit the scheduler and subsequenty shut down the CPU.
@@ -48,7 +52,7 @@ tid_t thread_new_kernel(badge_err_t *ec, char const *name, sched_entry_t entry_p
 // Do not wait for thread to be joined; clean up immediately.
 void  thread_detach(badge_err_t *ec, tid_t thread);
 
-// Pauses execution of the thread.
+// Pauses execution of a user thread.
 void thread_suspend(badge_err_t *ec, tid_t thread);
 // Resumes a previously suspended thread or starts it.
 void thread_resume(badge_err_t *ec, tid_t thread);

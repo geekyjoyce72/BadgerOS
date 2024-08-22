@@ -49,7 +49,7 @@ enum { TRAPNAMES_LEN = sizeof(trapnames) / sizeof(trapnames[0]) };
 // Kill a process from a trap / ISR.
 static void kill_proc_on_trap() {
     proc_exit_self(-1);
-    isr_global_disable();
+    irq_disable();
     sched_lower_from_isr();
     isr_context_switch();
     __builtin_unreachable();
@@ -213,15 +213,17 @@ void riscv_trap_handler() {
 
 // Return a value from the syscall handler.
 void syscall_return(long long value) {
-    sched_thread_t *thread  = isr_ctx_get()->thread;
-    isr_ctx_t      *usr     = &thread->user_isr_ctx;
-    usr->regs.a0            = value;
-    usr->regs.a1            = value >> 32;
-    usr->regs.pc           += 4;
+    sched_thread_t *thread = isr_ctx_get()->thread;
+    isr_ctx_t      *usr    = &thread->user_isr_ctx;
+    usr->regs.a0           = value;
+#if __riscv_xlen == 32
+    usr->regs.a1 = value >> 32;
+#endif
+    usr->regs.pc += 4;
     if (proc_signals_pending_raw(thread->process)) {
         proc_signal_handler();
     }
-    irq_enable(false);
+    irq_disable();
     sched_lower_from_isr();
     isr_context_switch();
     __builtin_unreachable();
