@@ -1,6 +1,7 @@
 
 // SPDX-License-Identifier: MIT
 
+#include "assertions.h"
 #include "cpu/panic.h"
 #include "filesystem.h"
 #include "housekeeping.h"

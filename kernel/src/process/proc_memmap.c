@@ -142,10 +142,39 @@ error:
 
 // Release memory allocated to a process.
 void proc_unmap_raw(badge_err_t *ec, process_t *proc, size_t base) {
-    (void)ec;
-    (void)proc;
-    (void)base;
-    logk(LOG_WARN, "TODO: proc_unmap_raw");
+    // Search the memory map for the specified region.
+    proc_memmap_ent_t dummy = {.vaddr = base};
+    array_binsearch_t res   = array_binsearch(
+        proc->memmap.regions,
+        sizeof(proc_memmap_ent_t),
+        proc->memmap.regions_len,
+        &dummy,
+        proc_memmap_cmp
+    );
+    if (!res.found) {
+        badge_err_set(ec, ELOC_PROCESS, ECAUSE_NOTFOUND);
+        return;
+    }
+
+    // Remove the region from the memory map.
+    proc_memmap_ent_t removed;
+    array_lencap_remove(
+        &proc->memmap.regions,
+        sizeof(proc_memmap_ent_t),
+        &proc->memmap.regions_len,
+        &proc->memmap.regions_cap,
+        &removed,
+        res.index
+    );
+
+    // Remove it from the MMU.
+    assert_dev_keep(memprotect_u(&proc->memmap, &proc->memmap.mpu_ctx, removed.vaddr, 0, removed.size, 0));
+    memprotect_commit(&proc->memmap.mpu_ctx);
+
+    // Free the memory from PMM.
+    phys_page_free(removed.paddr / MEMMAP_PAGE_SIZE);
+
+    badge_err_set_ok(ec);
 }
 
 // Whether the process owns this range of virtual memory.

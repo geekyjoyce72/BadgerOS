@@ -129,6 +129,7 @@ int smp_cur_cpu() {
 
 // Get the SMP CPU index from the CPU ID value.
 int smp_get_cpu(size_t cpuid) {
+    return 0;
     smp_map_t         dummy = {.cpuid = cpuid};
     array_binsearch_t res   = array_binsearch(smp_map, sizeof(smp_map_t), smp_map_len, &dummy, smp_cpuid_cmp);
     if (res.found) {

@@ -6,6 +6,7 @@
 #include "assertions.h"
 #include "cpu/mmu.h"
 #include "cpu/panic.h"
+#include "interrupt.h"
 #include "isr_ctx.h"
 #include "limine.h"
 #include "memprotect.h"
@@ -196,6 +197,12 @@ void port_init() {
         logkf_from_isr(LOG_DEBUG, "Adding memory at 0x%{size;x}-0x%{size;x}", base, base + len - 1);
         init_pool((void *)(base + mmu_hhdm_vaddr), (void *)(base + len + mmu_hhdm_vaddr), 0);
     }
+}
+
+// Power off.
+void port_poweroff(bool restart) {
+    irq_disable();
+    while (1);
 }
 
 // Send a single character to the log output.
