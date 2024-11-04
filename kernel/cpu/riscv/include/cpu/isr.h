@@ -29,35 +29,25 @@
 // clang-format on
 #else
 // Interrupt vector table implemented in ASM.
-extern uint32_t riscv_interrupt_vector_table[32];
+extern uint32_t const riscv_interrupt_vector_table[32];
 // Callback from ASM to platform-specific interrupt handler.
-extern void     riscv_interrupt_handler();
-// Signature for system call handler.
-#define SYSCALL_HANDLER_SIGNATURE                                                                                      \
-    void syscall_handler(long a0, long a1, long a2, long a3, long a4, long a5, long a6, long sysnum)
-// Suppress unused arguments warning for syscall implementation.
-#define SYSCALL_HANDLER_IGNORE_UNUSED (void)a0, (void)a1, (void)a2, (void)a3, (void)a4, (void)a5, (void)a6, (void)sysnum
-// Callback from ASM to syscall implementation.
-extern SYSCALL_HANDLER_SIGNATURE;
+extern void           riscv_interrupt_handler();
+// ASM system call wrapper function.
+extern void           riscv_syscall_wrapper();
 // Callback from ASM on non-syscall trap.
-extern void riscv_trap_handler();
+extern void           riscv_trap_handler();
 // Return a value from the syscall handler.
-extern void syscall_return(long long value) __attribute__((noreturn));
+extern void           syscall_return(long long value) __attribute__((noreturn));
 
-// Disable interrupts and return whether they were enabled.
-static inline bool isr_global_disable() {
-    uint32_t mstatus;
-    asm volatile("csrr %0, mstatus" : "=r"(mstatus));
-    asm volatile("csrc mstatus, %0" ::"r"((1U << RISCV_STATUS_MIE_BIT)));
-    return mstatus & (1U << RISCV_STATUS_MIE_BIT);
-}
-// Enable interrupts.
-static inline void isr_global_enable() {
-    asm volatile("csrs mstatus, %0" ::"r"((1U << RISCV_STATUS_MIE_BIT)));
-}
-// Explicit context switch from M-mode.
+// Explicit context switch from kernel.
 // Interrupts must be disabled on entry and will be re-enabled on exit.
 // If the context switch target is not set, this is a NOP.
-extern void isr_context_switch();
+extern void        isr_context_switch();
+// Pause the CPU briefly.
+static inline void isr_pause() {
+    // RISC-V Zihintpause instruction.
+    // This is a fence with PRED=W and SUCC=none.
+    asm(".word 0x0100000f");
+}
 
 #endif

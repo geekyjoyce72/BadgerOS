@@ -1,0 +1,1 @@
+include(cpu/riscv/CMakeLists.txt)

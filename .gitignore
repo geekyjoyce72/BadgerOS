@@ -7,3 +7,4 @@ firmware/
 app/
 root/
 .venv/
+.config

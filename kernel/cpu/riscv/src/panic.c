@@ -3,16 +3,22 @@
 
 #include "cpu/panic.h"
 
+#include "backtrace.h"
 #include "interrupt.h"
 #include "isr_ctx.h"
 #include "log.h"
 #include "rawprint.h"
 
+void abort() {
+    panic_abort();
+}
+
 // Call this function when and only when the kernel has encountered a fatal error.
 // Prints register dump for current kernel context and jumps to `panic_poweroff`.
 void panic_abort() {
-    irq_enable(false);
+    irq_disable();
     logkf_from_isr(LOG_FATAL, "`panic_abort()` called!");
+    backtrace();
     kernel_cur_regs_dump();
     panic_poweroff();
 }
@@ -21,6 +27,6 @@ void panic_abort() {
 // Immediately power off or reset the system.
 void panic_poweroff() {
     rawprint("**** KERNEL PANIC ****\nhalted\n");
-    asm volatile("csrci mstatus, 0xa");
+    asm volatile("csrci " CSR_STATUS_STR ", %0" ::"ri"(1 << CSR_STATUS_IE_BIT));
     while (1) asm volatile("wfi");
 }

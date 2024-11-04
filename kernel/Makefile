@@ -1,54 +1,55 @@
 
 # SPDX-License-Identifier: MIT
 
+CONFIG_PATH       ?= ../.config/config.mk
+include $(CONFIG_PATH)
+
 MAKEFLAGS         += --silent
-IDF_PATH          ?= $(shell pwd)/../esp-idf
 SHELL             := /usr/bin/env bash
-PORT              ?= $(shell find /dev/ -name ttyUSB* -or -name ttyACM* 2>/dev/null | head -1)
 OUTPUT            ?= $(shell pwd)/firmware
 BUILDDIR          ?= build
 BADGER_RAMFS_ROOT ?= ../files/root
-BADGEROS_PORT     ?= esp32c6
+CROSS_COMPILE      = $(CONFIG_TC_PREFIX)
+GDB               ?= $(CROSS_COMPILE)gdb
+CLANG_FORMAT      ?= clang-format-18
+CLANG_TIDY        ?= clang-tidy-18
 
-.PHONY: all clean-tools clean configure build flash monitor test clang-format-check clang-tidy-check openocd gdb
+include port/$(CONFIG_TARGET)/port.mk
 
-all: build flash monitor
-
-configure:
+.PHONY: cmake-configure
+cmake-configure:  $(BUILDDIR)/fs_root.c
 	mkdir -p '$(BUILDDIR)'
-	touch '$(BUILDDIR)/fs_root.c'
 	cmake -B '$(BUILDDIR)' "-DCMAKE_BUILD_TYPE=$${CMAKE_BUILD_TYPE:-Debug}"
 
-build: configure
+$(BUILDDIR)/fs_root.c: $(shell find '$(BADGER_RAMFS_ROOT)' 2>/dev/null)
+	mkdir -p '$(BUILDDIR)'
 	../tools/ramfs-gen.py '$(BADGER_RAMFS_ROOT)' '$(BUILDDIR)/fs_root.c' init_ramfs
+
+.PHONY: build
+build: cmake-configure
 	cmake --build '$(BUILDDIR)'
 	cmake --install '$(BUILDDIR)' --prefix '$(OUTPUT)'
 
-clang-format-check: configure
-	echo "clang-format check the following files:"
-	jq -r '.[].file' build/compile_commands.json | grep '\.[ch]$$'
-	echo "analysis results:"
-	clang-format-18 --dry-run $(shell jq -r '.[].file' build/compile_commands.json | grep '\.[ch]$$')
-
-clang-tidy-check: configure
-	echo "clang-tidy check the following files:"
-	jq -r '.[].file' build/compile_commands.json | grep '\.[ch]$$'
-	echo "analysis results:"
-	clang-tidy-18 -p build $(shell jq -r '.[].file' build/compile_commands.json | grep '\.[ch]$$') --warnings-as-errors="*"
-
-openocd:
-	openocd -c 'set ESP_RTOS "none"' -f board/$(BADGEROS_PORT)-builtin.cfg
-
-gdb:
-	riscv32-unknown-elf-gdb -x port/$(BADGEROS_PORT)/gdbinit build/badger-os.elf
-
-clean-all: clean
+.PHONY: clean
 clean:
 	rm -rf "$(BUILDDIR)"
 
-flash: build
-	./port/$(BADGEROS_PORT)/flash.sh '$(PORT)' '$(OUTPUT)'
+.PHONY: clang-format-check
+clang-format-check: cmake-configure
+	echo "clang-format check the following files:"
+	jq -r '.[].file' build/compile_commands.json | grep '\.[ch]$$'
+	echo "analysis results:"
+	$(CLANG_FORMAT) --dry-run $(shell jq -r '.[].file' build/compile_commands.json | grep '\.[ch]$$')
 
-monitor:
-	echo -e "\033[1mType ^A^X to exit.\033[0m"
-	picocom -q -b 115200 '$(PORT)' | ../tools/address-filter.py '$(OUTPUT)/badger-os.elf'; echo -e '\033[0m'
+.PHONY: clang-tidy-check
+clang-tidy-check: cmake-configure
+	echo "clang-tidy check the following files:"
+	jq -r '.[].file' build/compile_commands.json | grep '\.[ch]$$'
+	echo "analysis results:"
+	$(CLANG_TIDY) -p build $(shell jq -r '.[].file' build/compile_commands.json | grep '\.[ch]$$') \
+		--checks=-*widening*multiplication*,-*insecureAPI* \
+		--warnings-as-errors="*"
+
+.PHONY: gdb
+gdb:
+	$(GDB) -x port/$(CONFIG_TARGET)/gdbinit build/badger-os.elf

@@ -10,10 +10,16 @@
 #include "process/internal.h"
 #include "process/sighandler.h"
 #include "process/types.h"
+#include "rawprint.h"
 #include "scheduler/cpu.h"
 #include "signal.h"
 #include "sys/wait.h"
+#include "syscall_util.h"
 #include "usercopy.h"
+#if MEMMAP_VMEM
+#include "cpu/mmu.h"
+#endif
+
 
 
 // Map a new range of memory at an arbitrary virtual address.
@@ -30,10 +36,17 @@ size_t syscall_mem_size(void *address) {
     mutex_acquire_shared(NULL, &proc->mtx, TIMESTAMP_US_MAX);
     size_t res = 0;
     for (size_t i = 0; i < proc->memmap.regions_len; i++) {
-        if (proc->memmap.regions[i].base == (size_t)address) {
+#if MEMMAP_VMEM
+        if (proc->memmap.regions[i].vaddr == (size_t)address) {
             res = proc->memmap.regions[i].size;
             break;
         }
+#else
+        if (proc->memmap.regions[i].paddr == (size_t)address) {
+            res = proc->memmap.regions[i].size;
+            break;
+        }
+#endif
     }
     mutex_release_shared(NULL, &proc->mtx);
     return res;
@@ -66,16 +79,8 @@ size_t syscall_proc_getargs(size_t cap, void *memory) {
     // Check required size.
     size_t required = proc->argv_size;
     if (cap >= required) {
-        // Check memory ownership.
-        if ((proc_map_contains_raw(proc, (size_t)memory, required) & MEMPROTECT_FLAG_RW) != MEMPROTECT_FLAG_RW) {
-            // Process does not own memory; raise SIGSEGV.
-            mutex_release_shared(NULL, &proc->mtx);
-            proc_sigsegv_handler();
-        }
-
-        // Okay to copy to process.
-        // TODO: Copy-to-user function?
-        mem_copy(memory, proc->argv, required);
+        // Buffer fits; copy to user.
+        sigsegv_assert(copy_to_user_raw(proc, (size_t)memory, proc->argv, required), (size_t)memory);
     }
 
     mutex_release_shared(NULL, &proc->mtx);
@@ -87,24 +92,19 @@ size_t syscall_proc_getargs(size_t cap, void *memory) {
 // Returns process ID of new child on success, or a (negative) errno on failure.
 int syscall_proc_pcreate(char const *binary, int argc, char const *const *argv) {
     process_t *const proc = proc_current();
+    // TODO: Copy these strings.
 
     // Verify validity of pointers.
     if (strlen_from_user_raw(proc, (size_t)binary, PTRDIFF_MAX) < 0) {
-        logk(LOG_DEBUG, "binary bad");
-        proc_sigsegv_handler();
+        proc_sigsegv_handler((size_t)binary);
     }
-    if (argc < 0) {
-        logk(LOG_DEBUG, "argc bad");
-        proc_sigsys_handler();
-    }
+    sigsys_assert(argc >= 0);
     if (!proc_map_contains_raw(proc, (size_t)argv, argc * sizeof(char const *))) {
-        logk(LOG_DEBUG, "argv bad");
-        proc_sigsegv_handler();
+        proc_sigsegv_handler((size_t)argv);
     }
     for (int i = 0; i < argc; i++) {
         if (strlen_from_user_raw(proc, (size_t)argv[i], PTRDIFF_MAX) < 0) {
-            logkf(LOG_DEBUG, "argv[%{d}] bad", i);
-            proc_sigsegv_handler();
+            proc_sigsegv_handler((size_t)argv[i]);
         }
     }
 
@@ -112,11 +112,19 @@ int syscall_proc_pcreate(char const *binary, int argc, char const *const *argv) 
     return proc_create(NULL, proc->pid, binary, argc, argv);
 }
 
+// Destroy a "pre-start" child process.
+// Usually used in case of errors.
+bool syscall_proc_pdestroy(int child) {
+    if (!proc_is_parent(proc_current()->pid, child)) {
+        return false;
+    }
+    return proc_delete_prestart(child);
+}
+
 // Starts a "pre-start" child process, thereby converting it into a running child process.
 bool syscall_proc_pstart(int child) {
     // Start a process.
     if (!proc_is_parent(proc_current()->pid, child)) {
-        logkf(LOG_DEBUG, "Process %{d} is not the parent of %{d}", proc_current()->pid, child);
         return false;
     }
     badge_err_t ec;
@@ -127,9 +135,7 @@ bool syscall_proc_pstart(int child) {
 
 // Set the signal handler for a specific signal number.
 void *syscall_proc_sighandler(int signum, void *newhandler) {
-    if (signum < 0 || signum >= SIG_COUNT) {
-        proc_sigsys_handler();
-    }
+    sigsys_assert(signum >= 0 && signum < SIG_COUNT);
     process_t *const proc = proc_current();
     mutex_acquire(NULL, &proc->mtx, TIMESTAMP_US_MAX);
     void *old                 = (void *)proc->sighandlers[signum];
@@ -140,26 +146,19 @@ void *syscall_proc_sighandler(int signum, void *newhandler) {
 
 // Return from a signal handler.
 void syscall_proc_sigret() {
-    if (!sched_is_sighandler()) {
-        proc_sigsys_handler();
-    }
-    if (!sched_signal_exit()) {
-        proc_sigsegv_handler();
-    }
-    irq_enable(false);
+    sigsys_assert(sched_is_sighandler());
+    sigsegv_assert(sched_signal_exit(), 0);
+    irq_disable();
     sched_lower_from_isr();
     isr_context_switch();
     __builtin_unreachable();
 }
 
 // Get child process status update.
-int syscall_proc_waitpid(int pid, int *wstatus, int options) {
+NOASAN int syscall_proc_waitpid(int pid, int *wstatus, int options) {
     process_t *proc = proc_current();
     // Check memory ownership.
-    if ((size_t)wstatus % sizeof(int) ||
-        (wstatus && (!(proc_map_contains_raw(proc, (size_t)wstatus, sizeof(int)) & MEMPROTECT_FLAG_W)))) {
-        proc_sigsegv_handler();
-    }
+    sysutil_memassert_rw(wstatus, sizeof(int));
 
     while (!(options & WNOHANG)) {
         mutex_acquire_shared(NULL, &proc->mtx, TIMESTAMP_US_MAX);
@@ -199,7 +198,7 @@ int syscall_proc_waitpid(int pid, int *wstatus, int options) {
         }
         mutex_release_shared(NULL, &proc->mtx);
         if (!eligible) {
-            // No children with matchind PIDs exist.
+            // No children with matching PIDs exist.
             return -ECHILD;
         }
         sched_yield();
@@ -207,4 +206,20 @@ int syscall_proc_waitpid(int pid, int *wstatus, int options) {
 
     // Nothing found in non-blocking wait.
     return 0;
+}
+
+
+
+// Temporary write system call.
+void syscall_temp_write(char const *message, size_t length) {
+    sysutil_memassert_r(message, length);
+    mutex_acquire(NULL, &log_mtx, TIMESTAMP_US_MAX);
+#if MEMMAP_VMEM
+    mmu_enable_sum();
+#endif
+    rawprint_substr(message, length);
+#if MEMMAP_VMEM
+    mmu_disable_sum();
+#endif
+    mutex_release(NULL, &log_mtx);
 }

@@ -15,9 +15,10 @@ MEMORY
 
 PHDRS
 {
-	codeseg   PT_LOAD;
-	rodataseg PT_LOAD;
-	dataseg   PT_LOAD;
+	codeseg    PT_LOAD;
+	ramcodeseg PT_LOAD;
+	rodataseg  PT_LOAD;
+	dataseg    PT_LOAD;
 }
 
 SECTIONS
@@ -27,6 +28,7 @@ SECTIONS
 	/* Import hardware addresses. */
 INCLUDE esp32p4.peripherals.ld
 INCLUDE esp32p4.rom.ld
+INCLUDE esp32p4.rom.api.ld
 PROVIDE(CACHE = 0x3FF10000);
 PROVIDE(INTMTX0 = 0x500D6000);
 PROVIDE(INTMTX1 = 0x500D6800);
@@ -72,13 +74,7 @@ PROVIDE(CLIC_CTL = 0x20801000);
 	} >xip :codeseg
 	
 	__start_text = .;
-	.init_array : AT(LOADADDR(.espseg.0) + SIZEOF(.espseg.0)) {
-		. = ALIGN(4);
-		__start_init_array = .;
-		*(.init_array)
-		__stop_init_array = .;
-	} >xip :codeseg
-	.text : AT(LOADADDR(.init_array) + SIZEOF(.init_array)) {
+	.text : AT(LOADADDR(.espseg.0) + SIZEOF(.espseg.0)) {
 		. = ALIGN(256);
 		*(.interrupt_vector_table)
 		*(.text) *(.text.*)
@@ -114,7 +110,12 @@ PROVIDE(CLIC_CTL = 0x20801000);
 	
 	. = __start_sram;
 	__start_data = .;
-	.data : AT(LOADADDR(.espseg.2) + SIZEOF(.espseg.2)) {
+	.ramtext : AT(LOADADDR(.espseg.2) + SIZEOF(.espseg.2)) {
+		. = ALIGN(__section_alignment);
+		*(.ramtext) *(.ramtext.*)
+		. = ALIGN(__section_alignment);
+	} >sram :ramcodeseg
+	.data : AT(LOADADDR(.ramtext) + SIZEOF(.ramtext)) {
 		. = ALIGN(__section_alignment);
 		*(.data) *(.data.*)
 		. = ALIGN(__section_alignment);

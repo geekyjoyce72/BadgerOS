@@ -261,6 +261,10 @@ void free_block(memory_pool_t *pool, buddy_block_t *block) {
 }
 
 void init_pool(void *mem_start, void *mem_end, uint32_t flags) {
+    if (memory_pool_num >= MAX_MEMORY_POOLS) {
+        BADGEROS_MALLOC_MSG_WARN("Out of pools; discarding " FMT_P, mem_start);
+        return;
+    }
     size_t  total_pages = (mem_end - mem_start) / PAGE_SIZE;
     uint8_t orders      = get_order(total_pages);
 
@@ -275,6 +279,7 @@ void init_pool(void *mem_start, void *mem_end, uint32_t flags) {
     void *pages_end   = ALIGN_PAGE_DOWN(mem_end);
 
     size_t   pages           = ((size_t)pages_end - (size_t)pages_start) / PAGE_SIZE;
+    // NOLINTNEXTLINE
     uint32_t max_order_waste = (1 << orders) - pages;
 
     BADGEROS_MALLOC_MSG_INFO("Initializing pool " FMT_I, memory_pool_num);
@@ -434,9 +439,12 @@ void *buddy_allocate(size_t size, enum block_type type, uint32_t flags) {
             break;
         }
 
-        if (size > (1 << allocation_order) - pool->max_order_waste) {
-            BADGEROS_MALLOC_MSG_WARN("buddy_allocate(" FMT_ZI ") = NULL (Allocation too large)", size);
-            continue;
+        if (allocation_order == pool->max_order) {
+            // NOLINTNEXTLINE
+            if (size > (1 << allocation_order) - pool->max_order_waste) {
+                BADGEROS_MALLOC_MSG_WARN("buddy_allocate(" FMT_ZI ") = NULL (Allocation too large)", size);
+                continue;
+            }
         }
 
         block = pool_find_block(pool, allocation_order, pages);

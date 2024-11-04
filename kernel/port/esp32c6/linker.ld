@@ -14,9 +14,10 @@ MEMORY
 
 PHDRS
 {
-	codeseg   PT_LOAD;
-	rodataseg PT_LOAD;
-	dataseg   PT_LOAD;
+	codeseg    PT_LOAD;
+	rodataseg  PT_LOAD;
+	ramcodeseg PT_LOAD;
+	dataseg    PT_LOAD;
 }
 
 SECTIONS
@@ -25,6 +26,8 @@ SECTIONS
 
 	/* Import hardware addresses. */
 INCLUDE esp32c6.peripherals.ld
+INCLUDE esp32c6.rom.ld
+INCLUDE esp32c6.rom.api.ld
 PROVIDE(INTPRI = 0x600C5000);
 PROVIDE(PLIC_MX = 0x20001000);
 PROVIDE(PLIC_UX = 0x20001400);
@@ -68,13 +71,7 @@ PROVIDE(CLINT_U = 0x20001C00);
 	} >xip :codeseg
 	
 	__start_text = .;
-	.init_array : AT(LOADADDR(.espseg.0) + SIZEOF(.espseg.0)) {
-		. = ALIGN(4);
-		__start_init_array = .;
-		*(.init_array)
-		__stop_init_array = .;
-	} >xip :codeseg
-	.text : AT(LOADADDR(.init_array) + SIZEOF(.init_array)) {
+	.text : AT(LOADADDR(.espseg.0) + SIZEOF(.espseg.0)) {
 		. = ALIGN(256);
 		*(.interrupt_vector_table)
 		*(.text) *(.text.*)
@@ -110,7 +107,12 @@ PROVIDE(CLINT_U = 0x20001C00);
 	
 	. = __start_sram;
 	__start_data = .;
-	.data : AT(LOADADDR(.espseg.2) + SIZEOF(.espseg.2)) {
+	.ramtext : AT(LOADADDR(.espseg.2) + SIZEOF(.espseg.2)) {
+		. = ALIGN(__section_alignment);
+		*(.ramtext) *(.ramtext.*)
+		. = ALIGN(__section_alignment);
+	} >sram :ramcodeseg
+	.data : AT(LOADADDR(.ramtext) + SIZEOF(.ramtext)) {
 		. = ALIGN(__section_alignment);
 		*(.data) *(.data.*)
 		. = ALIGN(__section_alignment);

@@ -6,6 +6,10 @@
 #include "filesystem.h"
 #include "process/process.h"
 
+extern mutex_t proc_mtx;
+
+
+
 // Kill a process from one of its own threads.
 void proc_exit_self(int code);
 
@@ -13,7 +17,7 @@ void proc_exit_self(int code);
 process_t *proc_get_unsafe(pid_t pid);
 
 // Suspend all threads for a process except the current.
-void proc_suspend(process_t *process, sched_thread_t *current);
+void proc_suspend(process_t *process, tid_t current);
 // Resume all threads for a process.
 void proc_resume(process_t *process);
 // Release all process runtime resources (threads, memory, files, etc.).
@@ -34,18 +38,16 @@ void proc_start_raw(badge_err_t *ec, process_t *process);
 
 // Create a new thread in a process.
 // Returns created thread handle.
-sched_thread_t *proc_create_thread_raw_unsafe(
-    badge_err_t *ec, process_t *process, sched_entry_point_t entry_point, void *arg, sched_prio_t priority
-);
+tid_t    proc_create_thread_raw(badge_err_t *ec, process_t *process, size_t entry_point, size_t arg, int priority);
 // Delete a thread in a process.
 void   proc_delete_thread_raw_unsafe(badge_err_t *ec, process_t *process, sched_thread_t *thread);
 // Allocate more memory to a process.
 // Returns actual virtual address on success, 0 on failure.
-size_t proc_map_raw(badge_err_t *ec, process_t *process, size_t vaddr, size_t size, size_t align, int flags);
+size_t proc_map_raw(badge_err_t *ec, process_t *process, size_t vaddr, size_t size, size_t align, uint32_t flags);
 // Release memory allocated to a process.
 void   proc_unmap_raw(badge_err_t *ec, process_t *process, size_t base);
 // Whether the process owns this range of memory.
-// Returns the lowest common denominator of the access bits bitwise or 8.
+// Returns the lowest common denominator of the access bits.
 int    proc_map_contains_raw(process_t *proc, size_t base, size_t size);
 // Add a file to the process file handle list.
 int    proc_add_fd_raw(badge_err_t *ec, process_t *process, file_t real);
