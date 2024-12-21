@@ -167,8 +167,8 @@ void port_early_init() {
     );
 }
 
-// Full hardware initialization.
-void port_init() {
+// Post-heap hardware initialization.
+void port_postheap_init() {
     // Parse and process DTB.
     dtdump(dtb_req.response->dtb_ptr);
     dtparse(dtb_req.response->dtb_ptr);
@@ -206,6 +206,10 @@ void port_poweroff(bool restart) {
     while (1);
 }
 
+// Full hardware initialization.
+void port_init() {
+}
+
 // Send a single character to the log output.
 void port_putc(char msg) {
     register char a0 asm("a0") = msg;
@@ -215,6 +219,7 @@ void port_putc(char msg) {
 
 // Power off.
 void port_poweroff(bool restart) {
+    (void)restart;
     irq_disable();
     logkf_from_isr(LOG_INFO, "TODO: port_poweroff() is a stub");
     while (1) asm("");

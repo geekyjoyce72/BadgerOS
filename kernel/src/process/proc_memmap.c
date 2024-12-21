@@ -142,39 +142,34 @@ error:
 
 // Release memory allocated to a process.
 void proc_unmap_raw(badge_err_t *ec, process_t *proc, size_t base) {
-    // Search the memory map for the specified region.
-    proc_memmap_ent_t dummy = {.vaddr = base};
-    array_binsearch_t res   = array_binsearch(
-        proc->memmap.regions,
-        sizeof(proc_memmap_ent_t),
-        proc->memmap.regions_len,
-        &dummy,
-        proc_memmap_cmp
-    );
-    if (!res.found) {
-        badge_err_set(ec, ELOC_PROCESS, ECAUSE_NOTFOUND);
-        return;
+    proc_memmap_t *map = &proc->memmap;
+    for (size_t i = 0; i < map->regions_len; i++) {
+        if (map->regions[i].vaddr == base) {
+            // Remove region entry.
+            proc_memmap_ent_t region = map->regions[i];
+            array_remove(&map->regions[0], sizeof(map->regions[0]), map->regions_len, NULL, i);
+            map->regions_len--;
+
+            // Revoke user access to the memory.
+            assert_dev_keep(memprotect_u(map, &map->mpu_ctx, base, 0, region.size, 0));
+            memprotect_commit(&map->mpu_ctx);
+
+            // Release physical memory.
+            size_t vaddr = base;
+            while (vaddr < base + region.size) {
+                virt2phys_t v2p = memprotect_virt2phys(&map->mpu_ctx, vaddr);
+                assert_dev_drop(v2p.flags & MEMPROTECT_FLAG_RWX);
+                assert_dev_drop(!(v2p.flags & MEMPROTECT_FLAG_KERNEL));
+                vaddr += phys_page_size(v2p.paddr / MEMMAP_PAGE_SIZE);
+                phys_page_free(v2p.paddr / MEMMAP_PAGE_SIZE);
+            }
+
+            badge_err_set_ok(ec);
+            logkf(LOG_INFO, "Unmapped %{size;d} bytes at %{size;x} from process %{d}", region.size, base, proc->pid);
+            return;
+        }
     }
-
-    // Remove the region from the memory map.
-    proc_memmap_ent_t removed;
-    array_lencap_remove(
-        &proc->memmap.regions,
-        sizeof(proc_memmap_ent_t),
-        &proc->memmap.regions_len,
-        &proc->memmap.regions_cap,
-        &removed,
-        res.index
-    );
-
-    // Remove it from the MMU.
-    assert_dev_keep(memprotect_u(&proc->memmap, &proc->memmap.mpu_ctx, removed.vaddr, 0, removed.size, 0));
-    memprotect_commit(&proc->memmap.mpu_ctx);
-
-    // Free the memory from PMM.
-    phys_page_free(removed.paddr / MEMMAP_PAGE_SIZE);
-
-    badge_err_set_ok(ec);
+    badge_err_set(ec, ELOC_PROCESS, ECAUSE_NOTFOUND);
 }
 
 // Whether the process owns this range of virtual memory.
