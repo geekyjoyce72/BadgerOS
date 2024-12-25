@@ -7,6 +7,7 @@
 
 #include "assertions.h"
 #include "attributes.h"
+#include "cpu/riscv.h"
 #include "meta.h"
 #include "port/hardware.h"
 #include "port/hardware_allocation.h"

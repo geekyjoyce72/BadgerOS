@@ -162,7 +162,7 @@ void riscv_interrupt_handler() {
 
     intmtx_t *intmtx = intmtx_local();
 
-    for (size_t i = 0; i < IRQ_GROUPS; i++) {
+    for (int i = 0; i < IRQ_GROUPS; i++) {
         uint32_t pending = intmtx->pending[i] & atomic_load(&enable_mask[i]);
         while (pending) {
             int      lsb_pos   = __builtin_ctz(pending);

@@ -14,6 +14,8 @@
 typedef struct {
     // Current CPU ID.
     size_t            cpuid;
+    // Current SMP CPU inder.
+    int               cpu;
     // ISR stack top.
     size_t            isr_stack_top;
     // ISR stack bottom.

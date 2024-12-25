@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include "cpu/riscv.h"
+
 
 
 // Completed successfully.

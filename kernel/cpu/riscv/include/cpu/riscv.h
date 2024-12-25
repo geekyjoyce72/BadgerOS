@@ -3,6 +3,20 @@
 
 #pragma once
 
+// Undef x86 macros because intellisense doesn't recognise RISC-V.
+#ifndef __riscv_xlen
+#ifdef __x86_64__
+#define __riscv_xlen 64
+#else
+#define __riscv_xlen 32
+#endif
+#endif
+#undef __x86_64__
+#undef __i386__
+#ifndef __riscv
+#define __riscv
+#endif
+
 
 
 /* ==== RISC-V MSTATUS DEFINITION ==== */

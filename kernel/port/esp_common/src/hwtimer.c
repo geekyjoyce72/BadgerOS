@@ -20,6 +20,7 @@
 #include <soc/clk_tree_defs.h>
 #include <soc/lp_wdt_struct.h>
 #include <soc/soc.h>
+#include <soc/soc_caps.h>
 #include <soc/timer_group_struct.h>
 
 #ifdef CONFIG_TARGET_esp32c6
@@ -105,6 +106,7 @@ void timer_set_freq(int timerno, frequency_hz_t freq) {
         case 1: clksrc = HP_SYS_CLKRST.peri_clk_ctrl20.reg_timergrp0_t1_src_sel; break;
         case 2: clksrc = HP_SYS_CLKRST.peri_clk_ctrl21.reg_timergrp1_t0_src_sel; break;
         case 3: clksrc = HP_SYS_CLKRST.peri_clk_ctrl21.reg_timergrp1_t1_src_sel; break;
+        default: __builtin_unreachable();
     }
 #endif
 #ifdef CONFIG_TARGET_esp32c6

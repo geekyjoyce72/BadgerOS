@@ -160,7 +160,7 @@ void proc_unmap_raw(badge_err_t *ec, process_t *proc, size_t base) {
                 virt2phys_t v2p = memprotect_virt2phys(&map->mpu_ctx, vaddr);
                 assert_dev_drop(v2p.flags & MEMPROTECT_FLAG_RWX);
                 assert_dev_drop(!(v2p.flags & MEMPROTECT_FLAG_KERNEL));
-                vaddr += phys_page_size(v2p.paddr / MEMMAP_PAGE_SIZE);
+                vaddr += phys_page_size(v2p.paddr / MEMMAP_PAGE_SIZE) * MEMMAP_PAGE_SIZE;
                 phys_page_free(v2p.paddr / MEMMAP_PAGE_SIZE);
             }
 

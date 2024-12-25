@@ -3,8 +3,8 @@
 
 #pragma once
 
+#include "cpu/riscv.h"
 #include "memprotect.h"
-#include "riscv.h"
 
 #include <stdbool.h>
 #include <stddef.h>

@@ -136,9 +136,6 @@ static void kernel_init() {
     // Full hardware initialization.
     port_init();
 
-    logk(LOG_DEBUG, "Waiting for a second");
-    thread_sleep(1000000);
-
     // Temporary filesystem image.
     fs_mount(&ec, FS_TYPE_RAMFS, NULL, "/", 0);
     badge_err_assert_always(&ec);

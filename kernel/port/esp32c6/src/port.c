@@ -48,6 +48,10 @@ void port_early_init() {
     PCR.uart0_conf.uart0_clk_en          = true;
 }
 
+// Post-heap hardware initialization.
+void port_postheap_init() {
+}
+
 // Full hardware initialization.
 void port_init() {
     extern void esp_i2c_isr();

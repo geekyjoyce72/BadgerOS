@@ -113,6 +113,7 @@ void smp_init_dtb(dtb_handle_t *dtb) {
     uint32_t cpu_acells = dtb_read_uint(dtb, cpus, "#address-cells");
     assert_always(cpu_acells && cpu_acells <= sizeof(size_t) / 4);
     assert_always(dtb_read_uint(dtb, cpus, "#size-cells") == 0);
+    size_t bsp_hartid = smp_req.response->bsp_hartid;
 
     while (cpu) {
         // Detect usable architecture.
@@ -139,11 +140,18 @@ void smp_init_dtb(dtb_handle_t *dtb) {
         dtb_prop_t *reg = dtb_get_prop(dtb, cpu, "reg");
         assert_always(reg && reg->content_len == 4 * cpu_acells);
         size_t cpuid = dtb_prop_read_uint(dtb, reg);
-        logkf(LOG_INFO, "Detected CPU #%{d} ID %{size;d}", cpu_index, cpuid);
+        int    detected_cpu;
+        if (cpuid == bsp_hartid) {
+            detected_cpu = 0;
+        } else {
+            detected_cpu = smp_count;
+            smp_count++;
+        }
+        logkf(LOG_INFO, "Detected CPU #%{d} ID %{size;d}", detected_cpu, cpuid);
 
         // Add to the maps.
         smp_map_t new_ent = {
-            .cpu   = cpu_index++,
+            .cpu   = detected_cpu,
             .cpuid = cpuid,
         };
         assert_always(array_len_sorted_insert(&smp_map, sizeof(smp_map_t), &smp_map_len, &new_ent, smp_cpuid_cmp));
@@ -151,13 +159,23 @@ void smp_init_dtb(dtb_handle_t *dtb) {
 
         cpu = cpu->next;
     }
+    int cur_cpu = smp_cur_cpu();
 
+    // Allocate status per CPU.
     cpu_status = calloc(smp_count, sizeof(smp_status_t));
     assert_always(cpu_status);
-    cpu_status[smp_cur_cpu()] = (smp_status_t){
+    cpu_status[cur_cpu] = (smp_status_t){
         .did_jump = true,
         .is_up    = true,
     };
+
+    // Transfer booting CPU's CPU-local data to this array.
+    bool ie = irq_disable();
+
+    cpu_status[cur_cpu].cpulocal = *isr_ctx_get()->cpulocal;
+    isr_ctx_get()->cpulocal      = &cpu_status[cur_cpu].cpulocal;
+
+    irq_enable_if(ie);
 }
 
 // The the SMP CPU index of the calling CPU.
@@ -165,7 +183,7 @@ int smp_cur_cpu() {
     if (!smp_map_len) {
         return 0;
     }
-    return smp_get_cpu(isr_ctx_get()->cpulocal->cpuid);
+    return isr_ctx_get()->cpulocal->cpu;
 }
 
 // Get the SMP CPU index from the CPU ID value.
@@ -206,9 +224,15 @@ static NAKED void cpu1_init0_limine(struct limine_smp_info *info) {
 
 // Second stage entrypoint for secondary CPUs.
 static void cpu1_init1_limine(struct limine_smp_info *info) {
-    isr_ctx_t tmp_ctx = {0};
-    tmp_ctx.flags     = ISR_CTX_FLAG_KERNEL;
-    __builtin_unreachable();
+    int       cur_cpu       = (int)info->extra_argument;
+    isr_ctx_t tmp_ctx       = {0};
+    tmp_ctx.flags           = ISR_CTX_FLAG_KERNEL;
+    tmp_ctx.cpulocal        = &cpu_status[cur_cpu].cpulocal;
+    tmp_ctx.cpulocal->cpuid = info->hartid;
+    tmp_ctx.cpulocal->cpu   = cur_cpu;
+    asm("csrw sscratch, %0" ::"r"(&tmp_ctx));
+    cpu_status[cur_cpu].entrypoint();
+    __builtin_trap();
 }
 
 // Power on another CPU.
@@ -224,7 +248,7 @@ bool smp_poweron(int cpu, void *entrypoint, void *stack) {
     // Start the CPU up.
     if (!cpu_status[cpu].did_jump) {
         for (uint64_t i = 0; i < smp_req.response->cpu_count; i++) {
-            if (smp_req.response->cpus[i]->processor_id == smp_map[cpu].cpuid) {
+            if (smp_req.response->cpus[i]->hartid == smp_map[cpu].cpuid) {
                 smp_req.response->cpus[i]->extra_argument = cpu;
                 atomic_store(&smp_req.response->cpus[i]->goto_address, &cpu1_init0_limine);
                 cpu_status[cpu].did_jump = true;

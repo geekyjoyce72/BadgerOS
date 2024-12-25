@@ -71,7 +71,7 @@ static void mutex_wait(mutex_t *mutex, timestamp_us_t timeout) {
     self->blocking_obj.mutex.mutex = mutex;
     if (timeout < TIMESTAMP_US_MAX) {
         // Set timeout interrupt for mutex.
-        self->blocking_obj.mutex.timer_id = time_add_async_task(timeout, mutex_resume_timer, self);
+        self->blocking_obj.mutex.timer_id = time_add_async_task(time_us() + timeout, mutex_resume_timer, self);
     } else {
         // No timeout; no timer interrupt is added.
         self->blocking_obj.mutex.timer_id = -1;

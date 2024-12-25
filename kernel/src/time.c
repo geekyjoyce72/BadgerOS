@@ -25,13 +25,13 @@ static timertask_t **tasks;
 
 
 // Timer task counter.
-static atomic_int_least64_t taskno_counter;
+static int64_t taskno_counter;
 
 
 // Comparator for timer tasks by timestamp.
-int timertask_timestamp_cmp(void const *_a, void const *_b) {
-    timertask_t const *a = *(void *const *)_a;
-    timertask_t const *b = *(void *const *)_b;
+int timertask_timestamp_cmp(void const *a_ptr, void const *b_ptr) {
+    timertask_t const *a = *(void *const *)a_ptr;
+    timertask_t const *b = *(void *const *)b_ptr;
     if (a->timestamp < b->timestamp) {
         return 1;
     } else if (a->timestamp > b->timestamp) {
@@ -42,9 +42,9 @@ int timertask_timestamp_cmp(void const *_a, void const *_b) {
 }
 
 // Comparator for timer tasks by ID.
-int timertask_id_cmp(void const *_a, void const *_b) {
-    timertask_t const *a = *(void *const *)_a;
-    timertask_t const *b = *(void *const *)_b;
+int timertask_id_cmp(void const *a_ptr, void const *b_ptr) {
+    timertask_t const *a = *(void *const *)a_ptr;
+    timertask_t const *b = *(void *const *)b_ptr;
     if (a->taskno < b->taskno) {
         return -1;
     } else if (a->taskno > b->taskno) {
@@ -87,7 +87,10 @@ int64_t time_add_async_task(timestamp_us_t timestamp, timer_fn_t callback, void 
     if (!task) {
         return -1;
     }
-    int64_t taskno  = atomic_fetch_add(&taskno_counter, 1);
+    spinlock_take(&tasks_spinlock);
+    int64_t taskno = taskno_counter;
+    taskno_counter++;
+    spinlock_release(&tasks_spinlock);
     task->taskno    = taskno;
     task->timestamp = timestamp;
     task->callback  = callback;
@@ -137,6 +140,7 @@ bool time_cancel_async_task(int64_t taskno) {
             found = true;
             timertask_t *task;
             array_lencap_remove(&tasks, sizeof(void *), &tasks_len, &tasks_cap, &task, i);
+            // NOLINTNEXTLINE
             free(task);
             break;
         }
@@ -174,6 +178,8 @@ void time_cpu_timer_isr() {
         spinlock_take(&tasks_spinlock);
         if (tasks_len && now >= tasks[tasks_len - 1]->timestamp) {
             task = tasks[--tasks_len];
+        } else {
+            task = NULL;
         }
         spinlock_release(&tasks_spinlock);
 

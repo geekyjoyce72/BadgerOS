@@ -200,12 +200,6 @@ void port_postheap_init() {
     }
 }
 
-// Power off.
-void port_poweroff(bool restart) {
-    irq_disable();
-    while (1);
-}
-
 // Full hardware initialization.
 void port_init() {
 }

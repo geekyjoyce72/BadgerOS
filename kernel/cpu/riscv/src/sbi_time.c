@@ -25,10 +25,16 @@ static uint64_t base_tick;
 // Get the current time in ticks.
 static inline uint64_t time_ticks() {
 #if __riscv_xlen == 32
-    uint32_t ticks_lo;
-    uint32_t ticks_hi;
-    asm("rdtime %0; rdtimeh %1" : "=r"(ticks_lo), "=r"(ticks_hi));
-    uint64_t ticks = ((uint64_t)ticks_hi << 32) | ticks_lo;
+    uint32_t ticks_lo0, ticks_lo1;
+    uint32_t ticks_hi0, ticks_hi1;
+    asm("rdtimeh %0; rdtime %1" : "=r"(ticks_hi0), "=r"(ticks_lo0));
+    asm("rdtimeh %0; rdtime %1" : "=r"(ticks_hi1), "=r"(ticks_lo1));
+    uint64_t ticks;
+    if (ticks_hi0 != ticks_hi1) {
+        ticks = ((uint64_t)ticks_hi1 << 32) | ticks_lo1;
+    } else {
+        ticks = ((uint64_t)ticks_hi0 << 32) | ticks_lo0;
+    }
 #else
     uint64_t ticks;
     asm("rdtime %0" : "=r"(ticks));

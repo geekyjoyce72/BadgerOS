@@ -70,13 +70,13 @@ static void set_switch(sched_cpulocal_t *info, sched_thread_t *thread) {
     isr_ctx_switch_set(next);
 
     // Set preemption timer.
-    timestamp_us_t timeout = SCHED_MIN_US + SCHED_INC_US * thread->priority;
+    timestamp_us_t now     = time_us();
+    timestamp_us_t timeout = now + SCHED_MIN_US + SCHED_INC_US * thread->priority;
     if (timeout > info->load_measure_time) {
         timeout = info->load_measure_time;
     }
-    timestamp_us_t now = time_us();
     info->last_preempt = now;
-    time_set_next_task_switch(now + timeout);
+    time_set_next_task_switch(timeout);
 }
 
 // Try to hand a thread off to another CPU.
@@ -186,7 +186,7 @@ static void sw_measure_load(timestamp_us_t now, int cur_cpu, sched_cpulocal_t *i
     while (thread) {
         timestamp_us_t cpu_time       = thread->timeusage.cycle_time;
         thread->timeusage.cycle_time  = 0;
-        int cpu_permil                = cpu_time * 10000 / total_time;
+        int cpu_permil                = (int)(cpu_time * 10000 / total_time);
         total_load                   += cpu_permil;
         atomic_store(&thread->timeusage.cpu_usage, cpu_permil);
         thread = (sched_thread_t *)thread->node.next;
@@ -264,7 +264,7 @@ void sched_request_switch_from_isr() {
         }
     }
 
-    // Check for load measurement tiemr.
+    // Check for load measurement timer.
     if (now >= info->load_measure_time) {
         // Measure load on this CPU.
         sw_measure_load(now, cur_cpu, info);
@@ -426,9 +426,12 @@ void sched_init() {
 // Power on and start scheduler on secondary CPUs.
 void sched_start_altcpus() {
     int cpu = smp_cur_cpu();
-    for (int i = 0; i < smp_count; i++) {
-        if (i != cpu) {
-            sched_start_on(i);
+    if (smp_count > 1) {
+        logkf(LOG_INFO, "Starting scheduler on %{d} alt CPU(s)", smp_count - 1);
+        for (int i = 0; i < smp_count; i++) {
+            if (i != cpu) {
+                sched_start_on(i);
+            }
         }
     }
 }
@@ -442,7 +445,10 @@ bool sched_start_on(int cpu) {
     void *tmp_stack  = malloc(CONFIG_STACK_SIZE);
     bool  poweron_ok = smp_poweron(cpu, sched_exec, tmp_stack);
     if (poweron_ok) {
+        logkf(LOG_INFO, "Started CPU%{d}", cpu);
         while (!(atomic_load(&cpu_ctx[cpu].flags) & SCHED_RUNNING)) continue;
+    } else {
+        logkf(LOG_ERROR, "Starting CPU%{d} failed", cpu);
     }
 
     free(tmp_stack);
@@ -459,7 +465,7 @@ void sched_exec() {
     cpulocal_t       *cpulocal = isr_ctx_get()->cpulocal;
     sched_cpulocal_t *info     = cpu_ctx + smp_get_cpu(cpulocal->cpuid);
     cpulocal->sched            = info;
-    logkf_from_isr(LOG_INFO, "Starting scheduler on CPU%{d}", smp_cur_cpu());
+    logkf(LOG_INFO, "Scheduler started on CPU%{d}", smp_cur_cpu());
 
     // Set next timestamp to measure load average.
     info->load_average      = 0;
