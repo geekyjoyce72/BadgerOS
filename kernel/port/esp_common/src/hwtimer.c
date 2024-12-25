@@ -31,7 +31,7 @@
 #endif
 
 #define GET_TIMER_INFO(timerno)                                                                                        \
-    assert_dev_drop((timerno) >= 0 && (timerno) < SOC_TIMER_GROUPS * SOC_TIMER_GROUP_TIMERS_PER_GROUP);                \
+    assert_dev_drop((timerno) >= 0 && (unsigned int)(timerno) < SOC_TIMER_GROUPS * SOC_TIMER_GROUP_TIMERS_PER_GROUP);  \
     timg_dev_t *timg  = (timerno) / SOC_TIMER_GROUP_TIMERS_PER_GROUP ? &TIMERG1 : &TIMERG0;                            \
     int         timer = (timerno) % SOC_TIMER_GROUP_TIMERS_PER_GROUP;
 
