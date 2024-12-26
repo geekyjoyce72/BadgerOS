@@ -25,19 +25,24 @@
     .macro isr_entry
 #pragma region
     .cfi_return_column CSR_EPC
-    .cfi_def_cfa CSR_SCRATCH, 0
+    # .cfi_signal_frame
     
-    # Save tempregs t0/t1.
+    # Save tempregs t0-t3.
     csrrw   t0, CSR_SCRATCH, t0
-    ST_REG  t1, isr_ctx_t_scratch1(t0)
+    .cfi_def_cfa t0, 0
+    ST_REG  t1, isr_ctx_t_regs+cpu_regs_t_t1(t0)
+    .cfi_offset t1, isr_ctx_t_regs+cpu_regs_t_t1
     csrrw   t1, CSR_SCRATCH, t0
-    ST_REG  t1, isr_ctx_t_scratch0(t0)
+    .cfi_def_cfa CSR_SCRATCH, 0
+    ST_REG  t1, isr_ctx_t_regs+cpu_regs_t_t0(t0)
+    .cfi_offset t1, isr_ctx_t_regs+cpu_regs_t_t0
     
     ST_REG  t2, isr_ctx_t_regs+cpu_regs_t_t2(t0)
     .cfi_offset t2, isr_ctx_t_regs+cpu_regs_t_t2
     ST_REG  t3, isr_ctx_t_regs+cpu_regs_t_t3(t0)
     .cfi_offset t3, isr_ctx_t_regs+cpu_regs_t_t3
     
+    # Save special regs.
     ST_REG  ra, isr_ctx_t_regs+cpu_regs_t_ra(t0)
     .cfi_offset ra, isr_ctx_t_regs+cpu_regs_t_ra
     ST_REG  sp, isr_ctx_t_regs+cpu_regs_t_sp(t0)
@@ -49,14 +54,6 @@
     
     # Clear context to switch field.
     ST_REG  x0, isr_ctx_t_ctxswitch(t0)
-    
-    # Move tempregs.
-    LD_REG  t1, isr_ctx_t_scratch0(t0)
-    ST_REG  t1, isr_ctx_t_regs+cpu_regs_t_t0(t0)
-    .cfi_offset t0, isr_ctx_t_regs+cpu_regs_t_t0
-    LD_REG  t1, isr_ctx_t_scratch1(t0)
-    ST_REG  t1, isr_ctx_t_regs+cpu_regs_t_t1(t0)
-    .cfi_offset t1, isr_ctx_t_regs+cpu_regs_t_t1
     
     # Save PC.
     csrr    t1, CSR_EPC
@@ -82,9 +79,12 @@
     la      gp, __global_pointer$
     .option pop
     LD_REG  t1, isr_ctx_t_flags(t0)
-    andi    t1, t1, ISR_CTX_FLAG_USE_SP
+    andi    t1, t1, ISR_CTX_FLAG_KERNEL
+    # For kernel threads, just use the thread's stack.
     bnez    t1, 1f
-    la      sp, __interrupt_stack_hi
+    # For user threads, use the memory allocated for the kernel stack.
+    # This is safe even for syscalls because the ISR finishes before the stack is used.
+    LD_REG  sp, isr_ctx_t_user_isr_stack(t0)
 1:
 #pragma endregion
     .endm
@@ -185,7 +185,7 @@
     ST_REG  t6,  isr_ctx_t_regs+cpu_regs_t_t6(t0)
     # Toolchain bug: GDB does not understand the backtrace if `t6` is in the CFI info.
     # This means that if `t6` was in use at the time of trap or ISR, GDB cannot tell.
-    # .cfi_offset t6, isr_ctx_t_regs+cpu_regs_t_t6
+    .cfi_offset t6, isr_ctx_t_regs+cpu_regs_t_t6
 #pragma endregion
     .endm
 
@@ -453,17 +453,6 @@ __isr_asm:
     isr_exit
     RISCV_TRAP_RET
     .cfi_endproc
-
-
-
-
-
-    # Interrupt and trap handler stack.
-    .bss
-    .align 4
-__interrupt_stack_lo:
-    .skip ISR_STACK_DEPTH*4
-__interrupt_stack_hi:
 
 
 

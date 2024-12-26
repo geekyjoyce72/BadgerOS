@@ -57,42 +57,45 @@ static void kill_proc_on_trap() {
 
 // Called from ASM on non-system call trap.
 void riscv_trap_handler() {
-    // TODO: Per-CPU double trap detection.
-    static int trap_depth = 0;
-
+    // Redirect interrupts to the interrupt handler.
     long cause, status, tval, epc;
-    asm volatile("csrr %0, " CSR_TVAL_STR : "=r"(tval));
     asm volatile("csrr %0, " CSR_CAUSE_STR : "=r"(cause));
     long trapno = cause & RISCV_VT_ICAUSE_MASK;
     if (cause < 0) {
         riscv_interrupt_handler();
         return;
     }
+    asm volatile("csrr %0, " CSR_TVAL_STR : "=r"(tval));
     asm volatile("csrr %0, " CSR_STATUS_STR : "=r"(status));
 
-    trap_depth++;
     isr_ctx_t recurse_ctx;
     recurse_ctx.mpu_ctx = NULL;
-    recurse_ctx.flags   = ISR_CTX_FLAG_USE_SP | ISR_CTX_FLAG_KERNEL;
+    recurse_ctx.flags   = ISR_CTX_FLAG_IN_ISR | ISR_CTX_FLAG_KERNEL;
     isr_ctx_t *kctx     = isr_ctx_swap(&recurse_ctx);
     recurse_ctx.thread  = kctx->thread;
 
+    // Double fault detection.
+    bool fault3 = kctx->flags & ISR_CTX_FLAG_2FAULT;
+    bool fault2 = kctx->flags & ISR_CTX_FLAG_IN_ISR;
+    if (fault2) {
+        kctx->flags |= ISR_CTX_FLAG_2FAULT;
+    }
+
     // Check for custom trap handler.
-    if ((kctx->flags & ISR_CTX_FLAG_NOEXC) && kctx->noexc_cb(kctx, kctx->noexc_cookie)) {
+    if (!fault2 && (kctx->flags & ISR_CTX_FLAG_NOEXC) && kctx->noexc_cb(kctx, kctx->noexc_cookie)) {
         isr_ctx_swap(kctx);
-        trap_depth--;
         return;
     }
 
     if (!(kctx->flags & ISR_CTX_FLAG_KERNEL)) {
         switch (trapno) {
+                // Unknown trap? The kernel must have messed up, don't handle it.
             default: break;
 
             case RISCV_TRAP_U_ECALL:
                 // ECALL from U-mode goes to system call handler.
                 sched_raise_from_isr(kctx->thread, true, riscv_syscall_wrapper);
                 isr_ctx_swap(kctx);
-                trap_depth--;
                 return;
 
             case RISCV_TRAP_IACCESS:
@@ -105,31 +108,28 @@ void riscv_trap_handler() {
                 sched_raise_from_isr(kctx->thread, true, proc_sigsegv_handler);
                 kctx->thread->kernel_isr_ctx.regs.a0 = tval;
                 isr_ctx_swap(kctx);
-                trap_depth--;
                 return;
 
             case RISCV_TRAP_IILLEGAL:
-                // Memory access faults go to the SIGILL handler.
+                // Illegal instruction faults go to the SIGILL handler.
                 sched_raise_from_isr(kctx->thread, true, proc_sigill_handler);
                 isr_ctx_swap(kctx);
-                trap_depth--;
                 return;
 
             case RISCV_TRAP_EBREAK:
-                // Memory access faults go to the SIGTRAP handler.
+                // Breakpoints go to the SIGTRAP handler.
                 sched_raise_from_isr(kctx->thread, true, proc_sigtrap_handler);
                 isr_ctx_swap(kctx);
-                trap_depth--;
                 return;
         }
     }
 
     // Unhandled trap.
     rawprint("\033[0m");
-    if (trap_depth >= 3) {
+    if (fault3) {
         rawprint("**** TRIPLE FAULT ****\n");
         panic_poweroff();
-    } else if (trap_depth == 2) {
+    } else if (fault2) {
         rawprint("**** DOUBLE FAULT ****\n");
     }
 
@@ -176,7 +176,7 @@ void riscv_trap_handler() {
 #endif
 
     // Print privilige mode.
-    if (trap_depth == 1) {
+    if (!fault2) {
         if (status & (CSR_STATUS_PP_MASK << CSR_STATUS_PP_BASE_BIT)) {
             rawprint("Running in kernel mode");
             if (!(kctx->flags & ISR_CTX_FLAG_KERNEL)) {
@@ -191,7 +191,7 @@ void riscv_trap_handler() {
     }
 
     // Print current process.
-    if (trap_depth == 1 && kctx->thread && !(kctx->thread->flags & THREAD_KERNEL)) {
+    if (!fault2 && kctx->thread && !(kctx->thread->flags & THREAD_KERNEL)) {
         rawprint(" in process ");
         rawprintdec(kctx->thread->process->pid, 1);
     }
@@ -200,7 +200,7 @@ void riscv_trap_handler() {
 
     isr_ctx_dump(kctx);
 
-    if (status & (CSR_STATUS_PP_MASK << CSR_STATUS_PP_BASE_BIT) || trap_depth > 1) {
+    if (status & (CSR_STATUS_PP_MASK << CSR_STATUS_PP_BASE_BIT) || !fault2) {
         // When the kernel traps it's a bad time.
         panic_poweroff();
     } else {
@@ -208,7 +208,6 @@ void riscv_trap_handler() {
         sched_raise_from_isr(kctx->thread, false, kill_proc_on_trap);
     }
     isr_ctx_swap(kctx);
-    trap_depth--;
 }
 
 // Return a value from the syscall handler.

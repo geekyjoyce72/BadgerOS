@@ -28,7 +28,7 @@ set(common_compiler_flags
     -mabi=${target_abi}                # Selects target ABI
     -nodefaultlibs                     # Do not link any default libraries like libgcc or libc.
     -O0                                # Optimize the code.
-    -ggdb                              # Generate debug information in default extended format.
+    -ggdb -gdwarf-2                    # Generate debug information in default extended format.
     -Werror=return-type                # Error when a function doesn't return a value, but declares to do so.
     -Werror=implicit-fallthrough
     -Werror=int-conversion

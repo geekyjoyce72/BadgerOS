@@ -474,7 +474,6 @@ void sched_exec() {
     atomic_store_explicit(&info->flags, 0, memory_order_release);
 
     // Start handed over threads or idle until one is handed over to this CPU.
-    isr_ctx_get()->flags |= ISR_CTX_FLAG_USE_SP;
     sched_request_switch_from_isr();
     isr_context_switch();
     __builtin_unreachable();
@@ -547,6 +546,8 @@ tid_t thread_new_user(
     thread->kernel_isr_ctx.thread = thread;
     thread->user_isr_ctx.thread   = thread;
     thread->user_isr_ctx.mpu_ctx  = &process->memmap.mpu_ctx;
+    thread->user_isr_ctx.user_isr_stack =
+        thread->kernel_stack_top; // This is duplicate info but the ISR assembly needs it to set up the stack.
     sched_prepare_user_entry(thread, user_entrypoint, user_arg);
 
     assert_dev_keep(mutex_acquire(NULL, &threads_mtx, TIMESTAMP_US_MAX));
