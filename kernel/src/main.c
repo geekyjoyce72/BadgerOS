@@ -131,8 +131,6 @@ void syscall_sys_shutdown(bool is_reboot) {
 // When finished, the non-booting CPUs will be started (method and entrypoints to be determined).
 static void kernel_init() {
     badge_err_t ec = {0};
-    logk(LOG_DEBUG, "Causing intentional trap");
-    __builtin_trap();
 
     // Memory protection initialization.
     memprotect_init();
