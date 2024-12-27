@@ -1,7 +1,6 @@
 # BadgerOS
 
-BadgerOS is the operating system currently in development for the upcoming [WHY2025](https://why2025.org/) badge.
-The goal is the allow future badge users to get both the performance that native apps can afford as well as the portability made possible by this OS.
+BadgerOS is a hobby operating system.
 
 ## Index
 - [Contributing](#contributing)
