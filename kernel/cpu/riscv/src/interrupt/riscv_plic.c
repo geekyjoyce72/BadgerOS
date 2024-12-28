@@ -98,5 +98,5 @@ void plic_dtbinit(dtb_handle_t *dtb, dtb_node_t *node, uint32_t addr_cells, uint
 DRIVER_DECL(riscv_plic_driver) = {
     .dtb_supports_len = 2,
     .dtb_supports     = (char const *[]){"sifive,plic-1.0.0", "riscv,plic0"},
-    .dtbinit          = plic_dtbinit,
+    .dtb_init         = plic_dtbinit,
 };

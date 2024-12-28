@@ -51,7 +51,17 @@ static bool pcie_controller_init() {
 // Enumerate function via ECAM.
 void pcie_ecam_func_detect(uint8_t bus, uint8_t dev, uint8_t func) {
     pcie_hdr_com_t *hdr = (void *)(ctl.config_vaddr + (bus * 256 + dev * 8 + func) * 4096);
-    logkf(LOG_DEBUG, "PCIe device %{u8;x}:%{u8;x}.%{u8;d} detected, type %{u8;x}", bus, dev, func, hdr->hdr_type);
+    logkf(
+        LOG_DEBUG,
+        "PCIe device %{u8;x}:%{u8;x}.%{u8;d} detected, type %{u8;x}, class %{u8;x}:%{u8;x}:%{u8;x}",
+        bus,
+        dev,
+        func,
+        hdr->hdr_type,
+        hdr->classcode[2],
+        hdr->classcode[1],
+        hdr->classcode[0]
+    );
 }
 
 // Enumerate device via ECAM.
@@ -163,14 +173,16 @@ static void
 
 // Driver for normal no-nonsense PCIe.
 DRIVER_DECL(pcie_driver) = {
+    .type             = DRIVER_TYPE_DTB,
     .dtb_supports_len = 1,
     .dtb_supports     = (char const *[]){"pci-host-ecam-generic"},
-    .dtbinit          = pcie_driver_dtbinit,
+    .dtb_init         = pcie_driver_dtbinit,
 };
 
 // Driver for the factually stupid incoherent SiFive FU740 proprietary nonsense PCIe.
 DRIVER_DECL(pcie_fu740_driver) = {
+    .type             = DRIVER_TYPE_DTB,
     .dtb_supports_len = 1,
     .dtb_supports     = (char const *[]){"sifive,fu740-pcie"},
-    .dtbinit          = pcie_fu740_driver_dtbinit,
+    .dtb_init         = pcie_fu740_driver_dtbinit,
 };

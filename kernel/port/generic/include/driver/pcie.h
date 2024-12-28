@@ -4,6 +4,7 @@
 #pragma once
 
 #include "attributes.h"
+#include "pcie_class.h"
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -20,7 +21,7 @@
 
 
 
-// PCIe command register.
+// PCIe command register - not meant to be constructed.
 typedef union {
     struct {
         // Unused.
@@ -43,7 +44,7 @@ typedef union {
     uint16_t val;
 } pcie_cmdr_t;
 
-// PCIe status register.
+// PCIe status register - not meant to be constructed.
 typedef union {
     struct {
         // Unused.
@@ -70,7 +71,7 @@ typedef union {
     uint16_t val;
 } pcie_statr_t;
 
-// PCIe common header layout.
+// PCIe common header layout - not meant to be constructed.
 typedef struct {
     // Vendor ID.
     uint16_t              vendor_id;
@@ -95,7 +96,7 @@ typedef struct {
 } pcie_hdr_com_t;
 _Static_assert(sizeof(pcie_hdr_com_t) == 0x10, "Size of `pcie_hdr_com_t` must be 0x10");
 
-// PCIe type 0 (device) header layout.
+// PCIe type 0 (device) header layout - not meant to be constructed.
 typedef struct {
     // Header data common to type 0 and type 1.
     pcie_hdr_com_t    common;
@@ -122,7 +123,7 @@ typedef struct {
 } pcie_hdr_dev_t;
 _Static_assert(sizeof(pcie_hdr_dev_t) == 0x40, "Size of `pcie_hdr_dev_t` must be 0x40");
 
-// PCIe type 1 (switch) header layout.
+// PCIe type 1 (switch) header layout - not meant to be constructed.
 typedef struct {
     // Header data common to type 0 and type 1.
     pcie_hdr_com_t    common;
@@ -172,6 +173,120 @@ typedef struct {
     uint8_t           _reserved3[2];
 } pcie_hdr_sw_t;
 _Static_assert(sizeof(pcie_hdr_sw_t) == 0x40, "Size of `pcie_hdr_sw_t` must be 0x40");
+
+// PCIe capabilities register - not meant to be constructed.
+typedef union {
+    struct {
+        // Capability version, should be 2.
+        uint16_t ver     : 3;
+        // Device / port type.
+        uint16_t type    : 5;
+        // Slot implemented.
+        uint16_t impl    : 1;
+        // Interrupt message number.
+        uint16_t irq_msg : 5;
+        // Undefined.
+        uint16_t         : 1;
+        // Reserved.
+        uint16_t         : 1;
+    };
+    uint16_t val;
+} pcie_capr_t;
+
+// PCIe device capabilities register - not meant to be constructed.
+typedef union {
+    struct {
+        // Max payload size supported.
+        uint32_t max_payload   : 3;
+        // Phantom functions supported.
+        uint32_t phantom       : 2;
+        // Extended tag field supported.
+        uint32_t ext_tag_field : 1;
+        // Endpoint L0 acceptable latency.
+        uint32_t ep0_latency   : 3;
+        // Endpoint L1 acceptable latency.
+        uint32_t ep1_latency   : 3;
+        // Undefined.
+        uint32_t               : 3;
+        // Role-based error reporting.
+        uint32_t role_err      : 1;
+        // Reserved.
+        uint32_t               : 2;
+        // Captured slot power limit value.
+        uint32_t power_lim     : 8;
+        // Captured slot power limit scale.
+        uint32_t power_scale   : 2;
+        // Function level reset capability.
+        uint32_t func_reset    : 1;
+        // Reserved.
+        uint32_t               : 3;
+    };
+    uint32_t val;
+} pcie_devcapr_t;
+
+// PCIe device control register - not meant to be constructed.
+typedef union {
+    struct {
+        // Correctable error reporting enable.
+        uint16_t corr_err_en      : 1;
+        // Non-fatal error reporting enable.
+        uint16_t nonfatal_err_en  : 1;
+        // Fatal error reporting enable.
+        uint16_t fatal_err_en     : 1;
+        // Enable relaxed ordering.
+        uint16_t relaxed_order_en : 1;
+        // Max payload size.
+        uint16_t max_payload_size : 3;
+        // Extended tag field enable.
+        uint16_t ext_tag_field_en : 1;
+        // Phantom functions enable.
+        uint16_t phantom_en       : 1;
+        // Enable no snoop.
+        uint16_t nosnoop_en       : 1;
+        // Max read request size.
+        uint16_t max_read_size    : 3;
+        // Bridge configuration retry enable / initiate function level reset.
+        uint16_t func_reset_start : 1;
+    };
+    uint16_t val;
+} pcie_devctlr_t;
+
+// PCIe device status register - not meant to be constructed.
+typedef union {
+    struct {
+        // Correctable error detected.
+        uint16_t corr_err_det     : 1;
+        // Non-fatal error detected.
+        uint16_t nonfatal_err_det : 1;
+        // Fatal error detected.
+        uint16_t fatal_err_det    : 1;
+        // Unsupported request detected.
+        uint16_t unsupported_req  : 1;
+        // AUX power detected.
+        uint16_t aux_power_det    : 1;
+        // Transactions pending.
+        uint16_t trns_pending     : 1;
+        // Reserved.
+        uint16_t                  : 10;
+    };
+    uint16_t val;
+} pcie_devstatr_t;
+
+// PCIe common capability structure - not meant to be constructed.
+typedef struct {
+    // Capability ID.
+    uint8_t                  cap_id;
+    // Next capability pointer.
+    uint8_t                  next_cap;
+    // PCIe capabilities register.
+    pcie_capr_t              capr;
+    // PCIe device capabilities register.
+    pcie_devcapr_t           devcapr;
+    // PCIe device control register.
+    VOLATILE pcie_devctlr_t  devctlr;
+    // PCIe device status register.
+    VOLATILE pcie_devstatr_t devstatr;
+} pcie_cap_t;
 
 
 

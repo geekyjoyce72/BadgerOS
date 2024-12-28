@@ -14,6 +14,7 @@ set(cpu_enable_smp true)
 
 set(port_src
     ${CMAKE_CURRENT_LIST_DIR}/src/driver/pcie.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/driver/sata.c
     ${CMAKE_CURRENT_LIST_DIR}/src/hal/gpio.c
     ${CMAKE_CURRENT_LIST_DIR}/src/hal/i2c.c
     ${CMAKE_CURRENT_LIST_DIR}/src/hal/spi.c

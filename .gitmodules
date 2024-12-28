@@ -16,3 +16,6 @@
 [submodule "kernel/lib/badgelib"]
 	path = common/badgelib
 	url = https://github.com/badgeteam/badgelib
+[submodule "kernel/lib/uacpi"]
+	path = kernel/lib/uacpi
+	url = https://github.com/ultraos/uacpi
