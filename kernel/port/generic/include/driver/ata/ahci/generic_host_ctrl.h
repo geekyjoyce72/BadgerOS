@@ -157,26 +157,26 @@ typedef union {
 // HBA BAR registers: generic host control - not meant to be constructed.
 typedef struct {
     // Host Capabilities.
-    ahci_ghc_cap_t       cap;
+    VOLATILE ahci_ghc_cap_t       cap;
     // Global Host Control.
-    ahci_ghc_ghc_t       ghc;
+    VOLATILE ahci_ghc_ghc_t       ghc;
     // Interrupt Status.
-    ahci_ghc_is_t        is;
+    VOLATILE ahci_ghc_is_t        irq_status;
     // Ports Implemented.
-    ahci_ghc_pi_t        pi;
+    VOLATILE ahci_ghc_pi_t        ports_impl;
     // Version.
-    ahci_ghc_vs_t        vs;
+    VOLATILE ahci_ghc_vs_t        version;
     // Command Completion Coalescing Control.
-    ahci_ghc_ccc_ctl_t   ccc_ctl;
+    VOLATILE ahci_ghc_ccc_ctl_t   ccc_ctl;
     // Command Completion Coalsecing Ports.
-    ahci_ghc_ccc_ports_t ccc_ports;
+    VOLATILE ahci_ghc_ccc_ports_t ccc_ports;
     // Enclosure Management Location.
-    ahci_ghc_em_loc_t    em_loc;
+    VOLATILE ahci_ghc_em_loc_t    em_loc;
     // Enclosure Management Control.
-    ahci_ghc_em_ctl_t    em_ctl;
+    VOLATILE ahci_ghc_em_ctl_t    em_ctl;
     // Host Capabilities Extended.
-    ahci_ghc_cap2_t      cap2;
+    VOLATILE ahci_ghc_cap2_t      cap2;
     // BIOS/OS Handoff Control and Status.
-    ahci_ghc_bohc_t      bohc;
+    VOLATILE ahci_ghc_bohc_t      bohc;
 } ahci_bar_ghc_t;
 _Static_assert(sizeof(ahci_bar_ghc_t) == 0x2c, "Size of ahci_bar_t must be 0x2c");

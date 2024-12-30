@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include "attributes.h"
+
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -38,7 +40,7 @@ typedef union {
         uint32_t overflow      : 1;
     };
     uint32_t val;
-} achi_bar_port_irq_t;
+} ahci_bar_port_irq_t;
 
 // Command and status register.
 typedef union {
@@ -85,18 +87,106 @@ typedef union {
         uint32_t drive_led_atapi         : 1;
     };
     uint32_t val;
-} achi_bar_port_cmd_t;
+} ahci_bar_port_cmd_t;
+
+// Task file data.
+typedef union {
+    struct {
+        // Status.
+        uint32_t status : 8;
+        // Error.
+        uint32_t err    : 8;
+        // Reserved.
+        uint32_t        : 16;
+    };
+    uint32_t val;
+} ahci_bar_port_tfd_t;
+
+// SATA status register.
+typedef union {
+    struct {
+        // Device detection.
+        uint32_t detect : 4;
+        // Current interface speed..
+        uint32_t speed  : 4;
+        // Interface power management.
+        uint32_t power  : 4;
+    };
+    uint32_t val;
+} ahci_bar_port_sstatus_t;
+
+// SATA control register.
+typedef union {
+    struct {
+        // Devide detection initiation.
+        uint32_t det       : 4;
+        // Maximum speed.
+        uint32_t max_speed : 4;
+        // Allowed power management transitions.
+        uint32_t power     : 4;
+    };
+    uint32_t val;
+} ahci_bar_port_sctrl_t;
+
+// SATA error register.
+typedef union {
+    struct {
+        // Error code.
+        uint32_t err  : 16;
+        // Diagnostics code.
+        uint32_t diag : 16;
+    };
+    uint32_t val;
+} ahci_bar_port_err_t;
+
+// SATA port multiplier notification management register.
+typedef union {
+    // TODO.
+    uint32_t val;
+} ahci_bar_port_notif_t;
+
+// SATA port multiplier FIS-based switching control register.
+typedef union {
+    // TODO.
+    uint32_t val;
+} ahci_bar_port_swctrl_t;
+
+// SATA device sleep management.
+typedef union {
+    // TODO.
+    uint32_t val;
+} ahci_bar_port_sleep_t;
 
 // HBA BAR registers: AHCI port.
 typedef struct {
     // Command list base address.
-    uint64_t            cmdlist_addr;
+    VOLATILE uint64_t                cmdlist_addr;
     // FIS base address.
-    uint64_t            fis_addr;
+    VOLATILE uint64_t                fis_addr;
     // Interrupt status.
-    achi_bar_port_irq_t irq_status;
+    VOLATILE ahci_bar_port_irq_t     irq_status;
     // Interrupt enable.
-    achi_bar_port_irq_t irq_enable;
+    VOLATILE ahci_bar_port_irq_t     irq_enable;
     // Command and status register.
-    achi_bar_port_cmd_t cmd;
+    VOLATILE ahci_bar_port_cmd_t     cmd;
+    // Task file data.
+    VOLATILE ahci_bar_port_tfd_t     tfd;
+    // Port signature.
+    VOLATILE uint32_t                signature;
+    // SATA status register.
+    VOLATILE ahci_bar_port_sstatus_t sstatus;
+    // SATA control register.
+    VOLATILE ahci_bar_port_sctrl_t   sctrl;
+    // SATA error register.
+    VOLATILE ahci_bar_port_err_t     err;
+    // SATA active mask.
+    VOLATILE uint32_t                active;
+    // Command issue.
+    VOLATILE uint32_t                cmd_issue;
+    // Port multiplier notification management.
+    VOLATILE ahci_bar_port_notif_t   notif;
+    // Port multiplier switching control.
+    VOLATILE ahci_bar_port_swctrl_t  swctrl;
+    // Device sleep control.
+    VOLATILE ahci_bar_port_sleep_t   sleep_ctrl;
 } ahci_bar_port_t;

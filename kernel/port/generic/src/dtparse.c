@@ -25,6 +25,9 @@ static bool check_drivers(
     dtb_handle_t *handle, dtb_node_t *node, uint32_t addr_cells, uint32_t size_cells, char const *compat_str
 ) {
     for (driver_t const *driver = start_drivers; driver != stop_drivers; driver++) {
+        if (driver->type != DRIVER_TYPE_DTB) {
+            continue;
+        }
         for (size_t j = 0; j < driver->dtb_supports_len; j++) {
             if (cstr_equals(compat_str, driver->dtb_supports[j])) {
                 driver->dtb_init(handle, node, addr_cells, size_cells);

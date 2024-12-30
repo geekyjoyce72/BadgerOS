@@ -5,6 +5,19 @@
 
 #include "attributes.h"
 
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+
+
+
+// PCIe class code.
+typedef struct PACKED {
+    uint8_t progif;
+    uint8_t subclass;
+    uint8_t baseclass;
+} pci_class_t;
+
 
 
 // PCI base class definition.

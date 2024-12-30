@@ -32,7 +32,7 @@ typedef struct {
     union {
         struct {
             // PCI device class code.
-            uint8_t           pci_class[3];
+            pci_class_t       pci_class;
             // Init from PCI / PCIe.
             driver_pci_init_t pci_init;
         };

@@ -3,12 +3,10 @@
 
 #pragma once
 
-#include "driver/pcie.h"
-#include "driver/sata/ahci_port.h"
-#include "driver/sata/generic_host_ctrl.h"
-#include "driver/sata/pci_cap.h"
-
-
+#include "driver/ata.h"
+#include "driver/ata/ahci/ahci_port.h"
+#include "driver/ata/ahci/generic_host_ctrl.h"
+#include "driver/ata/ahci/pci_cap.h"
 
 // All HBA BAR registers - not meant to be constructed.
 typedef struct {
@@ -22,13 +20,19 @@ typedef struct {
     uint8_t         _reserved2[96];
     // Port control registers.
     ahci_bar_port_t ports[32];
-} achi_bar_t;
-_Static_assert(offsetof(achi_bar_t, ports) == 0x100, "Offset of ports in ahci_bar_t must be 0x100");
-
-
+} ahci_bar_t;
+_Static_assert(offsetof(ahci_bar_t, ports) == 0x100, "Offset of ports in ahci_bar_t must be 0x100");
 
 // SATA controller handle.
 typedef struct {
+    // Base class.
+    ata_handle_t     base;
     // PCI address.
-    pcie_addr_t addr;
+    pcie_addr_t      addr;
+    // PCI BAR handle.
+    pci_bar_handle_t bar;
+    // Port number.
+    int              port;
+    // Pointer to HBA BAR registers.
+    ahci_bar_t      *regs;
 } sata_handle_t;

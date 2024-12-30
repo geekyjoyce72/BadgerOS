@@ -48,8 +48,24 @@ static bool pcie_controller_init() {
     return true;
 }
 
+
+// Find a matching driver.
+static bool find_pci_driver(pci_class_t classcode, pcie_addr_t addr) {
+    for (driver_t const *driver = start_drivers; driver != stop_drivers; driver++) {
+        if (driver->type != DRIVER_TYPE_PCI) {
+            continue;
+        }
+        if (driver->pci_class.baseclass == classcode.baseclass && driver->pci_class.subclass == classcode.subclass &&
+            driver->pci_class.progif == classcode.progif) {
+            driver->pci_init(addr);
+            return true;
+        }
+    }
+    return false;
+}
+
 // Enumerate function via ECAM.
-void pcie_ecam_func_detect(uint8_t bus, uint8_t dev, uint8_t func) {
+static void pcie_ecam_func_detect(uint8_t bus, uint8_t dev, uint8_t func) {
     pcie_hdr_com_t *hdr = (void *)(ctl.config_vaddr + (bus * 256 + dev * 8 + func) * 4096);
     logkf(
         LOG_DEBUG,
@@ -58,14 +74,15 @@ void pcie_ecam_func_detect(uint8_t bus, uint8_t dev, uint8_t func) {
         dev,
         func,
         hdr->hdr_type,
-        hdr->classcode[2],
-        hdr->classcode[1],
-        hdr->classcode[0]
+        hdr->classcode.baseclass,
+        hdr->classcode.subclass,
+        hdr->classcode.progif
     );
+    find_pci_driver(hdr->classcode, (pcie_addr_t){bus, dev, func});
 }
 
 // Enumerate device via ECAM.
-void pcie_ecam_dev_detect(uint8_t bus, uint8_t dev) {
+static void pcie_ecam_dev_detect(uint8_t bus, uint8_t dev) {
     pcie_hdr_com_t *hdr = (void *)(ctl.config_vaddr + (bus * 256 + dev * 8) * 4096);
     if (hdr->vendor_id == 0xffff) {
         return;
@@ -101,6 +118,97 @@ void *pcie_ecam_vaddr(pcie_addr_t addr) {
 }
 
 
+// Get info from a BAR register.
+pci_bar_info_t pci_bar_info(VOLATILE pci_bar_t *bar) {
+    if (*bar & BAR_FLAG_IO) {
+        // I/O BARs.
+        pci_bar_t orig = *bar;
+        *bar           = -1;
+        pci_bar_t len  = 1 + ~(*bar & BAR_IO_ADDR_MASK);
+        *bar           = orig;
+        return (pci_bar_info_t){
+            .is_io    = true,
+            .is_64bit = false,
+            .prefetch = false,
+            .paddr    = orig & BAR_IO_ADDR_MASK,
+            .len      = len,
+        };
+
+    } else if (*bar & BAR_FLAG_64BIT) {
+        // 64-bit memory BARs.
+        pci_bar64_t *bar64 = (pci_bar64_t *)bar;
+        pci_bar64_t  orig  = *bar64;
+        *bar64             = -1;
+        pci_bar64_t len    = 1 + ~(*bar64 & BAR_MEM64_ADDR_MASK);
+        *bar64             = orig;
+        return (pci_bar_info_t){
+            .is_io    = false,
+            .is_64bit = true,
+            .prefetch = *bar & BAR_FLAG_PREFETCH,
+            .paddr    = orig & BAR_MEM64_ADDR_MASK,
+            .len      = len,
+        };
+
+    } else {
+        // 32-bit memory BARs.
+        pci_bar64_t orig = *bar;
+        *bar             = -1;
+        pci_bar64_t len  = 1 + ~(*bar & BAR_MEM32_ADDR_MASK);
+        *bar             = orig;
+        return (pci_bar_info_t){
+            .is_io    = false,
+            .is_64bit = false,
+            .prefetch = *bar & BAR_FLAG_PREFETCH,
+            .paddr    = orig & BAR_MEM32_ADDR_MASK,
+            .len      = len,
+        };
+    }
+}
+
+// Map a BAR into CPU virtual memory.
+pci_bar_handle_t pci_bar_map(VOLATILE pci_bar_t *bar) {
+    // Get info from this BAR register.
+    pci_bar_info_t info = pci_bar_info(bar);
+
+    // Find a matching PCI BAR range.
+    pci_paddr_t ppa;
+    uint64_t    pci_paddr;
+    size_t      i;
+    for (i = 0; i < ctl.ranges_len; i++) {
+        ppa       = ctl.ranges[i].pci_paddr;
+        pci_paddr = ((uint64_t)ppa.addr_hi << 32) | ppa.addr_lo;
+        if ((ppa.attr.type == PCI_ASPACE_IO) == info.is_io && pci_paddr <= info.paddr &&
+            pci_paddr + ctl.ranges[i].length >= info.paddr + info.len) {
+            break;
+        }
+    }
+    if (i >= ctl.ranges_len) {
+        // No matches found.
+        return (pci_bar_handle_t){0};
+    }
+
+    // Determine CPU physical address.
+    size_t cpu_paddr = ctl.ranges[i].cpu_paddr + info.paddr - pci_paddr;
+
+    // Determine appropriate flags.
+    int flags = MEMPROTECT_FLAG_RW | MEMPROTECT_FLAG_NC;
+    if (!ppa.attr.prefetch) {
+        flags |= MEMPROTECT_FLAG_IO;
+    }
+
+    // Create MMU mapping.
+    size_t vaddr = memprotect_alloc_vaddr(info.len);
+    if (!vaddr || !memprotect_k(vaddr, cpu_paddr, info.len, flags)) {
+        return (pci_bar_handle_t){0};
+    }
+
+    return (pci_bar_handle_t){
+        .bar     = info,
+        .pointer = (void *)vaddr,
+    };
+}
+
+
 
 // Extract ranges from DTB.
 static bool pcie_dtb_ranges(dtb_handle_t *handle, dtb_node_t *node, uint32_t addr_cells, uint32_t size_cells) {
@@ -114,35 +222,31 @@ static bool pcie_dtb_ranges(dtb_handle_t *handle, dtb_node_t *node, uint32_t add
     // If ranges is empty, it is identity-mapped.
     if (ranges->content_len == 0) {
         ctl.ranges_len = 1;
-        ctl.ranges     = malloc(sizeof(pcie_bar_range_t));
+        ctl.ranges     = malloc(sizeof(pci_bar_range_t));
         if (!ctl.ranges) {
             return false;
         }
-        ctl.ranges[0] = (pcie_bar_range_t){
+        ctl.ranges[0] = (pci_bar_range_t){
             .cpu_paddr = 0,
-            .pci_addr  = 0,
+            .pci_paddr = {0},
             .length    = SIZE_MAX,
-            .cpu_vaddr = 0,
         };
         return true;
     }
 
     // TODO: Is a range always 7 cells?
     ctl.ranges_len = ranges->content_len / (4 * 7);
-    ctl.ranges     = malloc(ctl.ranges_len * sizeof(pcie_bar_range_t));
+    ctl.ranges     = malloc(ctl.ranges_len * sizeof(pci_bar_range_t));
     if (!ctl.ranges) {
         return false;
     }
     for (size_t i = 0; i < ctl.ranges_len; i++) {
-        ctl.ranges[i] = (pcie_bar_range_t){
-            .cpu_paddr = dtb_prop_read_cells(handle, ranges, i * 7 + 3, 2),
-            .pci_addr =
-                {
-                    dtb_prop_read_cells(handle, ranges, i * 7 + 0, 2),
-                    dtb_prop_read_cells(handle, ranges, i * 7 + 1, 2),
-                    dtb_prop_read_cells(handle, ranges, i * 7 + 2, 2),
-                },
-            .length = dtb_prop_read_cells(handle, ranges, i * 7 + 6, 1),
+        ctl.ranges[i] = (pci_bar_range_t){
+            .cpu_paddr          = dtb_prop_read_cells(handle, ranges, i * 7 + 3, 2),
+            .pci_paddr.attr.val = dtb_prop_read_cells(handle, ranges, i * 7 + 0, 1),
+            .pci_paddr.addr_hi  = dtb_prop_read_cells(handle, ranges, i * 7 + 1, 1),
+            .pci_paddr.addr_lo  = dtb_prop_read_cells(handle, ranges, i * 7 + 2, 1),
+            .length             = dtb_prop_read_cells(handle, ranges, i * 7 + 6, 1),
         };
     }
     return true;

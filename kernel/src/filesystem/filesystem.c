@@ -377,7 +377,7 @@ void fs_mount(badge_err_t *ec, fs_type_t type, blkdev_t *media, char const *moun
         }
     }
     if (vfs_index == FILESYSTEM_MOUNT_MAX) {
-        logk(LOG_ERROR, "fs_mount: Mounted filesystem limit (" comptime_stringify(FILESYSTEM_MOUNT_MAX) ") reached.");
+        logkf(LOG_ERROR, "fs_mount: Mounted filesystem limit (%{d}) reached.", FILESYSTEM_MOUNT_MAX);
         badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_UNAVAIL);
         free(mountpoint_copy);
         mutex_release(NULL, &vfs_mount_mtx);
@@ -385,7 +385,7 @@ void fs_mount(badge_err_t *ec, fs_type_t type, blkdev_t *media, char const *moun
     }
 
     // Check writeability.
-    if (!(flags & MOUNTFLAGS_READONLY) && media && media->readonly) {
+    if (!(flags & MOUNTFLAGS_READONLY) && media && blkdev_is_readonly(media)) {
         logk(LOG_ERROR, "fs_mount: Writeable filesystem on readonly media.");
         badge_err_set(ec, ELOC_FILESYSTEM, ECAUSE_READONLY);
         goto error_cleanup;
