@@ -64,7 +64,7 @@ typedef union {
         // Reserved.
         uint32_t                 : 28;
         // Legacy AHCI enable.
-        uint32_t legacy_ahci_en  : 1;
+        uint32_t ahci_en         : 1;
     };
     uint32_t val;
 } ahci_ghc_ghc_t;

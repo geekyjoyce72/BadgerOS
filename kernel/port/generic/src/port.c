@@ -6,6 +6,7 @@
 #include "assertions.h"
 #include "cpu/mmu.h"
 #include "cpu/panic.h"
+#include "driver/pcie.h"
 #include "interrupt.h"
 #include "isr_ctx.h"
 #include "memprotect.h"
@@ -202,6 +203,8 @@ void port_postheap_init() {
 
 // Full hardware initialization.
 void port_init() {
+    // Enumerate PCIe devices.
+    pcie_ecam_detect();
 }
 
 // Send a single character to the log output.

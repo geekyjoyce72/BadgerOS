@@ -43,7 +43,7 @@ void port_postheap_init() {
 // Full hardware initialization.
 void port_init() {
     extern void esp_i2c_isr();
-    irq_ch_set_isr(ETS_I2C0_INTR_SOURCE, esp_i2c_isr);
+    isr_install(ETS_I2C0_INTR_SOURCE, (isr_t)esp_i2c_isr, NULL);
     irq_ch_enable(ETS_I2C0_INTR_SOURCE);
 }
 

@@ -23,9 +23,6 @@
 // Temporary interrupt context before scheduler.
 static isr_ctx_t tmp_ctx = {.flags = ISR_CTX_FLAG_KERNEL};
 
-// Interrupt service routine table.
-static isr_t isr_table[ETS_MAX_INTR_SOURCE];
-
 // NOLINTNEXTLINE
 extern intmtx_t       INTMTX0;
 // NOLINTNEXTLINE
@@ -143,12 +140,8 @@ bool irq_ch_is_enabled(int irq) {
     return (enable_mask[irq / 32] >> (irq % 32)) & 1;
 }
 
-// Set the interrupt service routine for an interrupt on this CPU.
-void irq_ch_set_isr(int irq, isr_t isr) {
-    assert_dev_drop(irq >= 0 && irq < ETS_MAX_INTR_SOURCE);
-    isr_table[irq] = isr;
-}
-
+// Generic interrupt handler that runs all callbacks on an IRQ.
+void generic_interrupt_handler(int irq);
 void timer_isr_timer_alarm();
 
 // Callback from ASM to platform-specific interrupt handler.
@@ -171,12 +164,7 @@ void riscv_interrupt_handler() {
             int irq            = i * 32 + lsb_pos;
             int prev           = atomic_fetch_or(&claim_mask[i], lsb_mask);
             if (!(prev & lsb_mask)) {
-                if (!isr_table[irq]) {
-                    logkf(LOG_FATAL, "Unhandled interrupt #%{u32;d}", irq);
-                    panic_abort();
-                } else {
-                    isr_table[irq]((int)irq);
-                }
+                generic_interrupt_handler(irq);
                 atomic_fetch_and(&claim_mask[i], ~lsb_mask);
             }
         }

@@ -58,15 +58,6 @@ void dtparse(void *dtb_ptr) {
     // Walk the SOC node to detect devices and install drivers.
     dtb_node_t *node = soc->nodes;
     while (node) {
-        // // Debug log.
-        // logkf_from_isr(LOG_DEBUG, "Node %{cs}", node.name);
-        // dtb_entity_t reg = dtb_get_prop(handle, node, "reg");
-        // for (uint32_t i = 0; i < reg.prop_len / 4 / (soc_alen + soc_slen); i++) {
-        //     size_t base = dtb_prop_read_cells(handle, reg, i * (soc_alen + soc_slen), soc_alen);
-        //     size_t size = dtb_prop_read_cells(handle, reg, i * (soc_alen + soc_slen) + soc_alen, soc_slen);
-        //     logkf_from_isr(LOG_DEBUG, "  Reg[%{u32;d}]:  base=0x%{size;x}  size=0x%{size;x}", i, base, size);
-        // }
-
         // Read which drivers the device is compatible with.
         dtb_prop_t *compatible = dtb_get_prop(handle, node, "compatible");
         uint32_t    compat_len = 0;

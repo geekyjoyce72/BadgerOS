@@ -11,8 +11,10 @@
 
 
 
-// Detected PCIe controllers.
+// PCIe controller data.
 static pcie_controller_t ctl;
+// Whether the PCIe controller is present.
+static bool              ctl_present;
 
 
 
@@ -42,15 +44,14 @@ static bool pcie_controller_init() {
         free(ctl.ranges);
         return -1;
     }
+    ctl_present = true;
 
-    // Detect devices.
-    pcie_ecam_detect();
     return true;
 }
 
 
 // Find a matching driver.
-static bool find_pci_driver(pci_class_t classcode, pcie_addr_t addr) {
+static bool find_pci_driver(pci_class_t classcode, pci_addr_t addr) {
     for (driver_t const *driver = start_drivers; driver != stop_drivers; driver++) {
         if (driver->type != DRIVER_TYPE_PCI) {
             continue;
@@ -78,7 +79,7 @@ static void pcie_ecam_func_detect(uint8_t bus, uint8_t dev, uint8_t func) {
         hdr->classcode.subclass,
         hdr->classcode.progif
     );
-    find_pci_driver(hdr->classcode, (pcie_addr_t){bus, dev, func});
+    find_pci_driver(hdr->classcode, (pci_addr_t){bus, dev, func});
 }
 
 // Enumerate device via ECAM.
@@ -102,6 +103,10 @@ static void pcie_ecam_dev_detect(uint8_t bus, uint8_t dev) {
 
 // Enumerate devices via ECAM.
 void pcie_ecam_detect() {
+    if (!ctl_present) {
+        return;
+    }
+    logk(LOG_INFO, "Enumerating PCIe devices");
     for (unsigned bus = ctl.bus_start; bus <= ctl.bus_end; bus++) {
         for (uint8_t dev = 0; dev < 32; dev++) {
             pcie_ecam_dev_detect(bus, dev);
@@ -110,7 +115,7 @@ void pcie_ecam_detect() {
 }
 
 // Get the ECAM virtual address for a device.
-void *pcie_ecam_vaddr(pcie_addr_t addr) {
+void *pcie_ecam_vaddr(pci_addr_t addr) {
     if (addr.bus < ctl.bus_start || addr.bus > ctl.bus_end) {
         return NULL;
     }
@@ -208,14 +213,40 @@ pci_bar_handle_t pci_bar_map(VOLATILE pci_bar_t *bar) {
     };
 }
 
+// Trace a PCI interrupt pin [1,4] to a CPU interrupt.
+// Returns -1 if the interrupt does not exist.
+int pci_trace_irq_pin(pci_addr_t addr, int pci_irq) {
+    pci_paddr_t paddr = {
+        .attr.bus  = addr.bus,
+        .attr.dev  = addr.dev,
+        .attr.func = addr.func,
+    };
+    paddr.attr.val &= ctl.irqmap_mask.attr.val;
+    for (size_t i = 0; i < ctl.irqmap_len; i++) {
+        if (paddr.attr.val == ctl.irqmap[i].pci_paddr.attr.val && pci_irq == ctl.irqmap[i].pci_irq) {
+            return ctl.irqmap[i].cpu_irq;
+        }
+    }
+    return -1;
+}
+
 
 
 // Extract ranges from DTB.
-static bool pcie_dtb_ranges(dtb_handle_t *handle, dtb_node_t *node, uint32_t addr_cells, uint32_t size_cells) {
-    (void)addr_cells;
-    (void)size_cells;
+static bool pci_dtb_ranges(dtb_handle_t *handle, dtb_node_t *node) {
     dtb_prop_t *ranges = dtb_get_prop(handle, node, "ranges");
     if (!ranges) {
+        logk(LOG_ERROR, "Missing ranges for PCI");
+        return false;
+    }
+
+    // PCIe cell counts must match these numbers.
+    if (dtb_read_uint(handle, node, "#size-cells") != 2) {
+        logk(LOG_ERROR, "Incorrect #size-cells for PCI");
+        return false;
+    }
+    if (dtb_read_uint(handle, node, "#address-cells") != 3) {
+        logk(LOG_ERROR, "Incorrect #address-cells for PCI");
         return false;
     }
 
@@ -234,10 +265,11 @@ static bool pcie_dtb_ranges(dtb_handle_t *handle, dtb_node_t *node, uint32_t add
         return true;
     }
 
-    // TODO: Is a range always 7 cells?
+    // A PCI range mapping is always 7 cells total.
     ctl.ranges_len = ranges->content_len / (4 * 7);
     ctl.ranges     = malloc(ctl.ranges_len * sizeof(pci_bar_range_t));
     if (!ctl.ranges) {
+        logk(LOG_ERROR, "Out of memory while initializing PCI");
         return false;
     }
     for (size_t i = 0; i < ctl.ranges_len; i++) {
@@ -252,25 +284,106 @@ static bool pcie_dtb_ranges(dtb_handle_t *handle, dtb_node_t *node, uint32_t add
     return true;
 }
 
+// Extract interrupt mappings from DTB.
+static bool pci_dtb_irqmap(dtb_handle_t *handle, dtb_node_t *node) {
+    // PCI #interrupt-cells must be 1.
+    if (dtb_read_uint(handle, node, "#interrupt-cells") != 1) {
+        logk(LOG_ERROR, "Incorrect #interrupt-cells for PCI");
+        return false;
+    }
+
+    dtb_prop_t *interrupt_mask = dtb_get_prop(handle, node, "interrupt-map-mask");
+    if (!interrupt_mask) {
+        logk(LOG_WARN, "Missing interrupt-map-mask for PCI");
+        return false;
+
+    } else if (interrupt_mask->content_len != 16) {
+        logk(LOG_ERROR, "Incorrect interrupt-map-mask for PCI");
+        return false;
+
+    } else {
+        ctl.irqmap_mask.attr.val = dtb_prop_read_cell(handle, interrupt_mask, 0);
+        ctl.irqmap_mask.addr_hi  = dtb_prop_read_cell(handle, interrupt_mask, 1);
+        ctl.irqmap_mask.addr_lo  = dtb_prop_read_cell(handle, interrupt_mask, 2);
+    }
+
+    // TODO: DTB supports far more complex interrupt trees than BadgerOS does.
+    // BadgerOS only supports interrupts directly into the CPU's interrupt controller.
+    dtb_prop_t *interrupt_map = dtb_get_prop(handle, node, "interrupt-map");
+    if (!interrupt_map) {
+        logk(LOG_ERROR, "Missing interrupt-map for PCI");
+    }
+
+    ctl.irqmap_len = interrupt_map->content_len / 4 / 6;
+    ctl.irqmap     = malloc(sizeof(pci_irqmap_t) * ctl.irqmap_len);
+    if (!ctl.irqmap) {
+        logk(LOG_ERROR, "Out of memory while initializing PCI");
+        return false;
+    }
+    for (size_t i = 0; i < ctl.irqmap_len; i++) {
+        ctl.irqmap[i].pci_paddr.attr.val = dtb_prop_read_cell(handle, interrupt_map, i * 6 + 0);
+        ctl.irqmap[i].pci_paddr.addr_hi  = dtb_prop_read_cell(handle, interrupt_map, i * 6 + 1);
+        ctl.irqmap[i].pci_paddr.addr_lo  = dtb_prop_read_cell(handle, interrupt_map, i * 6 + 2);
+        ctl.irqmap[i].pci_irq            = dtb_prop_read_cell(handle, interrupt_map, i * 6 + 3);
+        // phandle = dtb_prop_read_cell(handle, interrupt_map, i * 6 + 4);
+        ctl.irqmap[i].cpu_irq            = dtb_prop_read_cell(handle, interrupt_map, i * 6 + 5);
+    }
+
+    return true;
+}
+
 // DTB init for normal PCIe.
 static void pcie_driver_dtbinit(dtb_handle_t *handle, dtb_node_t *node, uint32_t addr_cells, uint32_t size_cells) {
-    ctl.type = PCIE_CTYPE_GENERIC_ECAM;
-    if (!pcie_dtb_ranges(handle, node, addr_cells, size_cells)) {
+    (void)size_cells;
+    if (ctl_present) {
+        logk(LOG_WARN, "Multiple PCIe controllers detected; only the first is used.");
         return;
     }
+    ctl.type = PCIE_CTYPE_GENERIC_ECAM;
+
+    // Read configuration space physical address.
     ctl.config_paddr = dtb_read_cells(handle, node, "reg", 0, addr_cells);
-    // size_t config_len = dtb_read_cells(handle, node, "reg", addr_cells, size_cells);
-    // size_t bus_count  = config_len / 1048576;
-    ctl.bus_start    = dtb_read_cell(handle, node, "bus-range", 0);
-    ctl.bus_end      = dtb_read_cell(handle, node, "bus-range", 1);
+
+    // Read bus range.
+    dtb_prop_t *bus_range = dtb_get_prop(handle, node, "bus-range");
+    if (bus_range->content_len != 8) {
+        logk(LOG_ERROR, "Incorrect bus-range for PCI");
+        goto malformed_dtb;
+    }
+    ctl.bus_start = dtb_prop_read_cell(handle, bus_range, 0);
+    ctl.bus_end   = dtb_prop_read_cell(handle, bus_range, 1);
+
+    // Read PCIe interrupt mappings.
+    if (!pci_dtb_irqmap(handle, node)) {
+        goto malformed_dtb;
+    }
+
+    // Read PCIe range mappings.
+    if (!pci_dtb_ranges(handle, node)) {
+        goto malformed_dtb;
+    }
+
     pcie_controller_init();
+    return;
+
+malformed_dtb:
+    logk(LOG_WARN, "Initialization failed; ignoring this PCIe controller!");
 }
 
 // DTB init for FU740 PCIe.
 static void
     pcie_fu740_driver_dtbinit(dtb_handle_t *handle, dtb_node_t *node, uint32_t addr_cells, uint32_t size_cells) {
+    if (ctl_present) {
+        logk(LOG_WARN, "Multiple PCIe controllers detected; only the first is used.");
+        return;
+    }
     ctl.type = PCIE_CTYPE_SIFIVE_FU740;
-    pcie_dtb_ranges(handle, node, addr_cells, size_cells);
+    if (!pci_dtb_ranges(handle, node)) {
+        logk(LOG_WARN, "Malformed DTB; ignoring this PCIe controller!");
+        return;
+    }
+    // TODO: Find FU740 PCIe configuration space.
+    pcie_controller_init();
 }
 
 

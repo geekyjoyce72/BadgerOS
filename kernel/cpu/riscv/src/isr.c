@@ -168,6 +168,8 @@ void riscv_trap_handler() {
             rawputc(info.flags & MEMPROTECT_FLAG_X ? 'x' : '-');
             rawputc(info.flags & MEMPROTECT_FLAG_KERNEL ? 'k' : 'u');
             rawputc(info.flags & MEMPROTECT_FLAG_GLOBAL ? 'g' : '-');
+            rawprint("\nPhysical address: 0x");
+            rawprinthex(info.paddr, 2 * sizeof(size_t));
             rawputc('\n');
         } else {
             rawprint("No memory at this address.\n");

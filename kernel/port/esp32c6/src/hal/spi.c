@@ -75,7 +75,7 @@ void spi_controller_init(
     // Clock configuration.
     clkconfig_spi2(bitrate, true, false);
 
-    irq_ch_set_isr(ETS_GSPI2_INTR_SOURCE, (isr_t)spi_isr);
+    isr_install(ETS_GSPI2_INTR_SOURCE, (isr_t)spi_isr, NULL);
     irq_ch_enable(ETS_GSPI2_INTR_SOURCE);
     GPSPI2.dma_int_ena.trans_done = true;
 
@@ -117,8 +117,8 @@ void spi_controller_init(
 }
 
 static void spi_controller_transfer_generic(badge_err_t *ec, int spi_num, void *buf, size_t len) {
-    int const data_buf_len = sizeof(GPSPI2.data_buf);
-    uint32_t  words[data_buf_len / sizeof(GPSPI2.data_buf[0])];
+    size_t const data_buf_len = sizeof(GPSPI2.data_buf);
+    uint32_t     words[data_buf_len / sizeof(GPSPI2.data_buf[0])];
 
     // Bounds check.
     if (spi_num != 0) {

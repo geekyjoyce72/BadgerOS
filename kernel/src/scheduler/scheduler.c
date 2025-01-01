@@ -616,7 +616,7 @@ tid_t thread_new_kernel(badge_err_t *ec, char const *name, sched_entry_t entrypo
         return 0;
     }
 
-    logkf(LOG_DEBUG, "Kernel thread #%{d} '%{cs}' @0x%{size;x} created", thread->id, thread->name, thread);
+    // logkf(LOG_DEBUG, "Kernel thread #%{d} '%{cs}' @0x%{size;x} created", thread->id, thread->name, thread);
 
     badge_err_set_ok(ec);
     return thread->id;

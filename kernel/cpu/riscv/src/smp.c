@@ -93,10 +93,8 @@ static REQ struct limine_smp_request smp_req = {
 
 // Initialise the SMP subsystem.
 void smp_init_dtb(dtb_handle_t *dtb) {
-    int cpu_index = 0;
-
-    sbi_ret_t res = sbi_probe_extension(SBI_HART_MGMT_EID);
-    sbi_supports_hsm == res.retval && !res.status;
+    sbi_ret_t res    = sbi_probe_extension(SBI_HART_MGMT_EID);
+    sbi_supports_hsm = res.retval && !res.status;
     if (sbi_supports_hsm) {
         // SBI supports HSM; CPUs can be started and stopped.
         logk(LOG_DEBUG, "SBI supports HSM");
@@ -188,7 +186,6 @@ int smp_cur_cpu() {
 
 // Get the SMP CPU index from the CPU ID value.
 int smp_get_cpu(size_t cpuid) {
-    return 0;
     smp_map_t         dummy = {.cpuid = cpuid};
     array_binsearch_t res   = array_binsearch(smp_map, sizeof(smp_map_t), smp_map_len, &dummy, smp_cpuid_cmp);
     if (res.found) {
@@ -210,7 +207,7 @@ size_t smp_get_cpuid(int cpu) {
 
 
 // First stage entrypoint for secondary CPUs.
-static NAKED void cpu1_init0_limine(struct limine_smp_info *info) {
+static NAKED void cpu1_init0_limine(__attribute__((used)) struct limine_smp_info *info) {
     // clang-format off
     asm(
         ".option push;"

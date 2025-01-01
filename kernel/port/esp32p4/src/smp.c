@@ -33,7 +33,7 @@ static void appcpu_stub() {
 static void appcpu_stub_2() __attribute__((unused));
 static void appcpu_stub_2() {
     isr_ctx_t kctx  = {0};
-    kctx.flags     |= ISR_CTX_FLAG_KERNEL | ISR_CTX_FLAG_USE_SP;
+    kctx.flags     |= ISR_CTX_FLAG_KERNEL;
     kctx.cpulocal   = &port_cpu1_local;
     asm("csrw mscratch, %0" ::"r"(&kctx));
     cpu1_entry();

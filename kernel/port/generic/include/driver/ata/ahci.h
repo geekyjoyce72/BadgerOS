@@ -28,11 +28,11 @@ typedef struct {
     // Base class.
     ata_handle_t     base;
     // PCI address.
-    pcie_addr_t      addr;
+    pci_addr_t       addr;
     // PCI BAR handle.
     pci_bar_handle_t bar;
-    // Port number.
-    int              port;
+    // Enabled ports.
+    uint32_t         ports_enabled;
     // Pointer to HBA BAR registers.
     ahci_bar_t      *regs;
 } sata_handle_t;

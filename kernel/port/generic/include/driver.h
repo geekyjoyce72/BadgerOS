@@ -17,7 +17,7 @@
 // Init function for devices detected from DTB.
 typedef void (*driver_dtb_init_t)(dtb_handle_t *dtb, dtb_node_t *node, uint32_t addr_cells, uint32_t size_cells);
 // Init function for devices detected from PCI / PCIe.
-typedef void (*driver_pci_init_t)(pcie_addr_t addr);
+typedef void (*driver_pci_init_t)(pci_addr_t addr);
 
 // Supported device driver types.
 typedef enum {
