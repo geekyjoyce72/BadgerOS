@@ -104,6 +104,9 @@ static void kernel_lifetime_func() {
         shutdown_mode = atomic_load(&kernel_shutdown_mode);
     } while (shutdown_mode == 0);
 
+    logk(LOG_FATAL, "We do a little trolling");
+    panic_abort();
+
     // Shut down the userland.
     userland_shutdown();
     // Tie up loose ends.
