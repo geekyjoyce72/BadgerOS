@@ -3,12 +3,16 @@
 
 #pragma once
 
+#include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 
 
 // Maximum number of PLIC contexts.
 #define PLIC_MAX_CTX_COUNT 15872
+// Address space size of the PLIC.
+#define PLIC_MEM_SIZE      0x4000000
 
 // Offset for interrupt priorities.
 #define PLIC_PRIO_OFF        0x000000

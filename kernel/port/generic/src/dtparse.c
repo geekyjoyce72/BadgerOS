@@ -25,9 +25,12 @@ static bool check_drivers(
     dtb_handle_t *handle, dtb_node_t *node, uint32_t addr_cells, uint32_t size_cells, char const *compat_str
 ) {
     for (driver_t const *driver = start_drivers; driver != stop_drivers; driver++) {
+        if (driver->type != DRIVER_TYPE_DTB) {
+            continue;
+        }
         for (size_t j = 0; j < driver->dtb_supports_len; j++) {
             if (cstr_equals(compat_str, driver->dtb_supports[j])) {
-                driver->dtbinit(handle, node, addr_cells, size_cells);
+                driver->dtb_init(handle, node, addr_cells, size_cells);
                 return true;
             }
         }
@@ -47,21 +50,14 @@ void dtparse(void *dtb_ptr) {
     uint32_t    soc_alen = dtb_read_uint(handle, soc, "#address-cells");
     uint32_t    soc_slen = dtb_read_uint(handle, soc, "#size-cells");
 
+    // Initialise timers.
+    time_init_dtb(handle);
     // Initialise SMP.
-    smp_init(handle);
+    smp_init_dtb(handle);
 
     // Walk the SOC node to detect devices and install drivers.
     dtb_node_t *node = soc->nodes;
     while (node) {
-        // // Debug log.
-        // logkf_from_isr(LOG_DEBUG, "Node %{cs}", node.name);
-        // dtb_entity_t reg = dtb_get_prop(handle, node, "reg");
-        // for (uint32_t i = 0; i < reg.prop_len / 4 / (soc_alen + soc_slen); i++) {
-        //     size_t base = dtb_prop_read_cells(handle, reg, i * (soc_alen + soc_slen), soc_alen);
-        //     size_t size = dtb_prop_read_cells(handle, reg, i * (soc_alen + soc_slen) + soc_alen, soc_slen);
-        //     logkf_from_isr(LOG_DEBUG, "  Reg[%{u32;d}]:  base=0x%{size;x}  size=0x%{size;x}", i, base, size);
-        // }
-
         // Read which drivers the device is compatible with.
         dtb_prop_t *compatible = dtb_get_prop(handle, node, "compatible");
         uint32_t    compat_len = 0;

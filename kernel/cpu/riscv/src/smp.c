@@ -12,7 +12,25 @@
 #include "mutex.h"
 #include "port/dtb.h"
 
+#include <limine.h>
 
+#define REQ __attribute__((section(".requests")))
+
+
+
+// SMP status.
+typedef struct {
+    // CPU is currently running.
+    bool  is_up;
+    // CPU has been taken over from Limine.
+    bool  did_jump;
+    // Temporary stack pointer.
+    void *tmp_stack;
+    // Point to jump to after starting the CPU.
+    void (*entrypoint)();
+    // CPU-local data.
+    cpulocal_t cpulocal;
+} smp_status_t;
 
 // CPUID to/from SMP index map.
 typedef struct {
@@ -47,9 +65,7 @@ static int smp_cpuid_cmp(void const *a, void const *b) {
 }
 
 // SMP operation mutex.
-static mutex_t smp_mtx = MUTEX_T_INIT;
-// CPU1 stack pointer.
-void          *cpu1_temp_stack;
+static mutex_t smp_mtx   = MUTEX_T_INIT;
 // Number of detected CPU cores.
 int            smp_count = 1;
 
@@ -62,15 +78,28 @@ static size_t     smp_unmap_len;
 // SMP index to CPUID map.
 static smp_map_t *smp_unmap;
 
+// Current status per CPU.
+static smp_status_t *cpu_status;
+// Whether the SBI supports HSM.
+static bool          sbi_supports_hsm;
+
+
+static REQ struct limine_smp_request smp_req = {
+    .id       = LIMINE_SMP_REQUEST,
+    .revision = 2,
+    .flags    = 0,
+};
 
 
 // Initialise the SMP subsystem.
-void smp_init(dtb_handle_t *dtb) {
-    int cpu_index = 0;
-
-    sbi_ret_t res = sbi_probe_extension(SBI_HART_MGMT_EID);
-    if (res.status || !res.retval) {
-        // Can't use SBI for SMP; use another mechanism.
+void smp_init_dtb(dtb_handle_t *dtb) {
+    sbi_ret_t res    = sbi_probe_extension(SBI_HART_MGMT_EID);
+    sbi_supports_hsm = res.retval && !res.status;
+    if (sbi_supports_hsm) {
+        // SBI supports HSM; CPUs can be started and stopped.
+        logk(LOG_DEBUG, "SBI supports HSM");
+    } else {
+        // SBI doesn't support HSM; CPUs can be started but not stopped.
         logk(LOG_DEBUG, "SBI doesn't support HSM");
     }
 
@@ -82,6 +111,7 @@ void smp_init(dtb_handle_t *dtb) {
     uint32_t cpu_acells = dtb_read_uint(dtb, cpus, "#address-cells");
     assert_always(cpu_acells && cpu_acells <= sizeof(size_t) / 4);
     assert_always(dtb_read_uint(dtb, cpus, "#size-cells") == 0);
+    size_t bsp_hartid = smp_req.response->bsp_hartid;
 
     while (cpu) {
         // Detect usable architecture.
@@ -108,11 +138,18 @@ void smp_init(dtb_handle_t *dtb) {
         dtb_prop_t *reg = dtb_get_prop(dtb, cpu, "reg");
         assert_always(reg && reg->content_len == 4 * cpu_acells);
         size_t cpuid = dtb_prop_read_uint(dtb, reg);
-        logkf(LOG_INFO, "Detected CPU #%{d} ID %{size;d}", cpu_index, cpuid);
+        int    detected_cpu;
+        if (cpuid == bsp_hartid) {
+            detected_cpu = 0;
+        } else {
+            detected_cpu = smp_count;
+            smp_count++;
+        }
+        logkf(LOG_INFO, "Detected CPU #%{d} ID %{size;d}", detected_cpu, cpuid);
 
         // Add to the maps.
         smp_map_t new_ent = {
-            .cpu   = cpu_index++,
+            .cpu   = detected_cpu,
             .cpuid = cpuid,
         };
         assert_always(array_len_sorted_insert(&smp_map, sizeof(smp_map_t), &smp_map_len, &new_ent, smp_cpuid_cmp));
@@ -120,16 +157,35 @@ void smp_init(dtb_handle_t *dtb) {
 
         cpu = cpu->next;
     }
+    int cur_cpu = smp_cur_cpu();
+
+    // Allocate status per CPU.
+    cpu_status = calloc(smp_count, sizeof(smp_status_t));
+    assert_always(cpu_status);
+    cpu_status[cur_cpu] = (smp_status_t){
+        .did_jump = true,
+        .is_up    = true,
+    };
+
+    // Transfer booting CPU's CPU-local data to this array.
+    bool ie = irq_disable();
+
+    cpu_status[cur_cpu].cpulocal = *isr_ctx_get()->cpulocal;
+    isr_ctx_get()->cpulocal      = &cpu_status[cur_cpu].cpulocal;
+
+    irq_enable_if(ie);
 }
 
 // The the SMP CPU index of the calling CPU.
 int smp_cur_cpu() {
-    return smp_get_cpu(isr_ctx_get()->cpulocal->cpuid);
+    if (!smp_map_len) {
+        return 0;
+    }
+    return isr_ctx_get()->cpulocal->cpu;
 }
 
 // Get the SMP CPU index from the CPU ID value.
 int smp_get_cpu(size_t cpuid) {
-    return 0;
     smp_map_t         dummy = {.cpuid = cpuid};
     array_binsearch_t res   = array_binsearch(smp_map, sizeof(smp_map_t), smp_map_len, &dummy, smp_cpuid_cmp);
     if (res.found) {
@@ -148,9 +204,58 @@ size_t smp_get_cpuid(int cpu) {
     return -1;
 }
 
+
+
+// First stage entrypoint for secondary CPUs.
+static NAKED void cpu1_init0_limine(__attribute__((used)) struct limine_smp_info *info) {
+    // clang-format off
+    asm(
+        ".option push;"
+        ".option norelax;"
+        "la gp, __global_pointer$;"
+        ".option pop;"
+        "j cpu1_init1_limine;"
+    );
+    // clang-format on
+}
+
+// Second stage entrypoint for secondary CPUs.
+static void cpu1_init1_limine(struct limine_smp_info *info) {
+    int       cur_cpu       = (int)info->extra_argument;
+    isr_ctx_t tmp_ctx       = {0};
+    tmp_ctx.flags           = ISR_CTX_FLAG_KERNEL;
+    tmp_ctx.cpulocal        = &cpu_status[cur_cpu].cpulocal;
+    tmp_ctx.cpulocal->cpuid = info->hartid;
+    tmp_ctx.cpulocal->cpu   = cur_cpu;
+    asm("csrw sscratch, %0" ::"r"(&tmp_ctx));
+    cpu_status[cur_cpu].entrypoint();
+    __builtin_trap();
+}
+
 // Power on another CPU.
 bool smp_poweron(int cpu, void *entrypoint, void *stack) {
-    return false;
+    assert_dev_drop(cpu <= smp_count);
+    if (cpu_status[cpu].is_up) {
+        return false;
+    }
+
+    cpu_status[cpu].entrypoint = entrypoint;
+    cpu_status[cpu].tmp_stack  = stack;
+
+    // Start the CPU up.
+    if (!cpu_status[cpu].did_jump) {
+        for (uint64_t i = 0; i < smp_req.response->cpu_count; i++) {
+            if (smp_req.response->cpus[i]->hartid == smp_map[cpu].cpuid) {
+                smp_req.response->cpus[i]->extra_argument = cpu;
+                atomic_store(&smp_req.response->cpus[i]->goto_address, &cpu1_init0_limine);
+                cpu_status[cpu].did_jump = true;
+                return true;
+            }
+        }
+        return false;
+    } else {
+        return false;
+    }
 }
 
 // Power off this CPU.

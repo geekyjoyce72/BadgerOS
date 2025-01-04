@@ -18,9 +18,11 @@
 
 
 // The minimum time a thread will run. `SCHED_PRIO_LOW` maps to this.
-#define SCHED_MIN_US 5000
+#define SCHED_MIN_US        5000
 // The time quota increment per increased priority.
-#define SCHED_INC_US 500
+#define SCHED_INC_US        500
+// The microsecond interval on which schedulers measure CPU load.
+#define SCHED_LOAD_INTERVAL 250000
 
 
 
@@ -40,8 +42,12 @@
 #define THREAD_STARTNOW   (1 << 6)
 // The thread should be suspended.
 #define THREAD_SUSPENDING (1 << 7)
+// The thread should be suspended even if it is a kernel thread.
+#define THREAD_KSUSPEND   (1 << 8)
 // The thread has exited and is awaiting join.
-#define THREAD_EXITED     (1 << 8)
+#define THREAD_EXITED     (1 << 9)
+// The thread is blocked on a resource.
+#define THREAD_BLOCKED    (1 << 10)
 
 // The scheduler is starting on this CPU.
 #define SCHED_STARTING (1 << 0)
@@ -50,24 +56,44 @@
 // The scheduler is pending exit on this CPU.
 #define SCHED_EXITING  (1 << 2)
 
+// Things a thread can be blocked on.
+typedef enum {
+    // Thread is blocked on a `mutex_t`.
+    THREAD_BLOCK_MUTEX,
+} thread_block_t;
+
 // Thread struct.
 struct sched_thread_t {
     // Thread queue link.
     dlist_node_t node;
 
     // Process to which this thread belongs.
-    process_t *process;
+    process_t  *process;
     // Lowest address of the kernel stack.
-    size_t     kernel_stack_bottom;
+    size_t      kernel_stack_bottom;
     // Highest address of the kernel stack.
-    size_t     kernel_stack_top;
+    size_t      kernel_stack_top;
     // Priority of this thread.
-    int        priority;
+    int         priority;
+    // Time usage information.
+    timeusage_t timeusage;
 
     // Thread flags.
-    atomic_int flags;
+    atomic_int     flags;
     // Exit code from `thread_exit`
-    int        exit_code;
+    int            exit_code;
+    // Cause for the thread to block. Only valid if THREAD_BLOCKED flag is set.
+    thread_block_t blocked_by;
+    // Information for the object the thread is blocking on.
+    union {
+        // Info for threads blocked on a mutex.
+        struct {
+            // Pointer to blocking mutex.
+            mutex_t *mutex;
+            // Timer ID used by mutex timeout code.
+            int64_t  timer_id;
+        } mutex;
+    } blocking_obj;
 
     // ISR context for threads running in kernel mode.
     isr_ctx_t kernel_isr_ctx;
@@ -92,11 +118,14 @@ struct sched_cpulocal_t {
     dlist_t        queue;
     // CPU-local scheduler state flags.
     atomic_int     flags;
+    // Last preemption time.
+    timestamp_us_t last_preempt;
+    // Time until next measurement interval.
+    timestamp_us_t load_measure_time;
+    // CPU load average in 0.01% increments.
+    atomic_int     load_average;
     // CPU load estimate in 0.01% increments.
-    atomic_int     load;
+    atomic_int     load_estimate;
     // Idle thread.
     sched_thread_t idle_thread;
 };
-
-// Returns the current thread without using a critical section.
-sched_thread_t *sched_current_thread_unsafe();

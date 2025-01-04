@@ -4,6 +4,7 @@
 #pragma once
 
 #include "cpu/regs.h"
+#include "cpu/riscv.h"
 
 #include <stdbool.h>
 

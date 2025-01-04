@@ -28,10 +28,11 @@ set(common_compiler_flags
     -mabi=${target_abi}                # Selects target ABI
     -nodefaultlibs                     # Do not link any default libraries like libgcc or libc.
     -O0                                # Optimize the code.
-    -ggdb                              # Generate debug information in default extended format.
+    -ggdb -gdwarf-2                    # Generate debug information in default extended format.
     -Werror=return-type                # Error when a function doesn't return a value, but declares to do so.
     -Werror=implicit-fallthrough
     -Werror=int-conversion
+    -Werror=incompatible-pointer-types
     -Wall -Wextra                      # Ramp up warning level.
     -Wno-missing-braces
     -std=gnu11                         # We use the C11 standard
@@ -68,6 +69,7 @@ add_executable(${target}
     ${CMAKE_CURRENT_LIST_DIR}/src/badgelib/mutex.c
     ${CMAKE_CURRENT_LIST_DIR}/src/badgelib/num_to_str.c
     ${CMAKE_CURRENT_LIST_DIR}/src/badgelib/rawprint.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/badgelib/spinlock.c
     
     ${CMAKE_CURRENT_LIST_DIR}/src/blockdevice/blkdev_ram.c
     ${CMAKE_CURRENT_LIST_DIR}/src/blockdevice/blockdevice.c
@@ -93,19 +95,20 @@ add_executable(${target}
     ${CMAKE_CURRENT_LIST_DIR}/src/process/syscall_util.c
     
     ${CMAKE_CURRENT_LIST_DIR}/src/scheduler/scheduler.c
-    ${CMAKE_CURRENT_LIST_DIR}/src/scheduler/syscall_impl.c
     
     ${CMAKE_CURRENT_LIST_DIR}/src/housekeeping.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/interrupt.c
     ${CMAKE_CURRENT_LIST_DIR}/src/main.c
     ${CMAKE_CURRENT_LIST_DIR}/src/page_alloc.c
     ${CMAKE_CURRENT_LIST_DIR}/src/syscall.c
+    ${CMAKE_CURRENT_LIST_DIR}/src/time.c
     
     ${cpu_src}
     ${port_src}
 )
 include_directories(
     ${CMAKE_CURRENT_LIST_DIR}/include
-    ${CMAKE_CURRENT_LIST_DIR}/src/malloc
+    # ${CMAKE_CURRENT_LIST_DIR}/src/malloc
     ${CMAKE_CURRENT_LIST_DIR}/include/badgelib
     ${CMAKE_CURRENT_LIST_DIR}/../common/include
     ${CMAKE_CURRENT_LIST_DIR}/../common/badgelib

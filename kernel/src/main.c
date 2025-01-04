@@ -44,20 +44,63 @@ static void kernel_init();
 static void userland_init();
 static void userland_shutdown();
 static void kernel_shutdown();
+static void kernel_lifetime_func();
+
+
+
+// After control handover, the booting CPU core starts here and other cores wait.
+// This sets up the basics of everything needed by the other systems of the kernel.
+// When finished, the booting CPU will perform kernel initialization.
+void basic_runtime_init() {
+    badge_err_t ec = {0};
+
+    // ISR initialization.
+    irq_init();
+    // Early memory protection initialization.
+    memprotect_early_init();
+    // Early platform initialization.
+    port_early_init();
+
+    // Announce that we're alive.
+    logk_from_isr(LOG_INFO, "BadgerOS " CONFIG_TARGET " starting...");
+
+    // Kernel memory allocator initialization.
+    kernel_heap_init();
+
+    // Post-heap memory protection initialization.
+    memprotect_postheap_init();
+    // Post-heap platform initialization.
+    port_postheap_init();
+
+    // Global scheduler initialization.
+    sched_init();
+
+    // Housekeeping thread initialization.
+    hk_init();
+    // Add the remainder of the kernel lifetime as a new thread.
+    tid_t thread = thread_new_kernel(&ec, "main", (void *)kernel_lifetime_func, NULL, SCHED_PRIO_NORMAL);
+    badge_err_assert_always(&ec);
+    thread_resume(&ec, thread);
+    badge_err_assert_always(&ec);
+
+    // Start the scheduler and enter the next phase in the kernel's lifetime.
+    sched_exec();
+}
+
 
 // Manages the kernel's lifetime after basic runtime initialization.
 static void kernel_lifetime_func() {
     // Start the kernel services.
     kernel_init();
     // Start other CPUs.
-    // sched_start_altcpus();
+    sched_start_altcpus();
     // Start userland.
     userland_init();
 
     // The boot process is now complete, this thread will wait until a shutdown is issued.
     int shutdown_mode;
     do {
-        sched_yield();
+        thread_yield();
         shutdown_mode = atomic_load(&kernel_shutdown_mode);
     } while (shutdown_mode == 0);
 
@@ -83,50 +126,12 @@ void syscall_sys_shutdown(bool is_reboot) {
 
 
 
-// After control handover, the booting CPU core starts here and other cores wait.
-// This sets up the basics of everything needed by the other systems of the kernel.
-// When finished, the booting CPU will perform kernel initialization.
-void basic_runtime_init() {
-    badge_err_t ec = {0};
-
-    // ISR initialization.
-    irq_init();
-    // Early platform initialization.
-    port_early_init();
-
-    // Timekeeping initialization.
-    time_init();
-
-    // Announce that we're alive.
-    logk(LOG_INFO, "BadgerOS " CONFIG_TARGET " starting...");
-
-    // Early memory protection initialization.
-    memprotect_early_init();
-    // Kernel memory allocator initialization.
-    kernel_heap_init();
-
-    // Global scheduler initialization.
-    sched_init();
-
-    // Housekeeping thread initialization.
-    hk_init();
-    // Add the remainder of the kernel lifetime as a new thread.
-    tid_t thread = thread_new_kernel(&ec, "main", (void *)kernel_lifetime_func, NULL, SCHED_PRIO_NORMAL);
-    badge_err_assert_always(&ec);
-    thread_resume(&ec, thread);
-    badge_err_assert_always(&ec);
-
-    // Start the scheduler and enter the next phase in the kernel's lifetime.
-    sched_exec();
-}
-
-
-
 // After basic runtime initialization, the booting CPU core continues here.
 // This finishes the initialization of all kernel systems, resources and services.
 // When finished, the non-booting CPUs will be started (method and entrypoints to be determined).
 static void kernel_init() {
     badge_err_t ec = {0};
+
     // Memory protection initialization.
     memprotect_init();
     // Full hardware initialization.
@@ -168,7 +173,7 @@ static void userland_shutdown() {
         proc_signal_all(SIGHUP);
         // Wait for one second to give them time.
         timestamp_us_t lim = time_us() + 1000000;
-        while (time_us() < lim && proc_has_noninit()) sched_yield();
+        while (time_us() < lim && proc_has_noninit()) thread_yield();
 
         if (proc_has_noninit()) {
             // Forcibly terminate all processes.
@@ -184,9 +189,10 @@ static void userland_shutdown() {
     timestamp_us_t lim = time_us() + 5 * 1000000;
     while (time_us() < lim) {
         if (!(proc_getflags(NULL, 1) & PROC_RUNNING)) {
+            // When the init process stops, userland has successfully been shut down.
             return;
         }
-        sched_yield();
+        thread_yield();
     }
 
     // If init didn't stop by this point we're probably out of luck.

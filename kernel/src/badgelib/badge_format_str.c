@@ -116,7 +116,9 @@ static bool format_str_parse_type(char const *substr, size_t length, format_str_
         *type_out      = FMT_TYPE_SIZE;
         *is_signed_out = false;
         return true;
-    } else if (length == 7 && lower(substr[0]) == 'p' && lower(substr[1]) == 't' && lower(substr[2]) == 'r' && lower(substr[3]) == 'd' && lower(substr[4]) == 'i' && lower(substr[5]) == 'f' && lower(substr[6]) == 'f') {
+    } else if (length == 7 && lower(substr[0]) == 'p' && lower(substr[1]) == 't' && lower(substr[2]) == 'r' &&
+               lower(substr[3]) == 'd' && lower(substr[4]) == 'i' && lower(substr[5]) == 'f' &&
+               lower(substr[6]) == 'f') {
         // size
         *type_out      = FMT_TYPE_SIZE;
         *is_signed_out = true;
@@ -140,7 +142,8 @@ static bool format_str_parse_type(char const *substr, size_t length, format_str_
         *is_signed_out = is_signed;
         return true;
 
-    } else if (length == 4 && lower(substr[0]) == 'l' && lower(substr[1]) == 'o' && lower(substr[2]) == 'n' && lower(substr[3]) == 'g') {
+    } else if (length == 4 && lower(substr[0]) == 'l' && lower(substr[1]) == 'o' && lower(substr[2]) == 'n' &&
+               lower(substr[3]) == 'g') {
         // long int
         *type_out      = FMT_TYPE_LONG;
         *is_signed_out = is_signed;
@@ -152,13 +155,15 @@ static bool format_str_parse_type(char const *substr, size_t length, format_str_
         *is_signed_out = is_signed;
         return true;
 
-    } else if (length == 5 && lower(substr[0]) == 's' && lower(substr[1]) == 'h' && lower(substr[2]) == 'o' && lower(substr[3]) == 'r' && lower(substr[4]) == 't') {
+    } else if (length == 5 && lower(substr[0]) == 's' && lower(substr[1]) == 'h' && lower(substr[2]) == 'o' &&
+               lower(substr[3]) == 'r' && lower(substr[4]) == 't') {
         // long int
         *type_out      = FMT_TYPE_SHORT;
         *is_signed_out = is_signed;
         return true;
 
-    } else if (length == 4 && lower(substr[0]) == 'c' && lower(substr[1]) == 'h' && lower(substr[2]) == 'a' && lower(substr[3]) == 'r') {
+    } else if (length == 4 && lower(substr[0]) == 'c' && lower(substr[1]) == 'h' && lower(substr[2]) == 'a' &&
+               lower(substr[3]) == 'r') {
         // char
         *type_out      = FMT_TYPE_CHAR;
         *is_signed_out = is_signed;
@@ -176,7 +181,8 @@ static bool format_str_parse_mult(char const *substr, size_t length, format_str_
         *mult_out = FMT_MULT_ARR;
         return true;
 
-    } else if ((length == 4 && cstr_prefix_equals_case(substr, "null", 4)) || (length == 3 && cstr_prefix_equals_case(substr, "nul", 3))) {
+    } else if ((length == 4 && cstr_prefix_equals_case(substr, "null", 4)) ||
+               (length == 3 && cstr_prefix_equals_case(substr, "nul", 3))) {
         // Null-terminated array.
         *mult_out = FMT_MULT_NUL;
         return true;

@@ -4,6 +4,7 @@
 #pragma once
 
 #include "cpu/regs.h"
+#include "cpu/riscv.h"
 
 #ifndef __ASSEMBLER__
 #include "cpulocal.h"
@@ -51,43 +52,40 @@ typedef bool (*isr_noexc_cb_t)(isr_ctx_t *ctx, void *cookie);
 
 // Context for interrupts, exceptions and traps in relation to threads.
 STRUCT_BEGIN(isr_ctx_t)
-// Scratch words for use by the ASM code.
-STRUCT_FIELD_WORD(isr_ctx_t, scratch0, 0)
-STRUCT_FIELD_WORD(isr_ctx_t, scratch1, 1)
-STRUCT_FIELD_WORD(isr_ctx_t, scratch2, 2)
-STRUCT_FIELD_WORD(isr_ctx_t, scratch3, 3)
-STRUCT_FIELD_WORD(isr_ctx_t, scratch4, 4)
-STRUCT_FIELD_WORD(isr_ctx_t, scratch5, 5)
 // Pointer to currently active memory protection information.
-STRUCT_FIELD_PTR(isr_ctx_t, mpu_ctx_t, mpu_ctx, 6)
+STRUCT_FIELD_PTR(isr_ctx_t, mpu_ctx_t, mpu_ctx, 0)
 // Frame pointer to use for backtraces.
-STRUCT_FIELD_PTR(isr_ctx_t, void, frameptr, 7)
+STRUCT_FIELD_PTR(isr_ctx_t, void, frameptr, 1)
 // Registers storage.
 // The trap/interrupt handler will save registers to here.
 // *Note: The syscall handler only saves/restores t0-t3, sp, gp, tp and ra, any other registers are not visible to the
 // kernel.*
-STRUCT_FIELD_STRUCT(isr_ctx_t, cpu_regs_t, regs, 8)
+STRUCT_FIELD_STRUCT(isr_ctx_t, cpu_regs_t, regs, 2)
 // Pointer to next isr_ctx_t to switch to.
 // If nonnull, the trap/interrupt handler will context switch to this new context before exiting.
-STRUCT_FIELD_PTR(isr_ctx_t, isr_ctx_t, ctxswitch, 40)
+STRUCT_FIELD_PTR(isr_ctx_t, isr_ctx_t, ctxswitch, 34)
 // Pointer to owning sched_thread_t.
-STRUCT_FIELD_PTR(isr_ctx_t, sched_thread_t, thread, 41)
+STRUCT_FIELD_PTR(isr_ctx_t, sched_thread_t, thread, 35)
 // Kernel context flags, only 32 bits available even on 64-bit targets.
-STRUCT_FIELD_WORD(isr_ctx_t, flags, 42)
+STRUCT_FIELD_WORD(isr_ctx_t, flags, 36)
 // Custom trap handler to call.
-STRUCT_FIELD_STRUCT(isr_ctx_t, isr_noexc_cb_t, noexc_cb, 43)
+STRUCT_FIELD_STRUCT(isr_ctx_t, isr_noexc_cb_t, noexc_cb, 37)
 // Cookie for custom trap handler.
-STRUCT_FIELD_PTR(isr_ctx_t, void, noexc_cookie, 44)
+STRUCT_FIELD_PTR(isr_ctx_t, void, noexc_cookie, 38)
 // Pointer to CPU-local struct.
-STRUCT_FIELD_PTR(isr_ctx_t, cpulocal_t, cpulocal, 45)
+STRUCT_FIELD_PTR(isr_ctx_t, cpulocal_t, cpulocal, 39)
+// Pointer to stack to use for user exceptions.
+STRUCT_FIELD_WORD(isr_ctx_t, user_isr_stack, 40)
 STRUCT_END(isr_ctx_t)
 
 // `isr_ctx_t` flag: Is a kernel thread.
-#define ISR_CTX_FLAG_KERNEL    0x00000001
-// `isr_ctx_t` flag: For not set `sp` to the ISR stack.
-#define ISR_CTX_FLAG_USE_SP    0x00000002
+#define ISR_CTX_FLAG_KERNEL    (1 << 0)
 // `isr_ctx_t` flag: Currently running custom trap-handling code.
-#define ISR_CTX_FLAG_NOEXC     0x00000004
+#define ISR_CTX_FLAG_NOEXC     (1 << 1)
+// `isr_ctx_t` flag: Currently in a trap or interrupt handler.
+#define ISR_CTX_FLAG_IN_ISR    (1 << 2)
+// `isr_ctx_t` flag: Currently in a double fault handler (which is fatal).
+#define ISR_CTX_FLAG_2FAULT    (1 << 3)
 // `isr_ctx_t` flag: SUM was set.
 #define ISR_CTX_FLAG_RISCV_SUM (1 << RISCV_STATUS_SUM_BIT)
 // `isr_ctx_t` flag: MXR was set.

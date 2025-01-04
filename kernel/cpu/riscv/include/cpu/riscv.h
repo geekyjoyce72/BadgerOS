@@ -3,6 +3,20 @@
 
 #pragma once
 
+// Undef x86 macros because intellisense doesn't recognise RISC-V.
+#ifndef __riscv_xlen
+#ifdef __x86_64__
+#define __riscv_xlen 64
+#else
+#define __riscv_xlen 32
+#endif
+#endif
+#undef __x86_64__
+#undef __i386__
+#ifndef __riscv
+#define __riscv
+#endif
+
 
 
 /* ==== RISC-V MSTATUS DEFINITION ==== */
@@ -24,6 +38,16 @@
 #define RISCV_STATUS_TW_BIT       21
 #define RISCV_STATUS_TSR_BIT      22
 #define RISCV_STATUS_SR_BIT       31
+
+
+
+/* ==== RISC-V INTERRUPT LIST ==== */
+#define RISCV_INT_SUPERVISOR_SOFT  1
+#define RISCV_INT_MACHINE_SOFT     3
+#define RISCV_INT_SUPERVISOR_TIMER 5
+#define RISCV_INT_MACHINE_TIMER    7
+#define RISCV_INT_SUPERVISOR_EXT   9
+#define RISCV_INT_MACHINE_EXT      11
 
 
 

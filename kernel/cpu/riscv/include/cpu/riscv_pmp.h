@@ -6,6 +6,8 @@
 // This file expects RISCV_PMP_REGION_COUNT to be defined by "port/hardware.h".
 
 #include "assertions.h"
+#include "attributes.h"
+#include "cpu/riscv.h"
 #include "meta.h"
 #include "port/hardware.h"
 #include "port/hardware_allocation.h"

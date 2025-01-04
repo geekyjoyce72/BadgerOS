@@ -3,11 +3,14 @@
 
 #include "blockdevice.h"
 
+#include "assertions.h"
 #include "badge_strings.h"
+#include "blockdevice/blkdev_impl.h"
 #include "blockdevice/blkdev_internal.h"
-#include "blockdevice/blkdev_ram.h"
 #include "log.h"
 #include "malloc.h"
+
+// TODO: Integrate mutexes to prevent race conditions.
 
 
 
@@ -55,9 +58,13 @@ static inline ptrdiff_t blkdev_alloc_cache(blkdev_t *dev, blksize_t block) {
     ptrdiff_t      oldest_read_index = -1;
 
     for (ptrdiff_t i = 0; i < (ptrdiff_t)dev->cache->cache_depth; i++) {
-        if (!flags[i].present || flags[i].index == block) {
-            // Vacant cache entry found.
+        if (flags[i].present && flags[i].index == block) {
+            // Cache entry for this block found.
             return i;
+        } else if (!flags[i].present) {
+            // Vacant cache entry found.
+            oldest_read_time  = 0;
+            oldest_read_index = i;
         } else if (!blkdev_is_dirty(flags[i]) && oldest_read_time > flags[i].update_time) {
             // Sufficiently old read cache entry found.
             oldest_read_time  = flags[i].update_time;
@@ -93,33 +100,6 @@ static inline ptrdiff_t blkdev_find_cache(blkdev_t *dev, blksize_t block) {
 
 
 
-// Write without caching.
-void blkdev_write_raw(badge_err_t *ec, blkdev_t *dev, blksize_t block, uint8_t const *writebuf) {
-    switch (dev->type) {
-        case BLKDEV_TYPE_RAM: return blkdev_ram_write(ec, dev, block, writebuf);
-        // case BLKDEV_TYPE_I2C_EEPROM: return blkdev_i2c_eeprom_write(ec, dev, block, writebuf);
-        default: badge_err_set(ec, ELOC_BLKDEV, ECAUSE_PARAM); break;
-    }
-}
-
-// Read without caching.
-void blkdev_read_raw(badge_err_t *ec, blkdev_t *dev, blksize_t block, uint8_t *readbuf) {
-    switch (dev->type) {
-        case BLKDEV_TYPE_RAM: return blkdev_ram_read(ec, dev, block, readbuf);
-        // case BLKDEV_TYPE_I2C_EEPROM: return blkdev_i2c_eeprom_read(ec, dev, block, readbuf);
-        default: badge_err_set(ec, ELOC_BLKDEV, ECAUSE_PARAM); break;
-    }
-}
-
-// Erase without caching.
-void blkdev_erase_raw(badge_err_t *ec, blkdev_t *dev, blksize_t block) {
-    switch (dev->type) {
-        case BLKDEV_TYPE_RAM: return blkdev_ram_erase(ec, dev, block);
-        // case BLKDEV_TYPE_I2C_EEPROM: return blkdev_i2c_eeprom_erase(ec, dev, block);
-        default: badge_err_set(ec, ELOC_BLKDEV, ECAUSE_PARAM); break;
-    }
-}
-
 // Read a block into a single-use read cache and copy out part of it.
 // Made for block devices that don't support partial read.
 void blkdev_write_partial_fallback(
@@ -130,45 +110,27 @@ void blkdev_write_partial_fallback(
     uint8_t const *writebuf,
     size_t         writebuf_len
 ) {
-    uint8_t        *cache = dev->cache->block_cache;
-    blkdev_flags_t *flags = dev->cache->block_flags;
-
-    // Try to look up the block in the cache.
-    ptrdiff_t i = blkdev_find_cache(dev, block);
-    if (i >= 0) {
-        // Update the entry in the cache.
-        flags[i].erase = false;
-        flags[i].dirty = false;
-        if (!flags[i].present) {
-            flags[i].present     = true;
-            flags[i].update_time = time_us();
-            flags[i].index       = block;
-        }
-        // Copy data into the cache entry.
-        mem_copy(cache + i * dev->block_size + subblock_offset, writebuf, writebuf_len);
-        badge_err_set_ok(ec);
-
-    } else {
-        // Cache was not available, allocate some on the heap.
-        uint8_t *tmp = malloc(dev->block_size);
-        if (!tmp) {
-            badge_err_set(ec, ELOC_BLKDEV, ECAUSE_NOMEM);
-            return;
-        }
-        // Read into the temporary buffer.
-        badge_err_t ec0;
-        if (!ec)
-            ec = &ec0;
-        blkdev_read_raw(ec, dev, block, tmp);
-        if (!badge_err_is_ok(ec)) {
-            free(tmp);
-            return;
-        }
-        // Modify and write back.
-        mem_copy(tmp + subblock_offset, writebuf, writebuf_len);
-        blkdev_write_raw(ec, dev, block, tmp);
-        free(tmp);
+    // Allocate temporary space to write to the device.
+    uint8_t *tmp = malloc(dev->block_size);
+    if (!tmp) {
+        badge_err_set(ec, ELOC_BLKDEV, ECAUSE_NOMEM);
+        return;
     }
+
+    // Read into the temporary buffer.
+    badge_err_t ec0;
+    if (!ec)
+        ec = &ec0;
+    blkdev_read_raw(ec, dev, block, tmp);
+    if (!badge_err_is_ok(ec)) {
+        free(tmp);
+        return;
+    }
+
+    // Modify and write back.
+    mem_copy(tmp + subblock_offset, writebuf, writebuf_len);
+    blkdev_write_raw(ec, dev, block, tmp);
+    free(tmp);
 }
 
 // Perform a read-modify-write operation for partial write.
@@ -176,58 +138,24 @@ void blkdev_write_partial_fallback(
 void blkdev_read_partial_fallback(
     badge_err_t *ec, blkdev_t *dev, blksize_t block, size_t subblock_offset, uint8_t *readbuf, size_t readbuf_len
 ) {
-    uint8_t        *cache = dev->cache->block_cache;
-    blkdev_flags_t *flags = dev->cache->block_flags;
-
-    // Try to look up the block in the cache.
-    ptrdiff_t i = blkdev_alloc_cache(dev, block);
-    if (i >= 0 && flags[i].present) {
-        // Existing cache found, copy it out.
-        mem_copy(readbuf, cache + i * dev->block_size + subblock_offset, readbuf_len);
-        // If it is a read cache, reset the timeout.
-        if (!blkdev_is_dirty(flags[i])) {
-            flags[i].update_time = time_us();
-        }
-        badge_err_set_ok(ec);
-
-    } else if (i >= 0) {
-        // Empty cache entry found.
-        badge_err_t ec0;
-        if (!ec)
-            ec = &ec0;
-        // Create read cache regardless of read cache enable.
-        blkdev_read_raw(ec, dev, block, cache + i * dev->block_offset);
-        flags[i] = (blkdev_flags_t){
-            .update_time = time_us(),
-            .index       = block,
-            .present     = true,
-            .erase       = false,
-            .dirty       = false,
-        };
-
-        // Partial copy.
-        mem_copy(readbuf, cache + i * dev->block_offset + subblock_offset, readbuf_len);
-
-    } else {
-        // Cache was not available, allocate some on the heap.
-        uint8_t *tmp = malloc(dev->block_size);
-        if (!tmp) {
-            badge_err_set(ec, ELOC_BLKDEV, ECAUSE_NOMEM);
-            return;
-        }
-        // Read into the temporary buffer.
-        badge_err_t ec0;
-        if (!ec)
-            ec = &ec0;
-        blkdev_read_raw(ec, dev, block, tmp);
-        if (!badge_err_is_ok(ec)) {
-            free(tmp);
-            return;
-        }
-        // Partial copy.
-        mem_copy(readbuf, tmp + subblock_offset, readbuf_len);
-        free(tmp);
+    // Allocate temporary space to read from the device.
+    uint8_t *tmp = malloc(dev->block_size);
+    if (!tmp) {
+        badge_err_set(ec, ELOC_BLKDEV, ECAUSE_NOMEM);
+        return;
     }
+    // Read into the temporary buffer.
+    badge_err_t ec0;
+    if (!ec)
+        ec = &ec0;
+    blkdev_read_raw(ec, dev, block, tmp);
+    if (!badge_err_is_ok(ec)) {
+        free(tmp);
+        return;
+    }
+    // Partial copy.
+    mem_copy(readbuf, tmp + subblock_offset, readbuf_len);
+    free(tmp);
 }
 
 
@@ -239,11 +167,16 @@ void blkdev_open(badge_err_t *ec, blkdev_t *dev) {
         badge_err_set(ec, ELOC_BLKDEV, ECAUSE_PARAM);
         return;
     }
-    switch (dev->type) {
-        case BLKDEV_TYPE_RAM: return blkdev_ram_open(ec, dev);
-        // case BLKDEV_TYPE_I2C_EEPROM: return blkdev_i2c_eeprom_open(ec, dev);
-        default: badge_err_set(ec, ELOC_BLKDEV, ECAUSE_PARAM); break;
-    }
+    assert_dev_drop(dev->vtable);
+    assert_dev_drop(dev->vtable->open);
+    assert_dev_drop(dev->vtable->close);
+    assert_dev_drop(dev->vtable->is_erased);
+    assert_dev_drop(dev->vtable->erase);
+    assert_dev_drop(dev->vtable->write);
+    assert_dev_drop(dev->vtable->read);
+    assert_dev_drop(dev->vtable->write_partial);
+    assert_dev_drop(dev->vtable->read_partial);
+    dev->vtable->open(ec, dev);
 }
 
 // Flush write caches and close block device.
@@ -252,14 +185,22 @@ void blkdev_close(badge_err_t *ec, blkdev_t *dev) {
         badge_err_set(ec, ELOC_BLKDEV, ECAUSE_PARAM);
         return;
     }
-    blkdev_flush(ec, dev);
-    if (!badge_err_is_ok(ec))
-        return;
-    switch (dev->type) {
-        case BLKDEV_TYPE_RAM: return blkdev_ram_close(ec, dev);
-        // case BLKDEV_TYPE_I2C_EEPROM: return blkdev_i2c_eeprom_close(ec, dev);
-        default: badge_err_set(ec, ELOC_BLKDEV, ECAUSE_PARAM); break;
-    }
+    dev->vtable->close(ec, dev);
+}
+
+// Get a block device's size in blocks.
+blksize_t blkdev_get_size(blkdev_t *dev) {
+    return dev->blocks;
+}
+
+// Get a block device's block size.
+blksize_t blkdev_get_block_size(blkdev_t *dev) {
+    return dev->block_size;
+}
+
+// Is this block device read-only?
+bool blkdev_is_readonly(blkdev_t *dev) {
+    return dev->readonly;
 }
 
 
@@ -277,17 +218,20 @@ bool blkdev_is_erased(badge_err_t *ec, blkdev_t *dev, blksize_t block) {
         return true;
     }
 
+    // Do some bounds checking.
+    if (block >= dev->blocks) {
+        badge_err_set(ec, ELOC_BLKDEV, ECAUSE_RANGE);
+        return true;
+    }
+
     // Check cache before querying hardware.
     ptrdiff_t i = blkdev_find_cache(dev, block);
     if (i >= 0) {
+        badge_err_set_ok(ec);
         return dev->cache->block_flags[i].erase;
     }
 
-    switch (dev->type) {
-        case BLKDEV_TYPE_RAM: return blkdev_ram_is_erased(ec, dev, block);
-        // case BLKDEV_TYPE_I2C_EEPROM: return blkdev_i2c_eeprom_is_erased(ec, dev, block);
-        default: badge_err_set(ec, ELOC_BLKDEV, ECAUSE_PARAM); return true;
-    }
+    return dev->vtable->is_erased(ec, dev, block);
 }
 
 // Explicitly erase a block, if possible.
@@ -299,6 +243,12 @@ void blkdev_erase(badge_err_t *ec, blkdev_t *dev, blksize_t block) {
     }
     if (dev->readonly) {
         badge_err_set(ec, ELOC_BLKDEV, ECAUSE_READONLY);
+        return;
+    }
+
+    // Do some bounds checking.
+    if (block >= dev->blocks) {
+        badge_err_set(ec, ELOC_BLKDEV, ECAUSE_RANGE);
         return;
     }
 
@@ -325,7 +275,7 @@ void blkdev_erase(badge_err_t *ec, blkdev_t *dev, blksize_t block) {
 
     } else {
         // Uncached or out of free cache.
-        blkdev_erase_raw(ec, dev, block);
+        dev->vtable->erase(ec, dev, block);
     }
 }
 
@@ -338,6 +288,12 @@ void blkdev_write(badge_err_t *ec, blkdev_t *dev, blksize_t block, uint8_t const
     }
     if (dev->readonly) {
         badge_err_set(ec, ELOC_BLKDEV, ECAUSE_READONLY);
+        return;
+    }
+
+    // Do some bounds checking.
+    if (block >= dev->blocks) {
+        badge_err_set(ec, ELOC_BLKDEV, ECAUSE_RANGE);
         return;
     }
 
@@ -366,7 +322,7 @@ void blkdev_write(badge_err_t *ec, blkdev_t *dev, blksize_t block, uint8_t const
 
     } else {
         // Uncached or out of free cache.
-        blkdev_write_raw(ec, dev, block, writebuf);
+        dev->vtable->write(ec, dev, block, writebuf);
     }
 }
 
@@ -375,6 +331,12 @@ void blkdev_write(badge_err_t *ec, blkdev_t *dev, blksize_t block, uint8_t const
 void blkdev_read(badge_err_t *ec, blkdev_t *dev, blksize_t block, uint8_t *readbuf) {
     if (!dev) {
         badge_err_set(ec, ELOC_BLKDEV, ECAUSE_PARAM);
+        return;
+    }
+
+    // Do some bounds checking.
+    if (block >= dev->blocks) {
+        badge_err_set(ec, ELOC_BLKDEV, ECAUSE_RANGE);
         return;
     }
 
@@ -400,7 +362,7 @@ void blkdev_read(badge_err_t *ec, blkdev_t *dev, blksize_t block, uint8_t *readb
         badge_err_t ec0;
         if (!ec)
             ec = &ec0;
-        blkdev_read_raw(ec, dev, block, cache + i * dev->block_size);
+        dev->vtable->read(ec, dev, block, cache + i * dev->block_size);
 
         flags[i] = (blkdev_flags_t){
             .update_time = time_us(),
@@ -415,7 +377,7 @@ void blkdev_read(badge_err_t *ec, blkdev_t *dev, blksize_t block, uint8_t *readb
         mem_copy(readbuf, cache + i * dev->block_size, dev->block_size);
     } else {
         // Uncached or out of free cache.
-        blkdev_read_raw(ec, dev, block, readbuf);
+        dev->vtable->read(ec, dev, block, readbuf);
     }
 }
 
@@ -438,9 +400,9 @@ void blkdev_write_partial(
         return;
     }
 
-    // Perform some bounds checking.
-    if (writebuf_len == 0) {
-        badge_err_set_ok(ec);
+    // Do some bounds checking.
+    if (block >= dev->blocks) {
+        badge_err_set(ec, ELOC_BLKDEV, ECAUSE_RANGE);
         return;
     }
     if (subblock_offset >= dev->block_size || writebuf_len > dev->block_size ||
@@ -448,12 +410,37 @@ void blkdev_write_partial(
         badge_err_set(ec, ELOC_BLKDEV, ECAUSE_RANGE);
         return;
     }
+    if (writebuf_len == 0) {
+        badge_err_set_ok(ec);
+        return;
+    }
 
-    switch (dev->type) {
-        case BLKDEV_TYPE_RAM: return blkdev_ram_write_partial(ec, dev, block, subblock_offset, writebuf, writebuf_len);
-        // case BLKDEV_TYPE_I2C_EEPROM:
-        //     return blkdev_i2c_eeprom_write_partial(ec, dev, block, subblock_offset, writebuf, writebuf_len);
-        default: badge_err_set(ec, ELOC_BLKDEV, ECAUSE_PARAM); break;
+    uint8_t        *cache = dev->cache->block_cache;
+    blkdev_flags_t *flags = dev->cache->block_flags;
+
+    // Attempt to cache write operation.
+    ptrdiff_t i = blkdev_alloc_cache(dev, block);
+    if (i >= 0) {
+        if (flags[i].present) {
+            // Set flag in existing cache entry.
+            flags[i].erase = false;
+            flags[i].dirty = true;
+        } else {
+            // Set flag in new cache entry.
+            flags[i] = (blkdev_flags_t){
+                .update_time = time_us(),
+                .index       = block,
+                .present     = true,
+                .erase       = false,
+                .dirty       = true,
+            };
+        }
+        mem_copy(cache + i * dev->block_size + subblock_offset, writebuf, writebuf_len);
+        badge_err_set_ok(ec);
+
+    } else {
+        // Uncached or out of free cache.
+        dev->vtable->write_partial(ec, dev, block, subblock_offset, writebuf, writebuf_len);
     }
 }
 
@@ -467,9 +454,9 @@ void blkdev_read_partial(
         return;
     }
 
-    // Perform some bounds checking.
-    if (readbuf_len == 0) {
-        badge_err_set_ok(ec);
+    // Do some bounds checking.
+    if (block >= dev->blocks) {
+        badge_err_set(ec, ELOC_BLKDEV, ECAUSE_RANGE);
         return;
     }
     if (subblock_offset >= dev->block_size || readbuf_len > dev->block_size ||
@@ -477,12 +464,49 @@ void blkdev_read_partial(
         badge_err_set(ec, ELOC_BLKDEV, ECAUSE_RANGE);
         return;
     }
+    if (readbuf_len == 0) {
+        badge_err_set_ok(ec);
+        return;
+    }
 
-    switch (dev->type) {
-        case BLKDEV_TYPE_RAM: return blkdev_ram_read_partial(ec, dev, block, subblock_offset, readbuf, readbuf_len);
-        // case BLKDEV_TYPE_I2C_EEPROM:
-        //     return blkdev_i2c_eeprom_read_partial(ec, dev, block, subblock_offset, readbuf, readbuf_len);
-        default: badge_err_set(ec, ELOC_BLKDEV, ECAUSE_PARAM); break;
+    uint8_t        *cache = dev->cache->block_cache;
+    blkdev_flags_t *flags = dev->cache->block_flags;
+
+    // Look for the entry in the cache.
+    ptrdiff_t i = blkdev_alloc_cache(dev, block);
+    if (i >= 0 && flags[i].present) {
+        // Existing cache entry.
+        if (flags[i].erase) {
+            mem_set(readbuf, 255, dev->block_size);
+        } else {
+            if (!flags[i].dirty) {
+                flags[i].update_time = time_us();
+            }
+            mem_copy(readbuf, cache + i * dev->block_size + subblock_offset, readbuf_len);
+        }
+        badge_err_set_ok(ec);
+
+    } else if (i >= 0 && dev->cache_read) {
+        // Read caching is enabled.
+        badge_err_t ec0;
+        if (!ec)
+            ec = &ec0;
+        dev->vtable->read(ec, dev, block, cache + i * dev->block_size);
+
+        flags[i] = (blkdev_flags_t){
+            .update_time = time_us(),
+            .index       = block,
+            .present     = true,
+            .erase       = false,
+            .dirty       = false,
+        };
+
+        if (!badge_err_is_ok(ec))
+            return;
+        mem_copy(readbuf, cache + i * dev->block_size + subblock_offset, readbuf_len);
+    } else {
+        // Uncached or out of free cache.
+        dev->vtable->read_partial(ec, dev, block, subblock_offset, readbuf, readbuf_len);
     }
 }
 
@@ -517,6 +541,10 @@ void blkdev_flush(badge_err_t *ec, blkdev_t *dev) {
 // Call this function occasionally per block device to do housekeeping.
 // Manages flushing of caches and erasure.
 void blkdev_housekeeping(badge_err_t *ec, blkdev_t *dev) {
+    if (!dev) {
+        badge_err_set(ec, ELOC_BLKDEV, ECAUSE_PARAM);
+        return;
+    }
     timestamp_us_t now     = time_us();
     timestamp_us_t timeout = now - BLKDEV_WRITE_CACHE_TIMEOUT;
 
@@ -536,7 +564,7 @@ void blkdev_housekeeping(badge_err_t *ec, blkdev_t *dev) {
 }
 
 // Allocate a cache for a block device.
-void blkdev_create_cache(badge_err_t *ec, blkdev_t *dev, size_t cache_depth) {
+void blkdev_create_cache(badge_err_t *ec, blkdev_t *dev, size_t cache_depth, bool cache_reads) {
     if (!dev) {
         badge_err_set(ec, ELOC_BLKDEV, ECAUSE_PARAM);
         return;
@@ -562,6 +590,7 @@ void blkdev_create_cache(badge_err_t *ec, blkdev_t *dev, size_t cache_depth) {
         return;
     }
     dev->cache->cache_depth = cache_depth;
+    dev->cache_read         = cache_reads;
 
     // Allocate block cache.
     dev->cache->block_cache = malloc(dev->block_size * cache_depth);
@@ -605,6 +634,43 @@ void blkdev_delete_cache(badge_err_t *ec, blkdev_t *dev) {
         dev->cache = NULL;
     }
     badge_err_set_ok(ec);
+}
+
+
+
+// Create a new block device with a vtable and a cookie.
+blkdev_t *blkdev_impl_create(badge_err_t *ec, blkdev_vtable_t const *vtable, void *cookie) {
+    blkdev_t *handle = calloc(1, sizeof(blkdev_t));
+    if (!handle) {
+        badge_err_set(ec, ELOC_BLKDEV, ECAUSE_NOMEM);
+        return NULL;
+    }
+
+    handle->vtable = vtable;
+    handle->cookie = cookie;
+
+    badge_err_set_ok(ec);
+    return handle;
+}
+
+// Get a block device's cookie.
+void *blkdev_impl_get_cookie(blkdev_t const *blkdev) {
+    return blkdev->cookie;
+}
+
+// Set read-only flag.
+void blkdev_impl_set_readonly(blkdev_t *blkdev, bool readonly) {
+    blkdev->readonly = readonly;
+}
+
+// Set block device size.
+void blkdev_impl_set_size(blkdev_t *blkdev, blksize_t blocks) {
+    blkdev->blocks = blocks;
+}
+
+// Set block size.
+void blkdev_impl_set_block_size(blkdev_t *blkdev, blksize_t block_size) {
+    blkdev->block_size = block_size;
 }
 
 

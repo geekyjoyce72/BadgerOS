@@ -8,7 +8,7 @@
 #include "blockdevice.h"
 
 // Maximum number of mountable filesystems.
-#define FILESYSTEM_MOUNT_MAX   4
+#define FILESYSTEM_MOUNT_MAX   8
 // Maximum supported filename length.
 #define FILESYSTEM_NAME_MAX    255
 // Maximum supported path length.

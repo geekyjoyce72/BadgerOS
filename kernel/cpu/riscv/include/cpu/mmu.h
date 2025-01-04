@@ -3,8 +3,8 @@
 
 #pragma once
 
+#include "cpu/riscv.h"
 #include "memprotect.h"
-#include "riscv.h"
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -28,7 +28,7 @@ typedef enum {
 // Address translation modes.
 typedef enum {
     // Direct-mapped; virtual memory disabled.
-    RISCV_SATP_BARE = 8,
+    RISCV_SATP_BARE = 0,
     // RISC-V page-based 39-bit virtual memory.
     RISCV_SATP_SV39 = 8,
     // RISC-V page-based 48-bit virtual memory.

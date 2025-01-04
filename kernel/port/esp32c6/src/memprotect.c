@@ -82,6 +82,10 @@ void memprotect_early_init() {
 }
 
 // Initialise memory protection driver.
+void memprotect_postheap_init() {
+}
+
+// Initialise memory protection driver.
 void memprotect_init() {
 }
 

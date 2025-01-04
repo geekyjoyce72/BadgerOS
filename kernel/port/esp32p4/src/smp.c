@@ -33,7 +33,7 @@ static void appcpu_stub() {
 static void appcpu_stub_2() __attribute__((unused));
 static void appcpu_stub_2() {
     isr_ctx_t kctx  = {0};
-    kctx.flags     |= ISR_CTX_FLAG_KERNEL | ISR_CTX_FLAG_USE_SP;
+    kctx.flags     |= ISR_CTX_FLAG_KERNEL;
     kctx.cpulocal   = &port_cpu1_local;
     asm("csrw mscratch, %0" ::"r"(&kctx));
     cpu1_entry();
@@ -92,9 +92,6 @@ bool smp_poweroff() {
 
 // Pause this CPU, if supported.
 bool smp_pause() {
-    if (smp_cur_cpu() == 0) {
-        return false;
-    }
     cpu_utility_ll_stall_cpu(smp_cur_cpu());
     return true;
 }
@@ -103,4 +100,9 @@ bool smp_pause() {
 bool smp_resume(int cpu) {
     cpu_utility_ll_unstall_cpu(cpu);
     return true;
+}
+
+// Whether a CPU can be powered off at runtime.
+bool smp_can_poweroff(int cpu) {
+    return cpu == 1;
 }

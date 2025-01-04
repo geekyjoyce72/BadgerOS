@@ -50,7 +50,7 @@ static inline void memmap_info(process_t *const proc, size_t vaddr) {
 
 // Runs the appropriate handler for a signal.
 static void run_sighandler(int signum, uint64_t cause) {
-    sched_thread_t  *thread = sched_current_thread_unsafe();
+    sched_thread_t  *thread = sched_current_thread();
     process_t *const proc   = thread->process;
     // Check for signal handler.
     if (signum == SIGKILL || proc->sighandlers[signum] == SIG_DFL) {
@@ -103,7 +103,7 @@ void proc_signal_handler() {
 // If the thread is already running a signal handler, the process is killed.
 static void trap_signal_handler(int signum, uint64_t cause) NORETURN;
 static void trap_signal_handler(int signum, uint64_t cause) {
-    sched_thread_t  *thread  = sched_current_thread_unsafe();
+    sched_thread_t  *thread  = sched_current_thread();
     process_t *const proc    = thread->process;
     int              current = sched_is_sighandler();
     if (current) {
@@ -130,7 +130,13 @@ static void trap_signal_handler(int signum, uint64_t cause) {
             memmap_info(proc, cause);
         }
         // Print backtrace of the calling thread.
+#if MEMMAP_VMEM
+        mmu_enable_sum();
+#endif
         backtrace_from_ptr((void *)thread->user_isr_ctx.regs.s0);
+#if MEMMAP_VMEM
+        mmu_disable_sum();
+#endif
         isr_ctx_dump(&thread->user_isr_ctx);
         mutex_release(NULL, &log_mtx);
         // Finally, kill the process.

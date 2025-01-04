@@ -28,9 +28,7 @@ extern intmtx_t INTMTX;
 // Temporary interrupt context before scheduler.
 static isr_ctx_t tmp_ctx = {.flags = ISR_CTX_FLAG_KERNEL};
 
-// Interrupt service routine table.
-static isr_t isr_table[ETS_MAX_INTR_SOURCE] = {0};
-
+void generic_interrupt_handler(int irq);
 void timer_isr_timer_alarm();
 
 
@@ -84,18 +82,15 @@ void riscv_interrupt_handler() {
         return;
     }
 
-    // Check pending interrupts.
     for (int i = 0; i < ETS_MAX_INTR_SOURCE / 32; i++) {
         uint32_t pending = INTMTX.status[i];
-        int      lsb_pos = __builtin_clz(pending);
-        int      irq     = i * 32 + lsb_pos;
-        if (irq_ch_is_enabled(irq)) {
-            // Jump to ISR.
-            if (isr_table[mcause]) {
-                isr_table[mcause](irq);
-            } else {
-                logkf_from_isr(LOG_FATAL, "Unhandled interrupt %{d}", mcause);
-                panic_abort();
+        while (pending) {
+            int lsb_pos  = __builtin_ctz(pending);
+            pending     ^= 1 << lsb_pos;
+            int irq      = i * 32 + lsb_pos;
+            if (irq && irq_ch_is_enabled(irq)) {
+                // Jump to ISR.
+                generic_interrupt_handler(irq);
             }
         }
     }
@@ -104,7 +99,8 @@ void riscv_interrupt_handler() {
 
 
 // Set the external interrupt signal for CPU0 timer IRQs.
-void set_cpu0_timer_irq(int timer_irq) {
+void set_cpu_timer_irq(int cpu, int timer_irq) {
+    (void)cpu;
     INTMTX.route[timer_irq] = TIMER_IRQ_CH;
 }
 
@@ -123,11 +119,5 @@ void irq_ch_disable(int irq) {
 // Query whether the IRQ is enabled.
 bool irq_ch_is_enabled(int irq) {
     assert_dev_drop(irq > 0 && irq < ETS_MAX_INTR_SOURCE);
-    return INTMTX.route[irq] != 0;
-}
-
-// Set the interrupt service routine for an interrupt on this CPU.
-void irq_ch_set_isr(int irq, isr_t isr) {
-    assert_dev_drop(irq > 0 && irq < ETS_MAX_INTR_SOURCE);
-    isr_table[irq] = isr;
+    return INTMTX.route[irq] == EXT_IRQ_CH;
 }
